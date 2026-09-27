@@ -408,6 +408,73 @@ Capture en mode microscope :
 
 Badges dédiés : `micro_count` (1, 5, tout le Micro-Dex) et des badges d'espèce emblématique (« Chasseur d'oursons d'eau » pour un tardigrade).
 
+### 2.7 Rareté et variantes « shiny »
+
+**Rareté** : chaque capture reçoit un niveau (Commun, Rare, Épique, Légendaire), le plus élevé de deux indices.
+- *Indice local* : part de l'espèce dans les observations GBIF de la maille de 50 km où la photo est prise, sur les 5 dernières années. Plus de 1 % des observations : commun ; 0,1–1 % : rare ; 0,01–0,1 % : épique ; en dessous : légendaire. Une mésange est commune à Lyon, une grue cendrée y est épique mais commune au lac du Der en novembre.
+- *Indice de conservation* : UICN quasi menacée → au moins rare, vulnérable → au moins épique, en danger ou en danger critique → légendaire.
+- XP de base : 10 / 25 / 60 / 150. Le calcul se fait à la capture et reste figé dans `captures.rarity`, pour que la valeur d'une capture ne change pas quand les données GBIF évoluent.
+
+**Variantes** : albinisme, leucisme, mélanisme, plumage nuptial, comportements rares (parade, nourrissage, chasse…). La liste possible dépend du groupe (et peut être surchargée par espèce).
+- Détection par un classifieur d'attributs sur la photo, puis **validation communautaire** (deux validateurs confirmés) avant d'accorder le bonus ×2, car c'est la récompense la plus exposée à la triche.
+
+```sql
+CREATE TABLE taxon_variants (
+  taxon_id  bigint REFERENCES taxa(id),
+  code      text NOT NULL,             -- 'leucism', 'breeding_plumage', 'courtship'…
+  kind      text NOT NULL,             -- 'color' | 'seasonal' | 'behavior'
+  name_fr   text NOT NULL,
+  PRIMARY KEY (taxon_id, code)
+);
+ALTER TABLE captures ADD COLUMN rarity smallint NOT NULL DEFAULT 0;
+CREATE TABLE capture_variants (
+  user_id        uuid,
+  taxon_id       bigint,
+  variant_code   text,
+  observation_id uuid REFERENCES observations(id),
+  status         text NOT NULL DEFAULT 'pending',  -- 'pending' | 'validated' | 'rejected'
+  PRIMARY KEY (user_id, taxon_id, variant_code)
+);
+```
+
+### 2.8 Carte, brouillard de guerre et hotspots
+
+- **Brouillard** : la carte est couverte, sauf dans un rayon de 40 km autour de chaque lieu d'observation du joueur. Stockage : cellules H3 de résolution 5 (≈ 250 km²) dans `user_explored_cells (user_id, h3_cell)`, remplies à chaque capture. Le client ne reçoit que les cellules, jamais les coordonnées des autres joueurs.
+- **Hotspots** : agrégats par maille de 50 km et par famille, recalculés chaque nuit. Règles de protection : au moins 5 observateurs distincts, délai d'une semaine, exclusion de toute espèce UICN vulnérable ou plus et des listes d'espèces sensibles (rapaces nicheurs, chiroptères en gîte…). La position exacte d'une observation n'est jamais exposée.
+
+### 2.9 Quêtes, événements et bonus météo
+
+- **Quêtes** : définitions en base (`quests` : période, règle en JSON, récompense), progression calculée à partir du journal des captures, comme les badges (§3). Types : quotidiennes (renouvelées à 4 h, heure locale), hebdomadaires, saisonnières.
+- **Événements** : fenêtres datées (« Grande migration d'automne » du 22 septembre au 21 décembre) qui ajoutent des quêtes et des multiplicateurs (×2 sur les migrateurs, liste tirée des traits d'espèce).
+- **Heure et météo** : calculées côté serveur à partir de la position et de l'heure de la photo. La nuit est définie par le coucher et le lever du soleil au lieu de la capture ; la météo vient d'une API météo historique (Open-Meteo, par exemple). Bonus : +50 % pour une espèce nocturne photographiée de nuit, +50 % sous la pluie. Le client ne déclare jamais ces conditions lui-même.
+
+### 2.10 Compagnon, sanctuaire et météo-morphisme
+
+- **Œuf et compagnon** : à l'inscription, un œuf mystère éclot après 3 captures ; le joueur choisit alors un compagnon (renardeau, chouette ou lézard). Il gagne la même XP que le joueur et évolue en trois stades (niveaux 1, 4 et 8).
+- **Sanctuaire** : chaque espèce capturée y apparaît sous forme animée. Le joueur choisit un biome (forêt, savane, océan, jungle). Il nourrit ses animaux avec des ressources gagnées en photographiant des animaux et en scannant des plantes (identification végétale, par exemple avec l'API Pl@ntNet ; les plantes ne comptent pas dans la collection).
+- **Météo-morphisme** : le sanctuaire reprend la météo réelle du joueur (position approximative, au kilomètre près, rafraîchie toutes les 30 minutes). Sous la pluie, les amphibiens et les escargots sortent et les autres s'abritent ; la nuit, seuls les animaux nocturnes restent actifs. Le comportement de chaque animal dépend de ses traits (`nocturnal`, `likes_rain`…).
+
+```sql
+CREATE TABLE companions (
+  user_id    uuid PRIMARY KEY REFERENCES users(id),
+  kind       text,                        -- NULL tant que l'œuf n'a pas éclos
+  egg_progress smallint NOT NULL DEFAULT 0,
+  xp         int NOT NULL DEFAULT 0,
+  hatched_at timestamptz
+);
+CREATE TABLE sanctuaries (
+  user_id    uuid PRIMARY KEY REFERENCES users(id),
+  biome      text NOT NULL DEFAULT 'forest',
+  food       int NOT NULL DEFAULT 0,
+  wellbeing  smallint NOT NULL DEFAULT 50
+);
+CREATE TABLE taxon_traits (
+  taxon_id   bigint REFERENCES taxa(id),
+  trait      text NOT NULL,               -- 'nocturnal' | 'likes_rain' | 'pollinator' | 'migratory'…
+  PRIMARY KEY (taxon_id, trait)
+);
+```
+
 ---
 
 ## 3. Logique de déblocage des badges

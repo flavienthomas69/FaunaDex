@@ -413,8 +413,11 @@
   }
   .overlay.fossil { background: radial-gradient(circle at 50% 42%, #6B5436 0%, #3D2F1C 60%, #1E170D 100%); }
 
+  .campills {
+    position: absolute; z-index: 2; left: 20px; right: 20px; bottom: 128px;
+    display: grid; gap: 6px; justify-items: center;
+  }
   .pospill {
-    position: absolute; z-index: 2; left: 50%; transform: translateX(-50%); bottom: 132px;
     display: flex; align-items: center; gap: 10px; text-align: left; cursor: pointer;
     max-width: calc(100% - 40px); padding: 8px 14px 8px 12px; border-radius: 16px; border: 0;
     background: rgba(0, 0, 0, .45); backdrop-filter: blur(6px); color: #fff !important;
@@ -471,6 +474,154 @@
   @keyframes pulse { from { opacity: .4; } to { opacity: 1; } }
   .overlay.micro { background: radial-gradient(circle at 50% 42%, #3A5577 0%, #22344A 60%, #0F1824 100%); }
   @media (prefers-reduced-motion: reduce) { .scopescan { animation: none; } }
+
+
+  /* Sélecteur de Dex */
+  .dexswitch {
+    margin: 4px 20px 0; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px;
+    background: #E3E8DF; border-radius: 12px; padding: 4px;
+  }
+  .dexswitch button {
+    border: 0; background: none; cursor: pointer; border-radius: 9px; padding: 9px 0;
+    font: 700 13px/1 var(--display); color: var(--muted) !important;
+  }
+  .dexswitch button small { font: 500 10.5px/1 var(--mono); opacity: .7; }
+  .dexswitch button.on { background: var(--card); color: var(--ink) !important; box-shadow: 0 1px 3px rgba(22, 33, 28, .12); }
+  .dexswitch + .dex-head, .dexswitch + .bhead { padding-top: 16px; }
+
+  /* Rareté et variantes */
+  .gem {
+    display: inline-block; width: 7px; height: 7px; margin-right: 4px; transform: rotate(45deg) translateY(-1px);
+    background: var(--r); border-radius: 1.5px;
+  }
+  .gem.big {
+    transform: none; width: auto; height: auto; margin: 0; border-radius: 999px; padding: 4px 8px 4px 20px;
+    font: 700 11px/1 var(--body); color: #fff; position: relative;
+  }
+  .gem.big::before {
+    content: ""; position: absolute; left: 8px; top: 50%; width: 6px; height: 6px; background: #fff;
+    transform: translateY(-50%) rotate(45deg); border-radius: 1px;
+  }
+  .sparkle { font-size: 10px; }
+  .tag.rar { background: var(--r); color: #fff; border-color: transparent; }
+  .rar-why { font-size: 12.5px !important; color: var(--muted); margin-bottom: 10px !important; }
+  .variants { display: flex; flex-wrap: wrap; gap: 6px; }
+  .variant { border: 1px dashed #B8C2BB; border-radius: 999px; padding: 7px 11px; font: 600 12px/1 var(--body); color: var(--muted); }
+  .variant.on { border: 1px solid #E8C35A; background: #FFF6D8; color: #6B4B00; }
+  .rewards { margin-top: 12px; display: grid; gap: 5px; padding: 10px 12px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
+  .rrow, .xrow { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; }
+  .xrow b { font: 500 12px/1 var(--mono); color: var(--moss); }
+  .shinyrow { font-size: 12.5px; padding: 6px 8px; border-radius: 10px; background: linear-gradient(90deg, #FFF3C4, #FDE2F3, #DDF1FF); }
+  .overlay.shiny { background: radial-gradient(circle at 50% 42%, #7A5CB8 0%, #3B2A6B 55%, #150D2A 100%); }
+  .overlay.shiny .burst::before, .overlay.shiny .burst::after { border-color: #FFE27A; }
+  .xpgain { color: #fff; }
+
+  /* Carte */
+  .mapwrap { margin: 14px 20px 0; border-radius: 16px; overflow: hidden; border: 1px solid var(--line); background: #A9C8D6; }
+  .mapwrap svg { display: block; width: 100%; height: auto; }
+  .hot { cursor: pointer; }
+  .hot circle { fill: rgba(242, 165, 65, .28); stroke: #F2A541; stroke-width: 1.2; stroke-dasharray: 3 2; }
+  .hot text { font: 700 8px/1 var(--mono); fill: #5A3A00; }
+  .hot.sel circle { fill: rgba(242, 165, 65, .55); stroke-dasharray: none; }
+  .hot:focus-visible circle { stroke: var(--ink); stroke-width: 2; }
+  .hotcard { background: var(--moss-deep); color: #E3F0E9; border-radius: 14px; padding: 12px; display: grid; gap: 4px; margin-bottom: 10px; }
+  .hotcard b { color: #fff; font: 700 15px/1.2 var(--display); }
+  .hotcard span { font-size: 13px; }
+  .hotcard small { font-size: 11px; color: #9FC2B1; }
+  .hotrow {
+    border: 1px solid var(--line); background: var(--card); border-radius: 12px; padding: 10px 12px; cursor: pointer;
+    display: flex; justify-content: space-between; font-size: 13px; text-align: left;
+  }
+  .hotrow b { font-weight: 600; }
+  .hotrow span { font: 500 11px/1.4 var(--mono); color: var(--muted); }
+  .hotrow.sel { border-color: var(--amber); }
+
+  /* Quêtes */
+  .event {
+    margin: 16px 20px 0; padding: 16px; border-radius: 18px; color: #fff;
+    background: linear-gradient(135deg, #B4622A 0%, #8C3F1C 60%, #5B2A14 100%);
+  }
+  .event .kicker { color: #FFD9A8; }
+  .event h3 { margin: 0 0 6px; font: 800 20px/1.15 var(--display); }
+  .event p { margin: 0; font-size: 12.5px; line-height: 1.45; color: #F6DCC8; }
+  .quest {
+    display: grid; grid-template-columns: 36px 1fr auto; gap: 10px; align-items: center;
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px;
+  }
+  .qicon { width: 36px; height: 36px; border-radius: 50%; background: #F1EBDD; display: grid; place-items: center; font-size: 17px; }
+  .quest .t { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+  .quest .t b { font: 700 13px/1.25 var(--display); }
+  .quest .t span { font: 500 11px/1.3 var(--mono); color: var(--muted); white-space: nowrap; }
+  .quest p { margin: -2px 0 6px; font-size: 11.5px; color: var(--muted); }
+  .qxp { font: 500 11px/1 var(--mono); color: var(--moss); white-space: nowrap; }
+  .quest.done { border-color: #BFD9CB; background: #F1F8F4; }
+  .quest.done .qicon { background: var(--moss); color: #fff; font-weight: 700; }
+  .condrow {
+    width: 100%; margin-bottom: 8px; border: 1px solid var(--line); background: var(--card); border-radius: 12px;
+    padding: 10px 12px; cursor: pointer; text-align: left; font-size: 13px; display: block;
+  }
+  .condrow small { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  /* Sanctuaire */
+  .compcard { display: grid; grid-template-columns: 84px 1fr; gap: 14px; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 12px; }
+  .compcard b { font: 700 16px/1.2 var(--display); }
+  .compcard small { display: block; margin-top: 6px; font-size: 12px; color: var(--muted); line-height: 1.4; }
+  .compcard .kicker { margin-bottom: 4px; }
+  .compart { width: 84px; height: 84px; border-radius: 50%; display: grid; place-items: center; font-size: 42px; background: radial-gradient(circle at 40% 35%, #fff, #E6EDE2); }
+  .compart.st1 { font-size: 52px; }
+  .compart.st2 { font-size: 62px; background: radial-gradient(circle at 40% 35%, #FFF6D8, #F2D98A); }
+  .compart.egg { animation: wobble 1.6s ease-in-out infinite; }
+  .compart.sleep { filter: saturate(.6) brightness(.9); }
+  @keyframes wobble { 0%, 100% { transform: rotate(0); } 20% { transform: rotate(-8deg); } 40% { transform: rotate(6deg); } 60% { transform: rotate(-3deg); } }
+  .scene { position: relative; margin: 10px 20px 0; height: 260px; border-radius: 18px; overflow: hidden; border: 1px solid var(--line); }
+  .scene.b-forest { background: linear-gradient(180deg, #CFE6D1 0%, #9CC79B 55%, #6FA26A 100%); }
+  .scene.b-savanna { background: linear-gradient(180deg, #F7E3B5 0%, #E6C47B 55%, #C99E4E 100%); }
+  .scene.b-ocean { background: linear-gradient(180deg, #BEE3F2 0%, #5FA8CC 50%, #2C6E95 100%); }
+  .scene.b-jungle { background: linear-gradient(180deg, #BFE3B4 0%, #5E9E54 55%, #2F6B35 100%); }
+  .scene.w-night::after { content: ""; position: absolute; inset: 0; background: rgba(12, 18, 40, .55); pointer-events: none; }
+  .scene.w-rain { filter: saturate(.8); }
+  .deco { position: absolute; font-size: 30px; opacity: .85; pointer-events: none; }
+  .critter {
+    position: absolute; border: 0; background: none; cursor: pointer; padding: 0; font-size: 28px; z-index: 2;
+    animation: wander var(--d) ease-in-out infinite alternate;
+  }
+  .critter span { display: block; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .25)); }
+  .critter.sleep { animation: none; z-index: 1; }
+  .critter.sleep span { filter: brightness(.55) saturate(.5); }
+  .critter.awake { z-index: 3; }
+  .critter.awake span { filter: drop-shadow(0 0 6px rgba(255, 240, 180, .9)); }
+  .critter.shelter { animation: none; opacity: .7; transform: scale(.85); }
+  .critter.rainy { animation-duration: 2s; }
+  .critter .zz { position: absolute; top: -12px; right: -10px; font-size: 13px; font-style: normal; }
+  .critter .hearts { position: absolute; top: -18px; left: 50%; transform: translateX(-50%); font-size: 16px; font-style: normal; animation: rise 1.2s ease-out forwards; }
+  @keyframes wander { from { transform: translateX(-14px); } to { transform: translateX(14px); } }
+  @keyframes rise { from { opacity: 1; transform: translate(-50%, 0); } to { opacity: 0; transform: translate(-50%, -22px); } }
+  .rain {
+    position: absolute; inset: 0; pointer-events: none; z-index: 4;
+    background-image: repeating-linear-gradient(105deg, rgba(255, 255, 255, .0) 0 8px, rgba(255, 255, 255, .55) 8px 9px, rgba(255, 255, 255, 0) 9px 22px);
+    background-size: 44px 44px; animation: fall .5s linear infinite;
+  }
+  @keyframes fall { to { background-position: -10px 44px; } }
+  .sanctbar { margin: 10px 20px 0; display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: stretch; }
+  .sanctbar > div { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; }
+  .sanctbar b { display: block; font: 700 15px/1.2 var(--display); }
+  .sanctbar small { font-size: 11px; color: var(--muted); }
+  .sanctbar button { border: 0; border-radius: 12px; padding: 0 12px; background: var(--moss); color: #fff !important; font: 600 12px/1.2 var(--body); cursor: pointer; }
+  .toast { margin: 10px 20px 0; padding: 10px 12px; border-radius: 12px; background: #FFF4E2; border: 1px solid #F6D9A8; font-size: 12.5px; }
+  .overlay.egg { background: radial-gradient(circle at 50% 35%, #F7E8C4 0%, #C9A96B 45%, #4A3A1E 100%); }
+  .bigegg { font-size: 84px; animation: wobble 1.2s ease-in-out infinite; }
+  .choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 16px; }
+  .choice {
+    border: 0; cursor: pointer; border-radius: 16px; padding: 12px 6px; background: rgba(255, 255, 255, .92);
+    display: grid; gap: 4px; justify-items: center; color: var(--ink) !important;
+  }
+  .choice span { font-size: 38px; }
+  .choice b { font: 700 12px/1.2 var(--display); }
+  .choice small { font-size: 10.5px; color: var(--muted); }
+  .choice:hover { outline: 2px solid var(--amber); }
+  @media (prefers-reduced-motion: reduce) {
+    .critter, .compart.egg, .bigegg, .rain, .critter .hearts { animation: none; }
+  }
 
   /* Capture */
   .cam { position: absolute; inset: 0; background: #0D1411; color: #fff; display: flex; flex-direction: column; }
@@ -628,20 +779,20 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>
             Collection
           </button>
-          <button class="tab" data-go="dinos" type="button">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.5 7.5 16.5 16.5"/><path d="M7.5 7.5a2.3 2.3 0 1 0-3-3 2.3 2.3 0 1 0 3 3z"/><path d="M16.5 16.5a2.3 2.3 0 1 0 3 3 2.3 2.3 0 1 0-3-3z"/></svg>
-            Paléo
+          <button class="tab" data-go="map" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/></svg>
+            Carte
           </button>
           <button class="shutter-tab" data-go="capture" type="button" aria-label="Capturer un animal">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.8"/></svg>
           </button>
-          <button class="tab" data-go="micros" type="button">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h4l-1 6h-2z"/><path d="M11 9v3"/><circle cx="11" cy="14" r="2"/><path d="M6 21h12"/><path d="M15 20a6 6 0 0 0 1-9"/><path d="M8 21v-2h6"/></svg>
-            Micro
+          <button class="tab" data-go="quests" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".8" fill="currentColor"/></svg>
+            Quêtes
           </button>
-          <button class="tab" data-go="badges" type="button">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9" r="6"/><path d="M8.5 13.8 7 22l5-3 5 3-1.5-8.2"/></svg>
-            Badges
+          <button class="tab" data-go="sanct" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c3 3 5 6 5 9a5 5 0 0 1-10 0c0-3 2-6 5-9z"/><path d="M12 21v-6"/></svg>
+            Sanctuaire
           </button>
         </nav>
         <div id="layer"></div>
@@ -652,18 +803,19 @@
       <section>
         <h2>À essayer</h2>
         <ol>
-          <li><b>Parcourez la collection.</b> Les espèces non découvertes apparaissent en silhouette, comme dans un Pokédex. Cherchez un animal par son nom, par exemple « aigle » ou « Panthera », ou basculez sur « Par zone » pour parcourir la faune de France, d'Afrique ou des océans.</li>
-          <li><b>Ouvrez une fiche.</b> Noms, caractéristiques, habitat, comportement, anecdote et statut UICN.</li>
-          <li><b>Touchez le bouton appareil photo.</b> Déclenchez ou importez une vraie photo depuis votre ordinateur, puis ajoutez l'espèce à votre collection.</li>
-          <li><b>Essayez de tricher.</b> Dans l'appareil photo, touchez la position simulée pour choisir le zoo ou l'aquarium de Lyon : la photo est refusée, car seuls les animaux en liberté comptent.</li>
-          <li><b>Ouvrez l'onglet Paléo.</b> Le Paléo-Dex liste 16 dinosaures dont un squelette est exposé dans un musée. On les capture en photographiant ce squelette (mode « Squelette (musée) » de l'appareil photo). Le bouton « Voir les musées » indique où aller.</li>
-          <li><b>Ouvrez l'onglet Micro.</b> Le Micro-Dex liste 15 organismes à trouver au microscope dans l'eau de mare, la mousse ou la poussière : tardigrades, rotifères, paramécies, diatomées… Chaque fiche explique comment faire le prélèvement.</li>
-          <li><b>Regardez les badges.</b> Certaines captures en débloquent un, avec son animation.</li>
+          <li><b>Collection.</b> Trois Dex en haut de l'écran : Faune (21 000 espèces, par famille ou par zone), Paléo (dinosaures à photographier en musée) et Micro (organismes au microscope). Le losange de couleur indique la rareté, ✨ une variante rare trouvée.</li>
+          <li><b>Capture.</b> Le bouton central. Changez l'heure et la météo (jour, nuit, pluie) et le lieu : de nuit, vous tombez sur des espèces nocturnes ; au lac du Der, sur des grues. Parfois, une variante rare ✨ double l'XP. Au zoo, la photo est refusée.</li>
+          <li><b>Carte.</b> Le brouillard se lève là où vous avez photographié. Les cercles sont des hotspots anonymisés par secteur de 50 km.</li>
+          <li><b>Quêtes.</b> Quêtes du jour, bonus de nuit et de pluie, événement « Grande migration d'automne ». Les badges sont dans le même onglet.</li>
+          <li><b>Sanctuaire.</b> Votre œuf éclot à la prochaine capture : choisissez un compagnon. Vos animaux vivent dans le sanctuaire, on peut les nourrir, et la météo y suit la vôtre.</li>
         </ol>
         <div class="jump">
           <button type="button" data-go="dex">Collection</button>
           <button type="button" data-go="fiche">Fiche espèce</button>
           <button type="button" data-go="capture">Capture</button>
+          <button type="button" data-go="map">Carte</button>
+          <button type="button" data-go="quests">Quêtes</button>
+          <button type="button" data-go="sanct">Sanctuaire</button>
           <button type="button" data-go="dinos">Paléo-Dex</button>
           <button type="button" data-go="micros">Micro-Dex</button>
           <button type="button" data-go="badges">Badges</button>
@@ -705,6 +857,7 @@ const CURATED_ZONES = {
   7: "eu,as,af,na,fr", 8: "eu,as,fr", 9: "eu,as,na,fr", 10: "eu,as,af,fr", 11: "eu,af,as,fr",
   12: "eu,as,na,fr", 13: "eu,as,af,fr", 14: "eu,fr", 15: "eu,fr", 16: "eu,as,fr", 17: "mer",
   18: "mer", 19: "eu,na,fr", 20: "mer,eu,fr", 21: "mer,eu,fr", 22: "eu,fr",
+  23: "eu,af,as,fr", 24: "eu,as,af,fr", 25: "eu,as,af,na,sa,fr", 26: "eu,as,af,fr",
 };
 const WORLD_TOTAL = Object.values(CATS).reduce((n, c) => n + c.world, 0);
 const NCATS = Object.keys(CATS).length;
@@ -850,6 +1003,30 @@ const SPECIES = [
     habitat: "Bois clairs, haies sur sol calcaire", zone: "Europe centrale",
     behavior: "Hermaphrodite, il hiberne scellé derrière un opercule calcaire.",
     fun: "En France, son ramassage est réglementé pour protéger les populations sauvages." },
+  { id: 23, fr: "Bourdon terrestre", sci: "Bombus terrestris", cat: "ins", em: "🐝", st: "LC",
+    facts: [["Taille", "11–27 mm"], ["Colonie", "jusqu'à 400"], ["Ouvrière", "quelques semaines"]],
+    desc: "Gros bourdon noir à bandes jaunes, à l'extrémité de l'abdomen blanche.",
+    habitat: "Jardins, prairies, lisières fleuries", zone: "Europe, Afrique du Nord, Asie occidentale",
+    behavior: "Il vole même par temps frais grâce à la chaleur produite par ses muscles de vol.",
+    fun: "Il pollinise les tomates en faisant vibrer ses muscles pour secouer le pollen des fleurs : c'est la pollinisation vibratile." },
+  { id: 24, fr: "Syrphe ceinturé", sci: "Episyrphus balteatus", cat: "ins", em: "🪰", st: "NE",
+    facts: [["Taille", "9–12 mm"], ["Vol", "stationnaire"], ["Adulte", "quelques semaines"]],
+    desc: "Petite mouche rayée d'orange et de noir, qui imite une guêpe pour dissuader ses prédateurs.",
+    habitat: "Jardins, haies et prairies fleuries", zone: "Europe, Asie, Afrique du Nord",
+    behavior: "L'adulte butine les fleurs ; la larve dévore les pucerons.",
+    fun: "Chaque année, des milliards de syrphes migrent à travers l'Europe au printemps et à l'automne." },
+  { id: 25, fr: "Hirondelle rustique", sci: "Hirundo rustica", cat: "ois", em: "🐦", st: "LC",
+    facts: [["Taille", "17–19 cm"], ["Masse", "16–22 g"], ["Migration", "≈ 10 000 km"]],
+    desc: "Passereau à gorge rouge brique et à longue queue très fourchue.",
+    habitat: "Campagnes, fermes, étables", zone: "Presque tout l'hémisphère nord, hiverne en Afrique",
+    behavior: "Elle chasse les insectes en vol et construit son nid de boue dans les granges.",
+    fun: "Les hirondelles de France partent en septembre pour passer l'hiver en Afrique subsaharienne." },
+  { id: 26, fr: "Grue cendrée", sci: "Grus grus", cat: "ois", em: "🪶", st: "LC",
+    facts: [["Taille", "110–120 cm"], ["Envergure", "2–2,4 m"], ["Masse", "4–6 kg"]],
+    desc: "Grand échassier gris au cou noir et blanc, coiffé d'une calotte rouge.",
+    habitat: "Marais, grandes plaines agricoles", zone: "Europe et Asie, hiverne en Espagne et en Afrique du Nord",
+    behavior: "Elle migre en grands vols en V en poussant des cris trompetants, et danse lors des parades.",
+    fun: "À l'automne, des dizaines de milliers de grues font halte au lac du Der, en Champagne." },
 ];
 SPECIES.forEach(s => { s.name = s.fr; s.zones = CURATED_ZONES[s.id].split(","); });
 const CURATED = SPECIES.length;
@@ -1084,10 +1261,117 @@ const DINO_SEED = { 3: ["2026-04-12", "mnhn"], 5: ["2026-07-02", "irsnb"] };
 // Positions proposées dans l'appareil photo de la démo (le vrai contrôle : services/captivity/).
 const POSITIONS = [
   { id: "wild", label: "Monts du Lyonnais", verdict: "ok" },
+  { id: "der", label: "Lac du Der-Chantecoq", verdict: "ok" },
+  { id: "ecrins", label: "Parc national des Écrins", verdict: "ok" },
+  { id: "camargue", label: "Camargue, Saintes-Maries-de-la-Mer", verdict: "ok" },
   { id: "zoo", label: "Zoo du parc de la Tête d'Or, Lyon", verdict: "captive", site: "le zoo du parc de la Tête d'Or" },
   { id: "aquarium", label: "Aquarium de Lyon, La Mulatière", verdict: "captive", site: "l'aquarium de Lyon" },
   { id: "none", label: "Localisation désactivée", verdict: "no_location" },
 ];
+
+/* ── Rareté, variantes « shiny », XP ── */
+const RARITY = [
+  { name: "Commun", fem: "commune", c: "#7F8C85", xp: 10 },
+  { name: "Rare", fem: "rare", c: "#2F6FB0", xp: 25 },
+  { name: "Épique", fem: "épique", c: "#8E44AD", xp: 60 },
+  { name: "Légendaire", fem: "légendaire", c: "#D08A00", xp: 150 },
+];
+// Fréquence dans la région de Lyon (démo) : 0 très observée … 3 presque jamais. Dans l'app : part des observations GBIF de la maille.
+const LOCAL_RARITY = { 1: 0, 2: 1, 3: 0, 4: 0, 5: 0, 6: 1, 7: 1, 8: 1, 9: 3, 10: 0, 11: 0, 12: 1, 13: 0, 14: 0, 15: 3, 16: 1,
+  17: 3, 18: 3, 19: 0, 20: 1, 21: 2, 22: 0, 23: 0, 24: 0, 25: 1, 26: 2 };
+const IUCN_TIER = { NT: 1, VU: 2, EN: 3, CR: 3, EW: 3 };
+const LOCAL_LABEL = ["très observée", "peu observée", "rarement observée", "presque jamais observée"];
+function rarityOf(sp) {
+  const iucn = sp.st ? (IUCN_TIER[sp.st] || 0) : null;
+  const local = LOCAL_RARITY[sp.id] ?? null;
+  if (iucn === null && local === null) return null;
+  return Math.max(iucn || 0, local || 0);
+}
+function rarityWhy(sp) {
+  const parts = [];
+  if (LOCAL_RARITY[sp.id] !== undefined) parts.push(`${LOCAL_LABEL[LOCAL_RARITY[sp.id]]} autour de Lyon`);
+  if (sp.st && IUCN[sp.st]) parts.push(`UICN : ${IUCN[sp.st][0].toLowerCase()}`);
+  return parts.join(" · ");
+}
+const gem = (r, big) => r === null ? "" : `<span class="gem ${big ? "big" : ""}" style="--r:${RARITY[r].c}" title="${RARITY[r].name}">${big ? RARITY[r].name : ""}</span>`;
+
+const TRAITS = { poll: [11, 12, 23, 24], migr: [25, 26], noct: [2, 6, 7, 16, 22], rain: [16, 22] };
+const VARIANTS_BY_CAT = {
+  ois: ["Plumage nuptial", "Leucisme", "Parade nuptiale", "Nourrissage des jeunes"],
+  mam: ["Albinisme", "Mélanisme", "Jeune avec sa mère", "Toilettage"],
+  ins: ["Accouplement", "Émergence de l'adulte", "Butinage en gros plan"],
+  rep: ["Mélanisme", "Mue en cours"], amp: ["Amplexus (accouplement)", "Albinisme"],
+  poi: ["Livrée nuptiale", "Chasse"], ara: ["Mue en cours", "Capture d'une proie"],
+  cru: ["Mue en cours", "Femelle portant ses œufs"], mol: ["Accouplement", "Coquille senestre"],
+};
+const VARIANT_OVERRIDES = {
+  1: ["Leucisme", "Nourrissage des jeunes", "Bain"],
+  3: ["Plumage nuptial du mâle", "Leucisme", "Canetons en file"],
+  6: ["Hérisson blond (leucique)", "Albinisme", "Portée de petits"],
+  7: ["Renard charbonnier (mélanique)", "Albinisme", "Mulotage (saut de chasse)", "Renardeaux au terrier"],
+  22: ["Coquille senestre (enroulée à gauche)", "Accouplement"],
+  26: ["Danse nuptiale", "Vol en V"],
+};
+const variantsOf = sp => VARIANT_OVERRIDES[sp.id] || VARIANTS_BY_CAT[sp.cat] || [];
+
+const CONDS = [
+  { id: "day", label: "Jour, temps sec", icon: "☀️" },
+  { id: "night", label: "Nuit", icon: "🌙" },
+  { id: "rain", label: "Pluie", icon: "🌧️" },
+];
+const TODAY = "2026-09-27";
+const EVENT = { name: "La grande migration d'automne", start: "2026-09-22", end: "2026-12-21", day: 6, days: 91 };
+const QUESTS = [
+  { id: "q-two", group: "day", name: "Capturer 2 nouvelles espèces", target: 2, xp: 50, icon: "🔎",
+    val: log => log.filter(e => e.kind === "live" && e.isNew).length },
+  { id: "q-rare", group: "day", name: "Trouver une espèce Rare ou mieux", target: 1, xp: 100, icon: "💎",
+    val: log => log.filter(e => e.kind === "live" && e.isNew && e.rarity >= 1).length },
+  { id: "q-poll", group: "day", scope: "Ce week-end", name: "Photographier 3 insectes pollinisateurs", target: 3, xp: 150, icon: "🌼",
+    val: log => new Set(log.filter(e => e.kind === "live" && TRAITS.poll.includes(e.id)).map(e => e.id)).size },
+  { id: "q-night", group: "meteo", name: "Capturer une espèce nocturne de nuit", target: 1, xp: 80, icon: "🌙",
+    bonus: "+50 % d'XP sur les espèces nocturnes photographiées de nuit",
+    val: log => log.filter(e => e.kind === "live" && e.cond === "night" && TRAITS.noct.includes(e.id)).length },
+  { id: "q-rain", group: "meteo", name: "Capturer un animal sous la pluie", target: 1, xp: 80, icon: "🌧️",
+    bonus: "+50 % d'XP sur toutes les captures sous la pluie",
+    val: log => log.filter(e => e.kind === "live" && e.cond === "rain").length },
+  { id: "e-migr", group: "event", name: "Trouver un oiseau migrateur", target: 1, xp: 200, icon: "🐦",
+    val: log => log.filter(e => e.kind === "live" && TRAITS.migr.includes(e.id)).length },
+  { id: "e-grue", group: "event", name: "Observer une grue cendrée en halte migratoire", target: 1, xp: 300, icon: "🪶",
+    val: log => log.filter(e => e.kind === "live" && e.id === 26).length },
+  { id: "e-five", group: "event", name: "Photographier 5 espèces pendant l'événement", target: 5, xp: 150, icon: "📸",
+    val: log => new Set(log.filter(e => e.kind === "live").map(e => e.id)).size },
+];
+const questsDone = () => new Set(QUESTS.filter(q => q.val(state.log) >= q.target).map(q => q.id));
+const level = xp => 1 + Math.floor(xp / 250);
+
+function xpFor(sp, variant, cond, isNew) {
+  const r = rarityOf(sp);
+  const base = isNew || variant ? (r === null ? 10 : RARITY[r].xp) : 2;
+  const lines = [[isNew || variant ? (r === null ? "Nouvelle espèce" : `Espèce ${RARITY[r].fem}`) : "Nouvelle observation", base]];
+  let total = base;
+  if (variant) { lines.push(["Variante ✨ (×2)", base]); total += base; }
+  if (TRAITS.migr.includes(sp.id) && (isNew || variant)) { lines.push(["Événement migration (×2)", total]); total *= 2; }
+  if (cond === "night" && TRAITS.noct.includes(sp.id)) { const b = Math.round(total / 2); lines.push(["Bonus nocturne +50 %", b]); total += b; }
+  if (cond === "rain") { const b = Math.round(total / 2); lines.push(["Bonus pluie +50 %", b]); total += b; }
+  return { total, lines };
+}
+
+/* ── Compagnon et sanctuaire ── */
+const COMPANIONS = {
+  fox: { em: "🦊", stages: ["Renardeau", "Jeune renard", "Renard des brumes"], trait: "Flaire les mammifères" },
+  owl: { em: "🦉", stages: ["Poussin de chouette", "Chouette curieuse", "Grande chouette sage"], trait: "Voit la nuit" },
+  lizard: { em: "🦎", stages: ["Lézardeau", "Lézard agile", "Lézard des murailles ancestral"], trait: "Adore le soleil" },
+};
+const EGG_TARGET = 3;
+const compLevel = xp => 1 + Math.floor(xp / 120);
+const compStage = xp => compLevel(xp) >= 8 ? 2 : compLevel(xp) >= 4 ? 1 : 0;
+const BIOMES = {
+  forest: { name: "Forêt", icon: "🌲", deco: ["🌲", "🌳", "🍄", "🌿", "🌲", "🪨"] },
+  savanna: { name: "Savane", icon: "🌾", deco: ["🌾", "🌳", "🪨", "🌾", "🌵", "🌾"] },
+  ocean: { name: "Océan", icon: "🌊", deco: ["🪸", "🐚", "🪨", "🌊", "🪸", "🐚"] },
+  jungle: { name: "Jungle", icon: "🌴", deco: ["🌴", "🌺", "🌿", "🌴", "🍃", "🌺"] },
+};
+const PLANTS = ["Pissenlit", "Ortie dioïque", "Trèfle des prés", "Ronce commune", "Plantain lancéolé"];
 const GARDEN = [10, 11, 13, 19, 22];
 const TIERS = [["bronze", 3, "#B87333"], ["argent", 10, "#9AA4AB"], ["or", 25, "#D9A82B"]];
 const VOLUME = [[1, "Premier pas"], [10, "Explorateur"], [25, "Naturaliste"], [50, "Biologiste"], [100, "Centurion"]];
@@ -1100,6 +1384,12 @@ function resetState() {
   for (const [id, [d, m]] of Object.entries(DINO_SEED)) state.dinos[id] = { date: d, museum: m };
   state.micros = {}; state.micro = 1; state.mgroup = "all";
   for (const [id, [d, pl]] of Object.entries(MICRO_SEED)) state.micros[id] = { date: d, place: pl };
+  state.captured[7].variants = ["Mulotage (saut de chasse)"];
+  state.log = []; state.cond = 0; state.mapView = "france"; state.hot = null;
+  state.xp = Object.keys(state.captured).reduce((n, id) => { const r = rarityOf(byId[id]); return n + (r === null ? 10 : RARITY[r].xp); }, 0)
+    + Object.keys(state.dinos).length * 60 + Object.keys(state.micros).length * 25 + 25;
+  state.companion = { kind: null, xp: 0, egg: 2 };
+  state.biome = "forest"; state.food = 3; state.happy = 60; state.hearts = null; state.toast = null;
 }
 resetState();
 
@@ -1163,7 +1453,7 @@ function renderDex() {
   const chip = (k, label, color, have, tot) =>
     `<button type="button" class="chip ${state.filter === k ? "on" : ""}" data-filter="${k}" style="--c:${color}">${k === "all" ? "" : '<i class="dot"></i>'}${label} <small>${have} / ${tot}</small></button>`;
   const loaded = catalog.status === "ok" ? SPECIES.length : CURATED;
-  return `
+  return `${dexSwitch()}
     <div class="dex-head">
       <div>
         <p class="kicker">Mon FaunaDex</p>
@@ -1175,7 +1465,7 @@ function renderDex() {
     <div class="stats">
       <div class="stat"><b>${nb}</b><small>badges</small></div>
       <div class="stat"><b>${catalog.status === "loading" ? "…" : fmtInt(loaded)}</b><small>espèces à explorer</small></div>
-      <div class="stat"><b>${byId[last[0]].em}</b><small>dernière capture</small></div>
+      <div class="stat"><b>Niv. ${level(state.xp)}</b><small>${fmtInt(state.xp)} XP</small></div>
     </div>
     <div class="search">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
@@ -1243,7 +1533,7 @@ function renderGrid() {
         const got = state.captured[sp.id];
         return `<button type="button" class="tile ${got ? "" : "locked"}" data-fiche="${sp.id}" style="--c:${CATS[sp.cat].c}" aria-label="${esc(displayName(sp))}${got ? "" : ", non capturée"}">
           ${state.fresh.has(sp.id) ? '<span class="new">NOUVEAU</span>' : ""}
-          <span class="no">${no(sp.id)}</span>
+          <span class="no">${gem(rarityOf(sp))}${no(sp.id)}${got && got.variants && got.variants.length ? ' <span class="sparkle">✨</span>' : ""}</span>
           <span class="em">${sp.em}</span>
           <span class="nm">${esc(displayName(sp))}</span>
         </button>`;
@@ -1284,9 +1574,10 @@ function renderFiche() {
       <div class="pic" ${photo ? `style="background-image:url(${photo})"` : ""}>${photo ? "" : sp.em}</div>
       <h2>${esc(sp.fr)}</h2>
       <p class="sci">${esc(sp.sci)}</p>
-      <div class="tags"><span class="tag cat">${cat.name}</span><span class="tag" style="border-color:${IUCN[sp.st][1]}">UICN : ${IUCN[sp.st][0]}</span></div>
+      <div class="tags"><span class="tag cat">${cat.name}</span><span class="tag" style="border-color:${IUCN[sp.st][1]}">UICN : ${IUCN[sp.st][0]}</span>${rarityTag(sp)}</div>
     </div>
     <div class="capinfo">${ICON.pin}<span>Capturée le <b>${fmtDate(got.date)}</b><br>${esc(got.place)}${photo ? " · votre photo" : ""}</span></div>
+    ${variantsBlock(sp, got)}
     <div class="sec"><h3>Description</h3><p>${esc(sp.desc)}</p></div>
     <div class="sec"><h3>Caractéristiques</h3><div class="facts">${sp.facts.map(([k, v]) => `<div class="fact"><small>${k}</small><b>${v}</b></div>`).join("")}</div></div>
     <div class="sec"><h3>Habitat et répartition</h3><div class="habitat">
@@ -1298,6 +1589,19 @@ function renderFiche() {
       ${iucnBlock(sp.st)}
     </div>
     <div class="sources">Sources : Wikipédia (CC BY-SA 4.0), Wikidata, GBIF, liste rouge de l'UICN. Fiche rédigée automatiquement puis relue.</div>`;
+}
+
+function rarityTag(sp) {
+  const r = rarityOf(sp);
+  return r === null ? "" : `<span class="tag rar" style="--r:${RARITY[r].c}" title="${esc(rarityWhy(sp))}">◆ ${RARITY[r].name}</span>`;
+}
+function variantsBlock(sp, got) {
+  const all = variantsOf(sp);
+  if (!all.length) return "";
+  const found = (got && got.variants) || [];
+  return `<div class="sec"><h3>Variantes rares ✨ · ${found.length} / ${all.length}</h3>
+    ${rarityOf(sp) === null ? "" : `<p class="rar-why">Rareté ${RARITY[rarityOf(sp)].name.toLowerCase()} : ${esc(rarityWhy(sp))}.</p>`}
+    <div class="variants">${all.map(v => `<span class="variant ${found.includes(v) ? "on" : ""}">${found.includes(v) ? "✨ " : ""}${esc(v)}</span>`).join("")}</div></div>`;
 }
 
 function zoneTags(sp) {
@@ -1323,7 +1627,7 @@ function renderCatalogFiche(sp, cat, got, top) {
       <div class="pic ${got ? "" : "locked"}" ${photo ? `style="background-image:url(${photo})"` : ""}>${photo ? "" : `<span>${sp.em}</span>`}</div>
       <h2>${esc(displayName(sp))}</h2>
       ${sp.name ? `<p class="sci">${esc(sp.sci)}</p>` : ""}
-      <div class="tags"><span class="tag cat">${cat.name}</span>${sp.fr ? "" : `<span class="tag">${sp.en ? "Nom anglais" : "Pas encore de nom commun"}</span>`}</div>
+      <div class="tags"><span class="tag cat">${cat.name}</span>${rarityTag(sp)}${sp.fr ? "" : `<span class="tag">${sp.en ? "Nom anglais" : "Pas encore de nom commun"}</span>`}</div>
     </div>
     ${got ? `<div class="capinfo">${ICON.pin}<span>Capturée le <b>${fmtDate(got.date)}</b><br>${esc(got.place)}${photo ? " · votre photo" : ""}</span></div>` : ""}
     <div class="sec"><h3>Classification</h3><div class="facts">
@@ -1346,6 +1650,7 @@ function renderBadges() {
   const nextVol = vol.find(b => !un.has(b.id));
   const challenges = BADGES.filter(b => ["garden", "ark", "globe", "france", "guard"].includes(b.id));
   return `
+    ${goalSwitch()}
     <div class="bhead"><p class="kicker">Accomplissements</p><h2>${un.size} badges</h2><p class="sub">sur ${BADGES.length} disponibles</p></div>
     <div class="bsec"><h3>Volume</h3>
       <div class="vol">${vol.map(b => `<div class="b ${un.has(b.id) ? "on" : ""}">${medal(b.medal, !un.has(b.id))}<small>${b.name}</small></div>`).join("")}</div>
@@ -1405,10 +1710,12 @@ function renderCapture() {
     ${scanning ? "" : `<div class="camseg" role="tablist" aria-label="Type de capture">
       ${seg.map(([k, label]) => `<button type="button" role="tab" aria-selected="${mode === k}" class="${mode === k ? "on" : ""}" data-cammode="${k}">${label}</button>`).join("")}
     </div>`}
-    ${mode !== "fossil" && !scanning ? `<button type="button" class="pospill" data-pos>
+    ${mode !== "fossil" && !scanning ? `<div class="campills">
+    ${mode === "live" ? `<button type="button" class="pospill" data-cond><span class="posdot ok" style="background:none;box-shadow:none;width:auto;height:auto">${CONDS[state.cond].icon}</span><span><b>${CONDS[state.cond].label}</b><small>Heure et météo simulées · toucher pour changer</small></span></button>` : ""}
+    <button type="button" class="pospill" data-pos>
       <span class="posdot ${micro ? "ok" : POSITIONS[state.pos].verdict}"></span>
       <span><b>${micro ? "Prélèvement : " : ""}${esc(POSITIONS[state.pos].label)}</b><small>Position simulée · toucher pour changer</small></span>
-    </button>` : ""}
+    </button></div>` : ""}
     ${micro ? "" : `<div class="reticle"><i></i><i></i><i></i><i></i>${scanning ? '<div class="scanline"></div>' : ""}</div>`}
     ${micro && scanning ? '<div class="scopescan"></div>' : ""}
     <div class="hint">${scanning
@@ -1434,7 +1741,7 @@ function renderMicros() {
     const all = MICROS.filter(m => k === "all" || m.g === k);
     return `<button type="button" class="chip ${state.mgroup === k ? "on" : ""}" data-mgroup="${k}" style="--c:${color || "var(--moss)"}">${k === "all" ? "" : '<i class="dot"></i>'}${label} <small>${all.filter(m => state.micros[m.id]).length} / ${all.length}</small></button>`;
   };
-  return `
+  return `${dexSwitch()}
     <div class="dex-head">
       <div>
         <p class="kicker" style="color:#56708F">Micro-Dex</p>
@@ -1490,13 +1797,162 @@ function renderMicro() {
     <div class="sources">${m.g === "ani" ? "Animal microscopique." : "Ce n'est pas un animal : " + (m.g === "pro" ? "les protistes sont des êtres vivants unicellulaires." : "c'est une algue.") + " Il figure dans le Micro-Dex parce qu'on le rencontre dans les mêmes prélèvements."} Tailles et grossissements indicatifs.</div>`;
 }
 
+
+const COLLECTION_VIEWS = ["dex", "fiche", "dinos", "dino", "museums", "micros", "micro"];
+function dexSwitch() {
+  const v = state.view;
+  const items = [["dex", "Faune", Object.keys(state.captured).length], ["dinos", "Paléo", Object.keys(state.dinos).length], ["micros", "Micro", Object.keys(state.micros).length]];
+  return `<div class="dexswitch" role="tablist" aria-label="Collections">${items.map(([k, label, n]) =>
+    `<button type="button" role="tab" aria-selected="${v === k}" class="${v === k ? "on" : ""}" data-go="${k}">${label} <small>${n}</small></button>`).join("")}</div>`;
+}
+
+/* Carte : brouillard de guerre et hotspots */
+let mapData = null;
+async function loadMap() {
+  try { const r = await fetch("carte.json"); if (!r.ok) throw 0; mapData = await r.json(); }
+  catch (e) { mapData = { error: true }; }
+  if (state.view === "map") render();
+}
+function explorePoints() {
+  const labels = [
+    ...Object.values(state.captured).map(c => c.place),
+    ...Object.values(state.micros).map(c => c.place),
+    ...Object.values(state.dinos).map(c => "mus:" + c.museum),
+    ...state.log.map(e => e.place),
+  ];
+  return [...new Set(labels)];
+}
+function renderMap() {
+  const head = `<div class="bhead"><p class="kicker">Exploration</p><h2>Carte</h2></div>`;
+  if (!mapData) return head + '<p class="count">Chargement de la carte…</p>';
+  if (mapData.error) return head + '<div class="gbif-note"><b>Carte indisponible</b>Le fond de carte n\'a pas pu être chargé.</div>';
+  const m = mapData[state.mapView];
+  const pts = explorePoints().map(l => m.places[l]).filter(Boolean);
+  const r = Math.max(m.px10km * 4, 6);
+  const cell = Math.max(m.px10km * 5, 1);
+  const sectors = new Set(pts.map(([x, y]) => `${Math.floor(x / cell)}:${Math.floor(y / cell)}`)).size;
+  const hot = state.mapView === "france" ? m.hotspots : [];
+  const sel = state.hot !== null && hot[state.hot];
+  return `${head}
+    <div class="seg" style="margin-top:14px">
+      <button type="button" class="${state.mapView === "france" ? "on" : ""}" data-mapview="france">France</button>
+      <button type="button" class="${state.mapView === "world" ? "on" : ""}" data-mapview="world">Monde</button>
+    </div>
+    <div class="mapwrap">
+      <svg viewBox="0 0 ${m.width} ${m.height}" role="img" aria-label="Carte des zones explorées">
+        <defs>
+          <filter id="soft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="${Math.max(r / 2.5, 2)}"/></filter>
+          <mask id="fogmask"><rect width="100%" height="100%" fill="#fff"/><g filter="url(#soft)">${pts.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#000"/>`).join("")}</g></mask>
+          <pattern id="fogtex" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="#1B2621"/><circle cx="1.5" cy="1.5" r=".7" fill="#2A3830"/></pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="#A9C8D6"/>
+        <path d="${m.graticule}" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width=".5"/>
+        <path d="${m.land}" fill="#E4DFC9" stroke="#B8B197" stroke-width=".6"/>
+        ${m.borders ? `<path d="${m.borders}" fill="none" stroke="#B8B197" stroke-width=".6" stroke-dasharray="2 2"/>` : ""}
+        <rect width="100%" height="100%" fill="url(#fogtex)" fill-opacity=".7" mask="url(#fogmask)"/>
+        ${hot.map((h, i) => `<g class="hot ${state.hot === i ? "sel" : ""}" data-hot="${i}" tabindex="0" role="button" aria-label="${esc(h.family)}">
+          <circle cx="${h.xy[0]}" cy="${h.xy[1]}" r="${m.px10km * 2.6}"/>
+          <text x="${h.xy[0]}" y="${h.xy[1] + 3}" text-anchor="middle">${h.observers}</text></g>`).join("")}
+        ${pts.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="2.2" fill="#F2A541" stroke="#fff" stroke-width=".8"/>`).join("")}
+      </svg>
+    </div>
+    <div class="stats" style="grid-template-columns:1fr 1fr">
+      <div class="stat"><b>${sectors}</b><small>secteurs de 50 km explorés</small></div>
+      <div class="stat"><b>${pts.length}</b><small>lieux d'observation</small></div>
+    </div>
+    ${state.mapView === "france" ? `<div class="bsec"><h3>Hotspots autour de vous</h3>
+      ${sel ? `<div class="hotcard"><b>${esc(sel.family)}</b><span>${sel.observers} passionnés en ont photographié ce mois-ci dans ce secteur.</span><small>Secteur de 50 km, position exacte jamais affichée.</small></div>` : '<p class="count" style="margin:0 0 8px">Touchez un cercle sur la carte.</p>'}
+      <div class="blist">${hot.map((h, i) => `<button type="button" class="hotrow ${state.hot === i ? "sel" : ""}" data-hot="${i}"><b>${esc(h.family)}</b><span>${h.observers} passionnés</span></button>`).join("")}</div>
+    </div>` : ""}
+    <div class="gbif-note" style="margin-top:16px"><b>Protection de la faune</b>Les hotspots agrègent les observations par secteurs de 50 km, avec au moins 5 observateurs, et un délai d'une semaine. Les espèces menacées ou sensibles n'y apparaissent jamais. Démo : hotspots fictifs.</div>
+    <div class="sources">Fond de carte : ${esc(mapData.source)}.</div>`;
+}
+
+/* Quêtes et événements */
+function questRow(q) {
+  const v = Math.min(q.val(state.log), q.target), done = v >= q.target;
+  return `<div class="quest ${done ? "done" : ""}">
+    <span class="qicon">${done ? "✓" : q.icon}</span>
+    <div><div class="t"><b>${esc(q.name)}</b><span>${v} / ${q.target}</span></div>
+      ${q.bonus ? `<p>${esc(q.bonus)}</p>` : ""}
+      <div class="bar"><i style="width:${v / q.target * 100}%"></i></div></div>
+    <span class="qxp">${done ? "Obtenu" : "+" + q.xp + " XP"}</span>
+  </div>`;
+}
+function goalSwitch() {
+  return `<div class="dexswitch"><button type="button" class="${state.view === "quests" ? "on" : ""}" data-go="quests">Quêtes</button><button type="button" class="${state.view === "badges" ? "on" : ""}" data-go="badges">Badges <small>${unlockedIds().size}</small></button></div>`;
+}
+function renderQuests() {
+  const lv = level(state.xp), into = state.xp % 250;
+  const cond = CONDS[state.cond];
+  return `${goalSwitch()}
+    <div class="bhead"><p class="kicker">Défis</p><h2>Niveau ${lv}</h2><p class="sub">${fmtInt(state.xp)} XP · encore ${250 - into} XP pour le niveau ${lv + 1}</p>
+      <div class="bar" style="margin-top:10px"><i style="width:${into / 250 * 100}%"></i></div></div>
+    <div class="event">
+      <p class="kicker">Événement saisonnier · jour ${EVENT.day} / ${EVENT.days}</p>
+      <h3>${EVENT.name}</h3>
+      <p>Du 22 septembre au 21 décembre, des millions d'oiseaux traversent la France vers le sud. Les migrateurs rapportent double XP.</p>
+    </div>
+    <div class="bsec"><h3>Événement</h3><div class="blist">${QUESTS.filter(q => q.group === "event").map(questRow).join("")}</div></div>
+    <div class="bsec"><h3>Aujourd'hui · nouvelles quêtes dans 6 h</h3><div class="blist">${QUESTS.filter(q => q.group === "day").map(questRow).join("")}</div></div>
+    <div class="bsec"><h3>Météo et heure</h3>
+      <button type="button" class="condrow" data-cond>${cond.icon} Conditions actuelles : <b>${cond.label}</b><small>simulées · toucher pour changer</small></button>
+      <div class="blist">${QUESTS.filter(q => q.group === "meteo").map(questRow).join("")}</div></div>
+    <div class="bpad"></div>`;
+}
+
+/* Sanctuaire, compagnon et météo-morphisme */
+function seeded(n) { const x = Math.sin(n * 9301 + 49297) * 233280; return x - Math.floor(x); }
+function renderSanct() {
+  const c = state.companion, cond = CONDS[state.cond].id, biome = BIOMES[state.biome];
+  const animals = Object.keys(state.captured).map(Number).filter(id => id <= CURATED).slice(0, 18).map(id => byId[id])
+    .concat(Object.keys(state.captured).map(Number).filter(id => id > CURATED).slice(0, 4).map(id => byId[id]));
+  const mood = sp => cond === "night" ? (TRAITS.noct.includes(sp.id) ? "awake" : "sleep") : cond === "rain" ? (TRAITS.rain.includes(sp.id) ? "rainy" : "shelter") : "";
+  let comp;
+  if (!c.kind) {
+    comp = `<div class="compcard"><div class="compart egg">🥚</div><div>
+      <p class="kicker">Œuf mystère</p><b>Encore ${EGG_TARGET - c.egg} capture${EGG_TARGET - c.egg > 1 ? "s" : ""} pour éclore</b>
+      <div class="bar" style="margin-top:8px"><i style="width:${c.egg / EGG_TARGET * 100}%"></i></div>
+      <small>Photographiez des animaux dans la vraie vie pour le faire éclore.</small></div></div>`;
+  } else {
+    const info = COMPANIONS[c.kind], st = compStage(c.xp), lv = compLevel(c.xp);
+    const feel = cond === "night" ? (c.kind === "owl" ? "Pleinement éveillée, elle scrute l'obscurité." : "Dort en boule 💤") :
+      cond === "rain" ? (c.kind === "lizard" ? "S'abrite sous une pierre en attendant le soleil." : "S'ébroue sous la pluie.") :
+      c.kind === "lizard" ? "Se chauffe au soleil, ravi." : "Joyeux, prêt à explorer.";
+    comp = `<div class="compcard"><div class="compart st${st} ${cond === "night" && c.kind !== "owl" ? "sleep" : ""}">${info.em}</div><div>
+      <p class="kicker">Compagnon · niveau ${lv}</p><b>${info.stages[st]}</b>
+      <div class="bar" style="margin-top:8px"><i style="width:${(c.xp % 120) / 120 * 100}%"></i></div>
+      <small>${feel} ${st < 2 ? `Évolue au niveau ${st === 0 ? 4 : 8}.` : "Forme finale."}</small></div></div>`;
+  }
+  return `
+    <div class="bhead"><p class="kicker">Mon sanctuaire</p><h2>${animals.length} animaux</h2>
+      <button type="button" class="condrow" data-cond style="margin-top:10px">${CONDS[state.cond].icon} Météo chez vous : <b>${CONDS[state.cond].label}</b><small>simulée · toucher pour changer</small></button></div>
+    <div style="padding:14px 20px 0">${comp}</div>
+    <div class="chips">${Object.entries(BIOMES).map(([k, b]) => `<button type="button" class="chip ${state.biome === k ? "on" : ""}" data-biome="${k}">${b.icon} ${b.name}</button>`).join("")}</div>
+    <div class="scene b-${state.biome} w-${cond}">
+      ${biome.deco.map((d, i) => `<span class="deco" style="left:${8 + i * 16}%;top:${i % 2 ? 14 : 58}%">${d}</span>`).join("")}
+      ${animals.map((sp, i) => { const md = mood(sp);
+        return `<button type="button" class="critter ${md}" data-feed="${sp.id}" style="left:${6 + seeded(sp.id) * 80}%;top:${18 + seeded(sp.id + 7) * 62}%;--d:${4 + seeded(sp.id + 3) * 5}s" aria-label="Nourrir ${esc(displayName(sp))}">
+          <span>${sp.em}</span>${md === "sleep" ? '<i class="zz">💤</i>' : ""}${state.hearts === sp.id ? '<i class="hearts">💚</i>' : ""}</button>`; }).join("")}
+      ${cond === "rain" ? '<div class="rain"></div>' : ""}
+    </div>
+    <div class="sanctbar">
+      <div><b>🍃 ${state.food}</b><small>nourriture</small></div>
+      <div><b>${state.happy} %</b><small>bien-être</small></div>
+      <button type="button" data-plant>🌱 Scanner une plante</button>
+    </div>
+    ${state.toast ? `<p class="toast">${esc(state.toast)}</p>` : ""}
+    <div class="gbif-note" style="margin-top:12px"><b>Comment ça marche</b>Chaque animal photographié en vrai apparaît ici. Touchez-en un pour le nourrir. Scanner une plante rapporte de la nourriture. La météo du sanctuaire suit la vôtre : sous la pluie, les amphibiens sortent et les autres s'abritent ; la nuit, seuls les animaux nocturnes restent éveillés.</div>
+    <div class="bpad"></div>`;
+}
+
 function museumLabel(key) { const m = MUSEUMS[key]; return `${m.name}, ${m.city}`; }
 
 function renderDinos() {
   const got = Object.keys(state.dinos).length;
   const list = DINOS.filter(d => state.period === "all" || d.per === state.period);
   const chip = (k, label, color) => `<button type="button" class="chip ${state.period === k ? "on" : ""}" data-period="${k}" style="--c:${color || "var(--moss)"}">${k === "all" ? "" : '<i class="dot"></i>'}${label} <small>${DINOS.filter(d => k === "all" || d.per === k).filter(d => state.dinos[d.id]).length} / ${DINOS.filter(d => k === "all" || d.per === k).length}</small></button>`;
-  return `
+  return `${dexSwitch()}
     <div class="dex-head">
       <div>
         <p class="kicker" style="color:#8A6A3B">Paléo-Dex</p>
@@ -1577,10 +2033,12 @@ function render(keepScroll = false) {
   const v = state.view;
   $app.classList.toggle("dark", v === "capture");
   $tabbar.hidden = v === "capture";
-  $tabbar.querySelectorAll(".tab").forEach(t => t.classList.toggle("on", t.dataset.go === v || (v === "fiche" && t.dataset.go === state.back) || (v === "dino" && t.dataset.go === "dinos") || (v === "museums" && t.dataset.go === "dinos") || (v === "micro" && t.dataset.go === "micros")));
+  const tabOf = COLLECTION_VIEWS.includes(v) ? "dex" : v === "badges" ? "quests" : v;
+  $tabbar.querySelectorAll(".tab").forEach(t => t.classList.toggle("on", t.dataset.go === tabOf));
   $screen.innerHTML = v === "dex" ? renderDex() : v === "fiche" ? renderFiche() : v === "badges" ? renderBadges()
     : v === "dinos" ? renderDinos() : v === "dino" ? renderDino() : v === "museums" ? renderMuseums()
-    : v === "micros" ? renderMicros() : v === "micro" ? renderMicro() : renderCapture();
+    : v === "micros" ? renderMicros() : v === "micro" ? renderMicro()
+    : v === "map" ? renderMap() : v === "quests" ? renderQuests() : v === "sanct" ? renderSanct() : renderCapture();
   if (v !== "capture" && !keepScroll) $screen.scrollTop = 0;
   const f = document.getElementById("file");
   if (f) f.addEventListener("change", onFile);
@@ -1594,6 +2052,7 @@ function render(keepScroll = false) {
 function go(view) {
   $layer.innerHTML = "";
   if (view === "fiche") { state.back = state.view === "badges" ? "badges" : "dex"; }
+  state.toast = null; state.hearts = null;
   if (view === "capture") { state.scan = null; if (state.view !== "capture") state.camMode = ["dinos", "dino", "museums"].includes(state.view) ? "fossil" : ["micros", "micro"].includes(state.view) ? "micro" : "live"; }
   if (view !== "capture") state.photo = null;
   state.view = view;
@@ -1619,17 +2078,60 @@ function shoot() {
 
 function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
+// La démo choisit une espèce plausible selon le lieu, l'heure et la météo, et favorise les quêtes en cours.
+function pickTarget() {
+  const curated = SPECIES.slice(0, CURATED);
+  const fresh = list => list.filter(s => !state.captured[s.id]);
+  const prefer = list => fresh(list).length ? fresh(list) : list;
+  const cond = CONDS[state.cond].id, place = POSITIONS[state.pos].id;
+  if (place === "der" && Math.random() < .7) return byId[26];
+  if (cond === "night") return pick(prefer(curated.filter(s => TRAITS.noct.includes(s.id))));
+  if (cond === "rain" && Math.random() < .6) return pick(prefer(curated.filter(s => TRAITS.rain.includes(s.id))));
+  const done = questsDone();
+  const helpful = curated.filter(s => (!done.has("q-poll") && TRAITS.poll.includes(s.id)) || (!done.has("e-migr") && TRAITS.migr.includes(s.id)));
+  if (fresh(helpful).length && Math.random() < .45) return pick(fresh(helpful));
+  const curatedLeft = fresh(curated);
+  // Espèces portant un nom commun : presque toujours actuelles (les fossiles n'en ont pas).
+  const rest = SPECIES.slice(CURATED).filter(s => !state.captured[s.id] && s.name);
+  return curatedLeft.length && (Math.random() < .6 || !rest.length) ? pick(curatedLeft)
+    : rest.length ? pick(rest) : pick(SPECIES);
+}
+
+// Après chaque capture : XP du joueur et du compagnon, quêtes, éclosion, évolution.
+function progressAfter(entry, gainXp, before) {
+  const qBefore = questsDone();
+  state.log.push(entry);
+  const newQuests = QUESTS.filter(q => questsDone().has(q.id) && !qBefore.has(q.id));
+  const questXp = newQuests.reduce((n, q) => n + q.xp, 0);
+  state.xp += gainXp + questXp;
+  const items = BADGES.filter(b => unlockedIds().has(b.id) && !before.has(b.id));
+  newQuests.forEach(q => items.push({ kind: "quest", name: q.name, desc: `Quête accomplie : +${q.xp} XP`, medal: { emo: q.icon, m: "#D08A00" } }));
+  const c = state.companion;
+  state.food += 1;
+  if (!c.kind) {
+    c.egg = Math.min(EGG_TARGET, c.egg + 1);
+    if (c.egg >= EGG_TARGET) items.push({ kind: "hatch" });
+  } else {
+    const stageBefore = compStage(c.xp);
+    c.xp += gainXp;
+    if (compStage(c.xp) > stageBefore) items.push({ kind: "evolve" });
+  }
+  return items;
+}
+
 function showResult() {
   if (state.view !== "capture") return;
   if (state.camMode === "fossil") return showFossilResult();
   if (state.camMode === "micro") return showMicroResult();
   if (POSITIONS[state.pos].verdict !== "ok") return showRefusal(POSITIONS[state.pos]);
-  const curatedLeft = SPECIES.slice(0, CURATED).filter(s => !state.captured[s.id]);
-  // Espèces portant un nom commun : presque toujours actuelles (les fossiles n'en ont pas).
-  const rest = SPECIES.slice(CURATED).filter(s => !state.captured[s.id] && s.name);
-  const target = curatedLeft.length && (Math.random() < .6 || !rest.length) ? pick(curatedLeft)
-    : rest.length ? pick(rest) : pick(SPECIES);
+  const target = pickTarget();
   const isNew = !state.captured[target.id];
+  const cond = CONDS[state.cond].id;
+  const vars = variantsOf(target).filter(v => !((state.captured[target.id] || {}).variants || []).includes(v));
+  const variant = vars.length && Math.random() < .25 ? pick(vars) : null;
+  const gain = xpFor(target, variant, cond, isNew);
+  const r = rarityOf(target);
+  state.pendingCap = { id: target.id, variant, gain, isNew, cond, rarity: r === null ? 0 : r };
   const conf = 86 + Math.floor(Math.random() * 12);
   const pool = SPECIES.filter(s => s.id !== target.id);
   const same = pool.filter(s => s.cat === target.cat && s.sci.split(" ")[0] === target.sci.split(" ")[0]);
@@ -1657,6 +2159,11 @@ function showResult() {
     <div class="alts">
       <div><em>${esc(a1.sci)}</em><span>${r1} %</span></div>
       <div><em>${esc(a2.sci)}</em><span>${r2} %</span></div>
+    </div>
+    <div class="rewards">
+      ${r === null ? "" : `<div class="rrow"><span>Rareté</span>${gem(r, true)}</div>`}
+      ${variant ? `<div class="shinyrow">✨ Variante rare détectée : <b>${esc(variant)}</b></div>` : ""}
+      ${gain.lines.map(([k, v]) => `<div class="xrow"><span>${esc(k)}</span><b>+${v} XP</b></div>`).join("")}
     </div>
     <button type="button" class="cta" data-capture="${target.id}">${isNew ? "Ajouter à mon FaunaDex" : "Enregistrer l'observation"}</button>
     <button type="button" class="ghost" data-retry>Ce n'est pas ça, reprendre</button>
@@ -1724,9 +2231,9 @@ function doMicroCapture(id) {
   const before = unlockedIds();
   const isNew = !state.micros[id];
   const m = microById[id];
-  if (isNew) state.micros[id] = { date: "2026-09-27", place: POSITIONS[state.pos].label };
+  if (isNew) state.micros[id] = { date: TODAY, place: POSITIONS[state.pos].label };
   if (state.photo) (state.microPhotos ||= {})[id] = state.photo;
-  const gained = BADGES.filter(b => unlockedIds().has(b.id) && !before.has(b.id));
+  const gained = progressAfter({ kind: "micro", id, place: POSITIONS[state.pos].label }, isNew ? 25 : 2, before);
   $layer.innerHTML = `<div class="overlay micro"><div class="inner">
     <div class="burst"><span class="em">${m.em}</span></div>
     <h2>${isNew ? "Organisme trouvé !" : "Observation ajoutée"}</h2>
@@ -1771,9 +2278,9 @@ function doDinoCapture(id, museum) {
   const before = unlockedIds();
   const isNew = !state.dinos[id];
   const d = dinoById[id];
-  if (isNew) state.dinos[id] = { date: "2026-09-27", museum };
+  if (isNew) state.dinos[id] = { date: TODAY, museum };
   if (state.photo) (state.dinoPhotos ||= {})[id] = state.photo;
-  const gained = BADGES.filter(b => unlockedIds().has(b.id) && !before.has(b.id));
+  const gained = progressAfter({ kind: "fossil", id, place: "mus:" + museum }, isNew ? 60 : 2, before);
   $layer.innerHTML = `<div class="overlay fossil"><div class="inner">
     <div class="burst"><span class="em">${d.em}</span></div>
     <h2>${isNew ? "Fossile trouvé !" : "Visite enregistrée"}</h2>
@@ -1787,42 +2294,67 @@ function doDinoCapture(id, museum) {
 function doCapture(id) {
   state.after = "fiche";
   const before = unlockedIds();
-  const isNew = !state.captured[id];
+  const pc = state.pendingCap && state.pendingCap.id === id ? state.pendingCap : { id, variant: null, gain: { total: 2 }, isNew: !state.captured[id], cond: "day", rarity: 0 };
   const sp = byId[id];
-  if (isNew) {
-    state.captured[id] = { date: "2026-09-27", place: POSITIONS[state.pos].label };
+  if (pc.isNew) {
+    state.captured[id] = { date: TODAY, place: POSITIONS[state.pos].label, variants: [] };
     state.fresh.add(id);
   }
+  if (pc.variant) (state.captured[id].variants ||= []).push(pc.variant);
   if (state.photo) state.photos[id] = state.photo;
-  const after = unlockedIds();
-  const gained = BADGES.filter(b => after.has(b.id) && !before.has(b.id));
+  const items = progressAfter({ kind: "live", id, isNew: pc.isNew, cond: pc.cond, rarity: pc.rarity, place: POSITIONS[state.pos].label }, pc.gain.total, before);
   const total = Object.keys(state.captured).length;
-  $layer.innerHTML = `<div class="overlay"><div class="inner">
+  $layer.innerHTML = `<div class="overlay ${pc.variant ? "shiny" : ""}"><div class="inner">
     <div class="burst"><span class="em">${sp.em}</span></div>
-    <h2>${isNew ? "Capturée !" : "Observation ajoutée"}</h2>
-    <p>${esc(displayName(sp))} ${isNew ? "rejoint votre collection" : "était déjà dans votre collection"}</p>
-    <div class="no">${no(id)} · ${total} espèces capturées</div>
+    <h2>${pc.variant ? "Variante rare ✨" : pc.isNew ? "Capturée !" : "Observation ajoutée"}</h2>
+    <p>${esc(displayName(sp))} ${pc.variant ? `· ${esc(pc.variant)}` : pc.isNew ? "rejoint votre collection" : "était déjà dans votre collection"}</p>
+    <div class="no">${no(id)} · ${total} espèces · <b class="xpgain">+${pc.gain.total} XP</b></div>
   </div></div>`;
   state.fiche = id;
-  setTimeout(() => showBadges(gained, 0), 1700);
+  setTimeout(() => showBadges(items, 0), 1700);
 }
 
 function showBadges(list, i) {
+  state.pending = list;
   if (i >= list.length) { state.photo = null; state.back = "dex"; state.view = state.after || "fiche"; $layer.innerHTML = ""; render(); return; }
   const b = list[i];
+  const next = i + 1 < list.length ? "Suivant" : { fiche: "Voir la fiche", dino: "Voir la fiche", micro: "Voir la fiche" }[state.after] || "Continuer";
+  const count = list.length > 1 ? `<div class="count">${i + 1} / ${list.length}</div>` : "";
+  if (b.kind === "hatch") {
+    $layer.innerHTML = `<div class="overlay egg"><div class="inner">
+      <p class="kicker" style="color:var(--amber)">L'œuf éclot !</p>
+      <div class="bigegg">🥚</div>
+      <h2>Choisissez votre compagnon</h2>
+      <p>Il gagnera de l'expérience à chacune de vos captures, et grandira avec vous.</p>
+      <div class="choices">${Object.entries(COMPANIONS).map(([k, c]) => `<button type="button" class="choice" data-choose="${k}" data-next="${i + 1}"><span>${c.em}</span><b>${c.stages[0]}</b><small>${c.trait}</small></button>`).join("")}</div>
+      ${count}
+    </div></div>`;
+    return;
+  }
+  if (b.kind === "evolve") {
+    const c = state.companion, info = COMPANIONS[c.kind];
+    $layer.innerHTML = `<div class="overlay"><div class="inner">
+      <p class="kicker" style="color:var(--amber)">Évolution</p>
+      <div class="burst"><span class="em" style="font-size:${80 + compStage(c.xp) * 18}px">${info.em}</span></div>
+      <h2>${info.stages[compStage(c.xp)]}</h2>
+      <p>Votre compagnon a grandi grâce à vos explorations.</p>
+      ${count}
+      <button type="button" class="cta" data-nextbadge="${i + 1}">${next}</button>
+    </div></div>`;
+    return;
+  }
   $layer.innerHTML = `<div class="overlay"><div class="inner">
-    <p class="kicker" style="color:var(--amber)">Badge débloqué</p>
+    <p class="kicker" style="color:var(--amber)">${b.kind === "quest" ? "Quête accomplie" : "Badge débloqué"}</p>
     ${medal(b.medal, false, "bigmedal")}
-    <h2>${b.name}</h2>
-    <p>${b.desc}</p>
-    ${list.length > 1 ? `<div class="count">${i + 1} / ${list.length}</div>` : ""}
-    <button type="button" class="cta" data-nextbadge="${i + 1}">${i + 1 < list.length ? "Badge suivant" : "Voir la fiche"}</button>
+    <h2>${esc(b.name)}</h2>
+    <p>${esc(b.desc)}</p>
+    ${count}
+    <button type="button" class="cta" data-nextbadge="${i + 1}">${next}</button>
   </div></div>`;
-  state.pending = list;
 }
 
 document.addEventListener("click", e => {
-  const t = e.target.closest("button, [data-fiche]");
+  const t = e.target.closest("button, [data-fiche], [data-hot]");
   if (!t) return;
   if (t.id === "reset") { resetState(); $layer.innerHTML = ""; render(); return; }
   if (t.id === "shoot") return shoot();
@@ -1840,6 +2372,26 @@ document.addEventListener("click", e => {
   if (t.dataset.period) { state.period = t.dataset.period; return render(); }
   if ("pos" in t.dataset) { state.pos = (state.pos + 1) % POSITIONS.length; return render(); }
   if (t.dataset.cammode) { state.camMode = t.dataset.cammode; return render(); }
+  if (t.dataset.choose) {
+    state.companion.kind = t.dataset.choose;
+    return showBadges(state.pending, Number(t.dataset.next));
+  }
+  if (t.dataset.mapview) { state.mapView = t.dataset.mapview; state.hot = null; return render(true); }
+  if (t.dataset.hot !== undefined) { state.hot = Number(t.dataset.hot); return render(true); }
+  if ("cond" in t.dataset) { state.cond = (state.cond + 1) % CONDS.length; return render(state.view !== "capture"); }
+  if (t.dataset.biome) { state.biome = t.dataset.biome; return render(true); }
+  if (t.dataset.feed) {
+    const sp = byId[t.dataset.feed];
+    if (state.food <= 0) { state.toast = "Plus de nourriture : scannez une plante ou photographiez un animal."; return render(true); }
+    state.food--; state.happy = Math.min(100, state.happy + 5); state.hearts = sp.id;
+    state.toast = `${displayName(sp)} a mangé avec appétit.`;
+    return render(true);
+  }
+  if ("plant" in t.dataset) {
+    const p = pick(PLANTS); state.food += 2;
+    state.toast = `${p} scanné : +2 nourriture. Les plantes ne comptent pas dans la collection.`;
+    return render(true);
+  }
   if (t.dataset.mcapture) return doMicroCapture(Number(t.dataset.mcapture));
   if (t.dataset.micro) { state.micro = Number(t.dataset.micro); return go("micro"); }
   if (t.dataset.mgroup) { state.mgroup = t.dataset.mgroup; return render(); }
@@ -1852,4 +2404,5 @@ document.addEventListener("click", e => {
 
 render();
 loadCatalogue();
+loadMap();
 </script>
