@@ -266,7 +266,9 @@ CREATE TYPE badge_rule AS ENUM (
   'rarity',             -- params: {"min_rarity": 5, "threshold": 1}
   'category_diversity', -- params: {"categories": 6}  (au moins 1 espèce dans 6 catégories)
   'zone_species',       -- params: {"zone_id": 1, "threshold": 25}      (cf. §2.4)
-  'zone_diversity'      -- params: {"zones": 6}
+  'zone_diversity',     -- params: {"zones": 6}
+  'fossil_count',       -- params: {"threshold": 5}                     (cf. §2.5)
+  'museum_countries'    -- params: {"countries": 3}
 );
 
 CREATE TABLE badges (
@@ -345,6 +347,50 @@ Sources de répartition, par ordre de préférence :
 2. **Occurrences GBIF** pour tous les autres groupes : une espèce est rattachée à une zone si elle y compte un nombre minimal d'observations validées (par exemple 5, hors spécimens de zoo ou de musée). Le calcul se fait par lots avec l'API d'agrégats GBIF, puis il est rafraîchi chaque trimestre.
 
 Chaque capture incrémente `user_zone_stats` pour toutes les zones de l'espèce, dans la même transaction que les autres compteurs (§3.3). Deux nouvelles règles de badges s'appuient dessus : `zone_species` (« Faune de France : 25 espèces présentes en France ») et `zone_diversity` (« Globe-trotter : des espèces de 6 zones du monde »).
+
+### 2.5 Paléo-Dex : les dinosaures
+
+Un onglet à part recense les dinosaures. On ne les rencontre pas vivants : **on les capture en photographiant leur squelette exposé dans un musée**. Seuls les dinosaures dont un squelette est exposé et répertorié peuvent donc être capturés, et l'application indique dans quels musées aller.
+
+```sql
+CREATE TABLE museums (
+  id        serial PRIMARY KEY,
+  name      text NOT NULL,
+  city      text NOT NULL,
+  country   text NOT NULL,
+  location  geography(Point, 4326) NOT NULL,
+  geofence_m int NOT NULL DEFAULT 250            -- rayon dans lequel la photo doit être prise
+);
+
+-- Un squelette exposé : original ou moulage, dans un musée donné
+CREATE TABLE skeleton_exhibits (
+  id            serial PRIMARY KEY,
+  taxon_id      bigint NOT NULL REFERENCES taxa(id),   -- espèce fossile (taxa.is_extinct = true)
+  museum_id     int    NOT NULL REFERENCES museums(id),
+  specimen      text,                                  -- « Sue », « Sophie », numéro d'inventaire…
+  is_cast       boolean NOT NULL DEFAULT false,        -- moulage plutôt que les os originaux
+  gallery       text,                                  -- salle où il est exposé
+  is_active     boolean NOT NULL DEFAULT true          -- retiré, prêté, en restauration…
+);
+
+-- Photos de référence de chaque squelette pour la reconnaissance
+CREATE TABLE exhibit_reference_images (
+  exhibit_id  int REFERENCES skeleton_exhibits(id) ON DELETE CASCADE,
+  image_path  text NOT NULL,
+  embedding   vector(768)                            -- extension pgvector
+);
+
+ALTER TABLE taxa ADD COLUMN is_extinct boolean NOT NULL DEFAULT false;
+ALTER TABLE captures ADD COLUMN exhibit_id int REFERENCES skeleton_exhibits(id);
+```
+
+Reconnaissance d'un squelette (flux distinct du vivant) :
+1. **Position** : la photo doit être prise dans le périmètre d'un musée connu (`geofence_m`), ce qui réduit les candidats aux squelettes exposés dans ce musée, souvent moins de dix.
+2. **Correspondance d'image** : l'embedding de la photo est comparé aux photos de référence de ces squelettes. Un squelette monté est un objet fixe, donc une recherche par similarité suffit, sans modèle d'espèce.
+3. **Cartel** : si le cartel du musée est dans le cadre, sa lecture par OCR confirme le nom.
+4. Une capture fossile n'est valide que si le squelette est `is_active`. Les photos importées de la galerie sans position de musée sont refusées, ce qui empêche de capturer un dinosaure depuis une image trouvée en ligne.
+
+Contenu du référentiel : partir d'une liste curatée de squelettes célèbres (Sue à Chicago, Sophie à Londres, le Diplodocus de Paris…), puis l'enrichir avec Wikidata, qui décrit de nombreux spécimens avec leur musée (propriétés « collection » et « lieu d'exposition »), et avec les musées partenaires. Badges dédiés : `fossil_count` (1, 5, tout le Paléo-Dex) et `museum_countries` (squelettes photographiés dans 3 pays).
 
 ---
 

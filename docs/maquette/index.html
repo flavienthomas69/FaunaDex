@@ -137,8 +137,8 @@
 
   /* Tab bar */
   .tabbar {
-    flex: 0 0 auto; height: 84px; padding: 0 28px 18px;
-    display: grid; grid-template-columns: 1fr 88px 1fr; align-items: center;
+    flex: 0 0 auto; height: 84px; padding: 0 10px 18px;
+    display: grid; grid-template-columns: 1fr 1fr 80px 1fr 1fr; align-items: center;
     background: var(--card); border-top: 1px solid var(--line);
   }
   .tab {
@@ -369,6 +369,50 @@
   .tiers i.on { background: var(--tc); }
   .bpad { height: 24px; }
 
+  /* Paléo-Dex */
+  .howto {
+    margin: 16px 20px 0; padding: 14px; border-radius: 16px;
+    background: #EFE7D8; border: 1px solid #DCCFB6; font-size: 12.5px; line-height: 1.5; color: #5A4B33;
+  }
+  .howto b { display: block; font: 700 15px/1.3 var(--display); color: var(--ink); margin-bottom: 2px; }
+  .howto-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .howto-actions button {
+    border: 0; cursor: pointer; border-radius: 10px; padding: 9px 12px;
+    font: 600 12px/1 var(--body); background: #fff; color: var(--ink);
+  }
+  .howto-actions button:first-child { background: #3D2F1C; color: #fff !important; }
+  .dtile { background: #EFE7D8; border-bottom: 4px solid var(--p); }
+  .dtile .no { color: #8A6A3B; }
+  .dtile .nm { font-size: 11px; overflow-wrap: normal; hyphens: auto; }
+  .dtile .per { font: 500 9.5px/1 var(--mono); color: #7A6A50; }
+  .dtile.locked { background: #E6E1D8; }
+  .dhero { background: linear-gradient(180deg, #E4D8C2 0%, var(--bg) 100%); }
+  .dhero .no { color: #8A6A3B; }
+  .dhero .pic { background: radial-gradient(circle at 35% 30%, #fff 0%, #EFE7D8 70%); }
+  .museums, .blist .mcard { display: grid; gap: 8px; }
+  .mus, .mcard { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: grid; gap: 3px; }
+  .mus b, .mcard b { font: 700 14px/1.25 var(--display); }
+  .mus span, .mcard .city { font-size: 12px; color: var(--muted); }
+  .mdinos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .ztag.got { border-color: var(--moss); color: var(--moss) !important; }
+  .camseg {
+    position: relative; z-index: 2; margin: 14px auto 0; width: max-content; max-width: calc(100% - 40px);
+    display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: rgba(0, 0, 0, .4); backdrop-filter: blur(6px);
+  }
+  .camseg button {
+    border: 0; background: none; cursor: pointer; border-radius: 999px; padding: 8px 12px;
+    font: 600 12px/1 var(--body); color: rgba(255, 255, 255, .8) !important;
+  }
+  .camseg button.on { background: #fff; color: var(--ink) !important; }
+  .viewfinder.museum {
+    background:
+      radial-gradient(ellipse 45% 30% at 50% 48%, rgba(230, 215, 185, .55), transparent 70%),
+      radial-gradient(ellipse 70% 25% at 50% 90%, rgba(120, 95, 70, .8), transparent 75%),
+      linear-gradient(180deg, #2A2520 0%, #3B332A 55%, #4A3E31 100%);
+    background-size: cover; background-position: center;
+  }
+  .overlay.fossil { background: radial-gradient(circle at 50% 42%, #6B5436 0%, #3D2F1C 60%, #1E170D 100%); }
+
   /* Capture */
   .cam { position: absolute; inset: 0; background: #0D1411; color: #fff; display: flex; flex-direction: column; }
   .viewfinder {
@@ -514,7 +558,7 @@
 
   <div class="stage">
     <div class="phone">
-      <div class="app" id="app">
+      <div class="app" id="app" lang="fr">
         <div class="statusbar"><span>9:41</span><span class="sys">
           <svg width="18" height="12" viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="5" width="3" height="7" rx="1" fill="currentColor"/><rect x="10" y="2.5" width="3" height="9.5" rx="1" fill="currentColor"/><rect x="15" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
           <svg width="26" height="12" viewBox="0 0 26 12" aria-hidden="true"><rect x=".5" y=".5" width="22" height="11" rx="3" fill="none" stroke="currentColor" opacity=".5"/><rect x="2" y="2" width="16" height="8" rx="1.8" fill="currentColor"/><rect x="24" y="4" width="1.6" height="4" rx=".8" fill="currentColor" opacity=".5"/></svg>
@@ -525,8 +569,16 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>
             Collection
           </button>
+          <button class="tab" data-go="dinos" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.5 7.5 16.5 16.5"/><path d="M7.5 7.5a2.3 2.3 0 1 0-3-3 2.3 2.3 0 1 0 3 3z"/><path d="M16.5 16.5a2.3 2.3 0 1 0 3 3 2.3 2.3 0 1 0-3-3z"/></svg>
+            Paléo
+          </button>
           <button class="shutter-tab" data-go="capture" type="button" aria-label="Capturer un animal">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.8"/></svg>
+          </button>
+          <button class="tab" data-go="museums" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10 12 4l9 6"/><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8"/><path d="M3 20h18"/></svg>
+            Musées
           </button>
           <button class="tab" data-go="badges" type="button">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9" r="6"/><path d="M8.5 13.8 7 22l5-3 5 3-1.5-8.2"/></svg>
@@ -544,12 +596,14 @@
           <li><b>Parcourez la collection.</b> Les espèces non découvertes apparaissent en silhouette, comme dans un Pokédex. Cherchez un animal par son nom, par exemple « aigle » ou « Panthera », ou basculez sur « Par zone » pour parcourir la faune de France, d'Afrique ou des océans.</li>
           <li><b>Ouvrez une fiche.</b> Noms, caractéristiques, habitat, comportement, anecdote et statut UICN.</li>
           <li><b>Touchez le bouton appareil photo.</b> Déclenchez ou importez une vraie photo depuis votre ordinateur, puis ajoutez l'espèce à votre collection.</li>
+          <li><b>Ouvrez l'onglet Paléo.</b> Le Paléo-Dex liste 16 dinosaures dont un squelette est exposé dans un musée. On les capture en photographiant ce squelette (mode « Squelette (musée) » de l'appareil photo). L'onglet Musées indique où aller.</li>
           <li><b>Regardez les badges.</b> Certaines captures en débloquent un, avec son animation.</li>
         </ol>
         <div class="jump">
           <button type="button" data-go="dex">Collection</button>
           <button type="button" data-go="fiche">Fiche espèce</button>
           <button type="button" data-go="capture">Capture</button>
+          <button type="button" data-go="dinos">Paléo-Dex</button>
           <button type="button" data-go="badges">Badges</button>
           <button type="button" id="reset">Réinitialiser</button>
         </div>
@@ -784,6 +838,101 @@ const SEED = {
   22: ["2026-05-27", "Beaujolais"],
 };
 
+
+/* ── Paléo-Dex : uniquement des dinosaures dont un squelette est exposé dans un musée ── */
+const PERIODS = {
+  tri: { name: "Trias", c: "#812B92", ink: "#fff" },
+  jur: { name: "Jurassique", c: "#34B2C9", ink: "#0B2A31" },
+  cre: { name: "Crétacé", c: "#7FC64E", ink: "#17300A" },
+};
+const MUSEUMS = {
+  field: { name: "Field Museum", city: "Chicago", country: "États-Unis" },
+  naturalis: { name: "Naturalis", city: "Leyde", country: "Pays-Bas" },
+  nmnh: { name: "Smithsonian, musée national d'histoire naturelle", city: "Washington", country: "États-Unis" },
+  carnegie: { name: "Carnegie Museum of Natural History", city: "Pittsburgh", country: "États-Unis" },
+  mnhn: { name: "Muséum national d'Histoire naturelle, galerie de paléontologie", city: "Paris", country: "France" },
+  berlin: { name: "Museum für Naturkunde", city: "Berlin", country: "Allemagne" },
+  irsnb: { name: "Muséum des sciences naturelles", city: "Bruxelles", country: "Belgique" },
+  nhm: { name: "Natural History Museum", city: "Londres", country: "Royaume-Uni" },
+  mor: { name: "Museum of the Rockies", city: "Bozeman", country: "États-Unis" },
+  mongolie: { name: "Musée central des dinosaures de Mongolie", city: "Oulan-Bator", country: "Mongolie" },
+  senckenberg: { name: "Senckenberg Naturmuseum", city: "Francfort", country: "Allemagne" },
+  yale: { name: "Yale Peabody Museum", city: "New Haven", country: "États-Unis" },
+  rom: { name: "Royal Ontario Museum", city: "Toronto", country: "Canada" },
+  frick: { name: "Sauriermuseum", city: "Frick", country: "Suisse" },
+  amnh: { name: "American Museum of Natural History", city: "New York", country: "États-Unis" },
+  trelew: { name: "Museo Paleontológico Egidio Feruglio", city: "Trelew", country: "Argentine" },
+  macn: { name: "Museo Argentino de Ciencias Naturales", city: "Buenos Aires", country: "Argentine" },
+  esperaza: { name: "Musée des Dinosaures", city: "Espéraza", country: "France" },
+};
+const DINOS = [
+  { id: 1, fr: "Tyrannosaure", sci: "Tyrannosaurus rex", em: "🦖", per: "cre", age: "68–66 Ma", size: "12 m", mass: "≈ 8 t", diet: "Carnivore", found: "Amérique du Nord",
+    where: [["field", "« Sue »"], ["naturalis", "« Trix »"]],
+    desc: "Grand théropode au crâne massif d'environ 1,5 m, aux dents coniques et aux bras très courts terminés par deux doigts.",
+    fun: "Sue, l'un des squelettes de T. rex les plus complets (environ 90 %), a été vendu aux enchères en 1997 pour 8,4 millions de dollars." },
+  { id: 2, fr: "Tricératops", sci: "Triceratops horridus", em: "🦴", per: "cre", age: "68–66 Ma", size: "8–9 m", mass: "6–10 t", diet: "Herbivore", found: "Amérique du Nord",
+    where: [["nmnh", "« Hatcher »"]],
+    desc: "Grand herbivore à trois cornes et à collerette osseuse, contemporain du tyrannosaure.",
+    fun: "Son crâne, qui dépasse 2 m de long, compte parmi les plus grands de tous les animaux terrestres." },
+  { id: 3, fr: "Diplodocus", sci: "Diplodocus carnegii", em: "🦕", per: "jur", age: "154–152 Ma", size: "≈ 25 m", mass: "≈ 15 t", diet: "Herbivore", found: "Amérique du Nord",
+    where: [["carnegie", "spécimen original"], ["mnhn", "moulage de 1908"]],
+    desc: "Sauropode au cou et à la queue très allongés, dont la queue se termine en fouet.",
+    fun: "Le milliardaire Andrew Carnegie a offert des moulages de son diplodocus à plusieurs pays d'Europe : celui de Paris est exposé depuis 1908." },
+  { id: 4, fr: "Giraffatitan", sci: "Giraffatitan brancai", em: "🦕", per: "jur", age: "≈ 150 Ma", size: "≈ 22 m", mass: "≈ 30 t", diet: "Herbivore", found: "Afrique (Tanzanie)",
+    where: [["berlin", "squelette monté"]],
+    desc: "Sauropode aux pattes avant plus longues que les pattes arrière, qui portait la tête très haut.",
+    fun: "Avec ses 13 m de haut, il a longtemps été le plus haut squelette de dinosaure monté au monde." },
+  { id: 5, fr: "Iguanodon", sci: "Iguanodon bernissartensis", em: "🦴", per: "cre", age: "126–122 Ma", size: "≈ 10 m", mass: "3–4 t", diet: "Herbivore", found: "Europe (Belgique)",
+    where: [["irsnb", "les iguanodons de Bernissart"]],
+    desc: "Herbivore capable de marcher sur deux ou quatre pattes, avec un pouce en forme de pointe.",
+    fun: "En 1878, des mineurs de Bernissart ont découvert une trentaine de squelettes à plus de 300 m sous terre." },
+  { id: 6, fr: "Stégosaure", sci: "Stegosaurus stenops", em: "🦴", per: "jur", age: "155–150 Ma", size: "7–9 m", mass: "≈ 5 t", diet: "Herbivore", found: "Amérique du Nord",
+    where: [["nhm", "« Sophie »"]],
+    desc: "Herbivore reconnaissable à sa double rangée de plaques dorsales et aux quatre pointes de sa queue.",
+    fun: "Sophie, exposée à Londres, est le squelette de stégosaure le plus complet jamais découvert." },
+  { id: 7, fr: "Allosaure", sci: "Allosaurus fragilis", em: "🦖", per: "jur", age: "155–145 Ma", size: "8–9 m", mass: "≈ 2 t", diet: "Carnivore", found: "Amérique du Nord",
+    where: [["mor", "« Big Al »"]],
+    desc: "Grand prédateur du Jurassique, au crâne surmonté de deux petites crêtes au-dessus des yeux.",
+    fun: "Le squelette de Big Al porte les traces de nombreuses fractures et infections guéries de son vivant." },
+  { id: 8, fr: "Vélociraptor", sci: "Velociraptor mongoliensis", em: "🦖", per: "cre", age: "75–71 Ma", size: "≈ 2 m", mass: "≈ 15 kg", diet: "Carnivore", found: "Asie (Mongolie)",
+    where: [["mongolie", "les « dinosaures combattants »"]],
+    desc: "Petit dromaeosaure à plumes, armé d'une griffe recourbée sur chaque pied.",
+    fun: "Un fossile célèbre montre un vélociraptor et un protocératops figés en plein combat." },
+  { id: 9, fr: "Archéoptéryx", sci: "Archaeopteryx lithographica", em: "🪶", per: "jur", age: "≈ 150 Ma", size: "≈ 50 cm", mass: "≈ 1 kg", diet: "Carnivore", found: "Europe (Allemagne)",
+    where: [["berlin", "spécimen de Berlin"], ["nhm", "spécimen de Londres"]],
+    desc: "Petit dinosaure à plumes et à ailes, qui conservait des dents, des griffes et une longue queue osseuse.",
+    fun: "Découvert en 1861, deux ans après la parution de L'Origine des espèces de Darwin." },
+  { id: 10, fr: "Edmontosaure", sci: "Edmontosaurus annectens", em: "🦴", per: "cre", age: "68–66 Ma", size: "≈ 12 m", mass: "≈ 4 t", diet: "Herbivore", found: "Amérique du Nord",
+    where: [["senckenberg", "la « momie »"]],
+    desc: "Grand dinosaure à bec de canard, doté de centaines de dents serrées pour broyer les végétaux.",
+    fun: "Le spécimen de Francfort a conservé des empreintes de peau autour de son squelette." },
+  { id: 11, fr: "Brontosaure", sci: "Brontosaurus excelsus", em: "🦕", per: "jur", age: "≈ 152 Ma", size: "≈ 22 m", mass: "≈ 15 t", diet: "Herbivore", found: "Amérique du Nord",
+    where: [["yale", "squelette monté"]],
+    desc: "Sauropode massif au cou épais, proche cousin de l'apatosaure.",
+    fun: "Considéré comme un simple synonyme d'Apatosaurus pendant plus d'un siècle, il a retrouvé son nom en 2015." },
+  { id: 12, fr: "Parasaurolophus", sci: "Parasaurolophus walkeri", em: "🦴", per: "cre", age: "76–74 Ma", size: "≈ 9,5 m", mass: "≈ 2,5 t", diet: "Herbivore", found: "Amérique du Nord",
+    where: [["rom", "spécimen type"]],
+    desc: "Dinosaure à bec de canard portant une longue crête creuse vers l'arrière du crâne.",
+    fun: "Sa crête, parcourue de conduits, lui servait probablement à produire des sons graves." },
+  { id: 13, fr: "Plateosaurus", sci: "Plateosaurus trossingensis", em: "🦕", per: "tri", age: "214–204 Ma", size: "≈ 8 m", mass: "0,6–4 t", diet: "Herbivore", found: "Europe",
+    where: [["frick", "squelettes de Frick"]],
+    desc: "L'un des premiers grands dinosaures herbivores, ancêtre lointain des sauropodes.",
+    fun: "C'est l'un des dinosaures les plus fréquents d'Europe : des dizaines de squelettes ont été mis au jour en Allemagne et en Suisse." },
+  { id: 14, fr: "Patagotitan", sci: "Patagotitan mayorum", em: "🦕", per: "cre", age: "≈ 101 Ma", size: "≈ 37 m", mass: "50–60 t", diet: "Herbivore", found: "Amérique du Sud (Argentine)",
+    where: [["trelew", "fossiles originaux"], ["amnh", "moulage « The Titanosaur »"]],
+    desc: "Titanosaure géant, l'un des plus grands animaux terrestres ayant jamais existé.",
+    fun: "À New York, son moulage est si long que sa tête dépasse de la salle d'exposition." },
+  { id: 15, fr: "Carnotaure", sci: "Carnotaurus sastrei", em: "🦖", per: "cre", age: "72–69 Ma", size: "≈ 8 m", mass: "≈ 1,5 t", diet: "Carnivore", found: "Amérique du Sud (Argentine)",
+    where: [["macn", "spécimen type"]],
+    desc: "Théropode aux deux cornes au-dessus des yeux et aux bras encore plus réduits que ceux du T. rex.",
+    fun: "Son squelette a été retrouvé avec de larges empreintes de peau couverte d'écailles." },
+  { id: 16, fr: "Ampelosaurus", sci: "Ampelosaurus atacis", em: "🦕", per: "cre", age: "≈ 70 Ma", size: "≈ 15 m", mass: "plusieurs tonnes", diet: "Herbivore", found: "Europe (France)",
+    where: [["esperaza", "squelette reconstitué"]],
+    desc: "Titanosaure découvert dans l'Aude, dont la peau était renforcée de plaques osseuses.",
+    fun: "C'est l'un des dinosaures les mieux connus de France, fouillé près d'Espéraza depuis les années 1990." },
+];
+const dinoById = Object.fromEntries(DINOS.map(d => [d.id, d]));
+const DINO_SEED = { 3: ["2026-04-12", "mnhn"], 5: ["2026-07-02", "irsnb"] };
 const GARDEN = [10, 11, 13, 19, 22];
 const TIERS = [["bronze", 3, "#B87333"], ["argent", 10, "#9AA4AB"], ["or", 25, "#D9A82B"]];
 const VOLUME = [[1, "Premier pas"], [10, "Explorateur"], [25, "Naturaliste"], [50, "Biologiste"], [100, "Centurion"]];
@@ -792,6 +941,8 @@ let state;
 function resetState() {
   state = { captured: {}, photos: {}, fresh: new Set(), view: "dex", group: "cat", zone: "all", filter: "all", query: "", limit: 60, fiche: 7, back: "dex", photo: null, scan: null };
   for (const [id, [d, p]] of Object.entries(SEED)) state.captured[id] = { date: d, place: p };
+  state.dinos = {}; state.dino = 1; state.camMode = "live"; state.period = "all";
+  for (const [id, [d, m]] of Object.entries(DINO_SEED)) state.dinos[id] = { date: d, museum: m };
 }
 resetState();
 
@@ -806,6 +957,8 @@ function stats() {
     cats: Object.values(byCat).filter(n => n > 0).length,
     zones: new Set(ids.flatMap(i => byId[i].zones || []).filter(z => z !== "fr")).size,
     france: ids.filter(i => (byId[i].zones || []).includes("fr")).length,
+    dinos: Object.keys(state.dinos).length,
+    museums: new Set(Object.values(state.dinos).map(d => MUSEUMS[d.museum].country)).size,
     threatened: ids.filter(i => ["VU", "EN", "CR"].includes(byId[i].st)).length,
   };
 }
@@ -817,6 +970,10 @@ function allBadges() {
   list.push({ id: "ark", name: "Arche de Noé", desc: "Au moins 1 espèce dans 9 familles différentes", medal: { emo: "🌍", m: "#1D7497" }, val: s => s.cats, target: 9 });
   list.push({ id: "globe", name: "Globe-trotter", desc: "Des espèces de 6 zones du monde différentes", medal: { emo: "🧭", m: "#3A77AE" }, val: s => s.zones, target: 6 });
   list.push({ id: "france", name: "Faune de France", desc: "25 espèces présentes en France", medal: { emo: "📍", m: "#1F5C46" }, val: s => s.france, target: 25 });
+  list.push({ id: "fossil1", name: "Premier fossile", desc: "Photographier un squelette de dinosaure", medal: { emo: "🦴", m: "#9A7B4F" }, val: s => s.dinos, target: 1 });
+  list.push({ id: "fossil5", name: "Paléontologue", desc: "5 dinosaures dans le Paléo-Dex", medal: { emo: "🦕", m: "#9A7B4F" }, val: s => s.dinos, target: 5 });
+  list.push({ id: "fossilAll", name: "Paléo-Dex complet", desc: `Les ${DINOS.length} dinosaures répertoriés`, medal: { emo: "🦖", m: "#D9A82B" }, val: s => s.dinos, target: DINOS.length });
+  list.push({ id: "museums", name: "Tour des musées", desc: "Des squelettes photographiés dans 3 pays", medal: { emo: "🏛️", m: "#56708F" }, val: s => s.museums, target: 3 });
   list.push({ id: "guard", name: "Gardien", desc: "Photographier une espèce vulnérable ou en danger", medal: { emo: "🛡️", m: "#C1443A" }, val: s => s.threatened, target: 1 });
   return list;
 }
@@ -1031,6 +1188,10 @@ function renderBadges() {
       <div class="vol">${vol.map(b => `<div class="b ${un.has(b.id) ? "on" : ""}">${medal(b.medal, !un.has(b.id))}<small>${b.name}</small></div>`).join("")}</div>
       ${nextVol ? `<div class="next"><div class="row"><span>Prochain : <b style="font-family:var(--body)">${nextVol.name}</b></span><b>${s.total} / ${nextVol.target}</b></div><div class="bar"><i style="width:${Math.min(100, s.total / nextVol.target * 100)}%"></i></div></div>` : ""}
     </div>
+    <div class="bsec"><h3>Paléontologie</h3><div class="blist">
+      ${BADGES.filter(b => ["fossil1", "fossil5", "fossilAll", "museums"].includes(b.id)).map(b => { const v = Math.min(b.val(s), b.target), ok = un.has(b.id);
+        return `<div class="brow">${medal(b.medal, !ok)}<div><div class="t"><b>${b.name}</b><span>${v} / ${b.target}</span></div><p>${b.desc}</p><div class="bar"><i style="width:${v / b.target * 100}%"></i></div></div></div>`; }).join("")}
+    </div></div>
     <div class="bsec"><h3>Défis</h3><div class="blist">
       ${challenges.map(b => { const v = Math.min(b.val(s), b.target), ok = un.has(b.id);
         return `<div class="brow">${medal(b.medal, !ok)}<div><div class="t"><b>${b.name}</b><span>${v} / ${b.target}</span></div><p>${b.desc}</p><div class="bar"><i style="width:${v / b.target * 100}%"></i></div></div></div>`; }).join("")}
@@ -1054,32 +1215,124 @@ function renderBadges() {
 
 function renderCapture() {
   const scanning = state.scan === "scan";
+  const fossil = state.camMode === "fossil";
   const bg = state.photo ? `style="background-image:url(${state.photo})"` : "";
   return `<div class="cam">
-    <div class="viewfinder ${state.photo ? "photo" : ""}" ${bg}></div>
+    <div class="viewfinder ${state.photo ? "photo" : ""} ${fossil ? "museum" : ""}" ${bg}></div>
     <div class="topbar">
-      <button type="button" class="iconbtn" data-go="dex" aria-label="Fermer">${ICON.close}</button>
-      <span class="pill">${scanning ? "Identification…" : "Cadrez l'animal"}</span>
+      <button type="button" class="iconbtn" data-go="${fossil ? "dinos" : "dex"}" aria-label="Fermer">${ICON.close}</button>
+      <span class="pill">${scanning ? "Identification…" : fossil ? "Cadrez le squelette entier" : "Cadrez l'animal"}</span>
       <span style="width:38px"></span>
     </div>
+    ${scanning ? "" : `<div class="camseg" role="tablist" aria-label="Type de capture">
+      <button type="button" role="tab" aria-selected="${!fossil}" class="${fossil ? "" : "on"}" data-cammode="live">Animal vivant</button>
+      <button type="button" role="tab" aria-selected="${fossil}" class="${fossil ? "on" : ""}" data-cammode="fossil">Squelette (musée)</button>
+    </div>`}
     <div class="reticle"><i></i><i></i><i></i><i></i>${scanning ? '<div class="scanline"></div>' : ""}</div>
     <div class="hint">${scanning
-      ? '<div class="steps"><span class="on" id="st1">Analyse de l\'image</span><span id="st2">Comparaison avec 450 000 taxons</span><span id="st3">Filtre géographique · Lyon</span></div>'
-      : (state.photo ? "Photo importée, prête à être analysée" : "Approchez-vous sans déranger l'animal")}</div>
+      ? (fossil
+        ? `<div class="steps"><span class="on" id="st1">Détection d'un squelette monté</span><span id="st2">Comparaison avec ${DINOS.length} squelettes répertoriés</span><span id="st3">Vérification du musée</span></div>`
+        : '<div class="steps"><span class="on" id="st1">Analyse de l\'image</span><span id="st2">Comparaison avec 450 000 taxons</span><span id="st3">Filtre géographique · Lyon</span></div>')
+      : (state.photo ? "Photo importée, prête à être analysée" : fossil ? "Incluez si possible le cartel du musée" : "Approchez-vous sans déranger l'animal")}</div>
     <div class="controls">
       <label class="gal" title="Importer depuis la galerie">${ICON.image}<input type="file" accept="image/*" id="file" aria-label="Importer une photo"></label>
       <button type="button" class="shoot" id="shoot" ${scanning ? "disabled" : ""} aria-label="Prendre la photo"><i></i></button>
-      <span class="mode">Photo<br><span style="opacity:.6">sauvage</span></span>
+      <span class="mode">${fossil ? "Musée" : "Photo"}<br><span style="opacity:.6">${fossil ? "squelette" : "sauvage"}</span></span>
     </div>
   </div>`;
+}
+
+
+function museumLabel(key) { const m = MUSEUMS[key]; return `${m.name}, ${m.city}`; }
+
+function renderDinos() {
+  const got = Object.keys(state.dinos).length;
+  const list = DINOS.filter(d => state.period === "all" || d.per === state.period);
+  const chip = (k, label, color) => `<button type="button" class="chip ${state.period === k ? "on" : ""}" data-period="${k}" style="--c:${color || "var(--moss)"}">${k === "all" ? "" : '<i class="dot"></i>'}${label} <small>${DINOS.filter(d => k === "all" || d.per === k).filter(d => state.dinos[d.id]).length} / ${DINOS.filter(d => k === "all" || d.per === k).length}</small></button>`;
+  return `
+    <div class="dex-head">
+      <div>
+        <p class="kicker" style="color:#8A6A3B">Paléo-Dex</p>
+        <h2>${got} dinosaure${got > 1 ? "s" : ""}</h2>
+        <p class="sub">sur ${DINOS.length} squelettes répertoriés dans des musées</p>
+      </div>
+      <div class="ring" style="--p:${got / DINOS.length * 100}"><span>${got}/${DINOS.length}</span></div>
+    </div>
+    <div class="howto">
+      <b>Comment les trouver ?</b>
+      Photographiez le squelette exposé dans un musée. Seuls les dinosaures dont un squelette est exposé et répertorié peuvent être capturés.
+      <div class="howto-actions">
+        <button type="button" data-fossilcam>Photographier un squelette</button>
+        <button type="button" data-go="museums">Voir les musées</button>
+      </div>
+    </div>
+    <div class="chips">${chip("all", "Toutes les périodes")}${Object.entries(PERIODS).map(([k, p]) => chip(k, p.name, p.c)).join("")}</div>
+    <div class="grid">
+      ${list.map(d => {
+        const g = state.dinos[d.id], per = PERIODS[d.per];
+        return `<button type="button" class="tile dtile ${g ? "" : "locked"}" data-dino="${d.id}" style="--p:${per.c}" aria-label="${esc(d.fr)}${g ? "" : ", non trouvé"}">
+          <span class="no">F-${String(d.id).padStart(3, "0")}</span>
+          <span class="em">${d.em}</span>
+          <span class="nm">${esc(d.fr)}</span>
+          <span class="per">${per.name}</span>
+        </button>`;
+      }).join("")}
+    </div>
+    <div class="bpad"></div>`;
+}
+
+function renderDino() {
+  const d = dinoById[state.dino], per = PERIODS[d.per], g = state.dinos[d.id];
+  const photo = g && state.dinoPhotos && state.dinoPhotos[d.id];
+  return `<div class="hero dhero" style="--p:${per.c}">
+      <div class="top"><button type="button" class="iconbtn" data-go="dinos" aria-label="Retour">${ICON.back}</button><span class="no">F-${String(d.id).padStart(3, "0")}</span><span style="width:38px"></span></div>
+      <div class="pic ${g ? "" : "locked"}" ${photo ? `style="background-image:url(${photo})"` : ""}>${photo ? "" : `<span>${d.em}</span>`}</div>
+      <h2>${esc(d.fr)}</h2>
+      <p class="sci">${esc(d.sci)}</p>
+      <div class="tags"><span class="tag" style="background:${per.c};color:${per.ink};border-color:transparent">${per.name} · ${d.age}</span><span class="tag">${d.diet}</span></div>
+    </div>
+    ${g
+      ? `<div class="capinfo">${ICON.pin}<span>Squelette photographié le <b>${fmtDate(g.date)}</b><br>${esc(museumLabel(g.museum))}</span></div>`
+      : `<div class="locked-note"><b>Pas encore dans votre Paléo-Dex</b>Photographiez son squelette dans l'un des musées ci-dessous pour débloquer la fiche complète.</div>`}
+    <div class="sec"><h3>Où voir son squelette</h3><div class="museums">
+      ${d.where.map(([k, note]) => { const m = MUSEUMS[k]; return `<div class="mus"><b>${esc(m.name)}</b><span>${esc(m.city)}, ${esc(m.country)} · ${esc(note)}</span></div>`; }).join("")}
+    </div></div>
+    <div class="sec"><h3>Caractéristiques</h3><div class="facts">
+      <div class="fact"><small>Époque</small><b>${d.age}</b></div>
+      <div class="fact"><small>Longueur</small><b>${d.size}</b></div>
+      <div class="fact"><small>Masse</small><b>${d.mass}</b></div>
+    </div></div>
+    ${g ? `
+    <div class="sec"><h3>Description</h3><p>${esc(d.desc)}</p></div>
+    <div class="sec"><h3>Découvert en</h3><div class="habitat"><div>${ICON.globe}<p>${esc(d.found)}</p></div></div></div>
+    <div class="sec"><div class="fun"><h3>Le saviez-vous ?</h3><p>${esc(d.fun)}</p></div></div>` : ""}
+    <div class="sources">Ma : millions d'années. Les dimensions sont des estimations publiées, arrondies. Certains musées exposent un moulage plutôt que les os originaux.</div>`;
+}
+
+function renderMuseums() {
+  const byCountry = {};
+  for (const [k, m] of Object.entries(MUSEUMS)) (byCountry[m.country] ||= []).push(k);
+  const countries = Object.keys(byCountry).sort((a, b) => (b === "France") - (a === "France") || a.localeCompare(b, "fr"));
+  return `
+    <div class="bhead"><p class="kicker" style="color:#8A6A3B">Paléo-Dex</p><h2>Musées</h2><p class="sub">${Object.keys(MUSEUMS).length} musées exposent les squelettes répertoriés</p></div>
+    ${countries.map(c => `<div class="bsec"><h3>${c}</h3><div class="blist">
+      ${byCountry[c].map(k => {
+        const m = MUSEUMS[k];
+        const here = DINOS.filter(d => d.where.some(([w]) => w === k));
+        return `<div class="mcard"><b>${esc(m.name)}</b><span class="city">${esc(m.city)}</span>
+          <div class="mdinos">${here.map(d => `<button type="button" class="ztag ${state.dinos[d.id] ? "got" : ""}" data-dino="${d.id}">${state.dinos[d.id] ? "✓ " : ""}${esc(d.fr)}</button>`).join("")}</div></div>`;
+      }).join("")}
+    </div></div>`).join("")}
+    <div class="bpad"></div>`;
 }
 
 function render(keepScroll = false) {
   const v = state.view;
   $app.classList.toggle("dark", v === "capture");
   $tabbar.hidden = v === "capture";
-  $tabbar.querySelectorAll(".tab").forEach(t => t.classList.toggle("on", t.dataset.go === v || (v === "fiche" && t.dataset.go === state.back)));
-  $screen.innerHTML = v === "dex" ? renderDex() : v === "fiche" ? renderFiche() : v === "badges" ? renderBadges() : renderCapture();
+  $tabbar.querySelectorAll(".tab").forEach(t => t.classList.toggle("on", t.dataset.go === v || (v === "fiche" && t.dataset.go === state.back) || (v === "dino" && t.dataset.go === "dinos")));
+  $screen.innerHTML = v === "dex" ? renderDex() : v === "fiche" ? renderFiche() : v === "badges" ? renderBadges()
+    : v === "dinos" ? renderDinos() : v === "dino" ? renderDino() : v === "museums" ? renderMuseums() : renderCapture();
   if (v !== "capture" && !keepScroll) $screen.scrollTop = 0;
   const f = document.getElementById("file");
   if (f) f.addEventListener("change", onFile);
@@ -1093,7 +1346,7 @@ function render(keepScroll = false) {
 function go(view) {
   $layer.innerHTML = "";
   if (view === "fiche") { state.back = state.view === "badges" ? "badges" : "dex"; }
-  if (view === "capture") { state.scan = null; }
+  if (view === "capture") { state.scan = null; if (state.view !== "capture") state.camMode = ["dinos", "dino", "museums"].includes(state.view) ? "fossil" : "live"; }
   if (view !== "capture") state.photo = null;
   state.view = view;
   render();
@@ -1120,6 +1373,7 @@ function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
 function showResult() {
   if (state.view !== "capture") return;
+  if (state.camMode === "fossil") return showFossilResult();
   const curatedLeft = SPECIES.slice(0, CURATED).filter(s => !state.captured[s.id]);
   // Espèces portant un nom commun : presque toujours actuelles (les fossiles n'en ont pas).
   const rest = SPECIES.slice(CURATED).filter(s => !state.captured[s.id] && s.name);
@@ -1159,7 +1413,55 @@ function showResult() {
   </div>`;
 }
 
+function showFossilResult() {
+  const left = DINOS.filter(d => !state.dinos[d.id]);
+  const d = left.length ? pick(left) : pick(DINOS);
+  const museum = pick(d.where)[0];
+  const isNew = !state.dinos[d.id];
+  const conf = 90 + Math.floor(Math.random() * 9);
+  const per = PERIODS[d.per];
+  state.scan = "done";
+  const pill = document.querySelector(".cam .pill"); if (pill) pill.textContent = "Squelette reconnu";
+  document.querySelector(".scanline")?.remove();
+  $layer.innerHTML = `<div class="sheet" style="--c:${per.c}">
+    <div class="grab"></div>
+    <div class="res">
+      <div class="pic" style="background:#EAE3D6">${d.em}</div>
+      <div>
+        ${isNew ? '<span class="okpill newsp">Nouveau fossile</span>' : '<span class="okpill">Déjà dans votre Paléo-Dex</span>'}
+        <h3>${esc(d.fr)}</h3>
+        <p class="sci">${esc(d.sci)}</p>
+      </div>
+    </div>
+    <div class="conf">
+      <div class="row"><span>Correspondance avec le squelette répertorié</span><b>${conf} %</b></div>
+      <div class="bar"><i style="width:${conf}%"></i></div>
+    </div>
+    <div class="alts"><div><span style="font-family:var(--body);font-size:12px">Musée détecté : <b style="color:var(--ink)">${esc(museumLabel(museum))}</b></span></div></div>
+    <button type="button" class="cta" data-dcapture="${d.id}" data-museum="${museum}">${isNew ? "Ajouter au Paléo-Dex" : "Enregistrer la visite"}</button>
+    <button type="button" class="ghost" data-retry>Ce n'est pas ça, reprendre</button>
+  </div>`;
+}
+
+function doDinoCapture(id, museum) {
+  const before = unlockedIds();
+  const isNew = !state.dinos[id];
+  const d = dinoById[id];
+  if (isNew) state.dinos[id] = { date: "2026-09-27", museum };
+  if (state.photo) (state.dinoPhotos ||= {})[id] = state.photo;
+  const gained = BADGES.filter(b => unlockedIds().has(b.id) && !before.has(b.id));
+  $layer.innerHTML = `<div class="overlay fossil"><div class="inner">
+    <div class="burst"><span class="em">${d.em}</span></div>
+    <h2>${isNew ? "Fossile trouvé !" : "Visite enregistrée"}</h2>
+    <p>${esc(d.fr)} ${isNew ? "rejoint votre Paléo-Dex" : "était déjà dans votre Paléo-Dex"}</p>
+    <div class="no">F-${String(id).padStart(3, "0")} · ${Object.keys(state.dinos).length} / ${DINOS.length} squelettes</div>
+  </div></div>`;
+  state.dino = id; state.after = "dino";
+  setTimeout(() => showBadges(gained, 0), 1700);
+}
+
 function doCapture(id) {
+  state.after = "fiche";
   const before = unlockedIds();
   const isNew = !state.captured[id];
   const sp = byId[id];
@@ -1182,7 +1484,7 @@ function doCapture(id) {
 }
 
 function showBadges(list, i) {
-  if (i >= list.length) { state.photo = null; state.back = "dex"; state.view = "fiche"; $layer.innerHTML = ""; render(); return; }
+  if (i >= list.length) { state.photo = null; state.back = "dex"; state.view = state.after || "fiche"; $layer.innerHTML = ""; render(); return; }
   const b = list[i];
   $layer.innerHTML = `<div class="overlay"><div class="inner">
     <p class="kicker" style="color:var(--amber)">Badge débloqué</p>
@@ -1209,6 +1511,11 @@ document.addEventListener("click", e => {
   }
   if ("more" in t.dataset) { state.limit += 60; document.getElementById("grid-wrap").innerHTML = renderGrid(); return; }
   if (t.dataset.capture) return doCapture(Number(t.dataset.capture));
+  if (t.dataset.dcapture) return doDinoCapture(Number(t.dataset.dcapture), t.dataset.museum);
+  if (t.dataset.dino) { state.dino = Number(t.dataset.dino); return go("dino"); }
+  if (t.dataset.period) { state.period = t.dataset.period; return render(); }
+  if (t.dataset.cammode) { state.camMode = t.dataset.cammode; return render(); }
+  if ("fossilcam" in t.dataset) { go("capture"); state.camMode = "fossil"; return render(); }
   if ("retry" in t.dataset) { $layer.innerHTML = ""; state.scan = null; return render(); }
   if (t.dataset.nextbadge) return showBadges(state.pending, Number(t.dataset.nextbadge));
   if (t.dataset.go) return go(t.dataset.go);
