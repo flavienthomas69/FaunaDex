@@ -189,7 +189,28 @@
   .chip.on { background: var(--ink); color: #fff; border-color: var(--ink); }
   .chip.on small { color: #C9D2CC; }
 
-  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 12px 20px 24px; }
+  .search {
+    margin: 16px 20px 0; display: flex; align-items: center; gap: 8px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 0 12px;
+  }
+  .search svg { width: 18px; height: 18px; color: var(--muted); flex: 0 0 auto; }
+  .search input {
+    flex: 1; min-width: 0; border: 0; background: none; outline: none;
+    font: 500 14px/1 var(--body); color: var(--ink); padding: 12px 0;
+  }
+  .search:focus-within { border-color: var(--moss); }
+  .count { margin: 10px 20px 0; font-size: 12px; color: var(--muted); }
+  .more {
+    display: block; margin: 0 20px 16px; width: calc(100% - 40px); cursor: pointer;
+    border: 1px solid var(--line); background: var(--card); border-radius: 14px; padding: 12px;
+    font: 600 13px/1 var(--body);
+  }
+  .gbif-note {
+    margin: 0 20px 24px; padding: 14px; border-radius: 16px; border: 1.5px dashed #B8C2BB;
+    font-size: 12.5px; line-height: 1.5; color: var(--muted);
+  }
+  .gbif-note b { display: block; color: var(--ink); font: 700 15px/1.3 var(--display); margin-bottom: 4px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 10px 20px 16px; }
   .tile {
     border: 0; cursor: pointer; text-align: left;
     border-radius: 16px; padding: 10px 10px 10px;
@@ -198,7 +219,7 @@
   }
   .tile .no { font: 500 10px/1 var(--mono); color: color-mix(in srgb, var(--c) 70%, #000); }
   .tile .em { font-size: 38px; line-height: 1; text-align: center; padding: 8px 0 4px; }
-  .tile .nm { font: 600 12px/1.2 var(--body); min-height: 2.4em; }
+  .tile .nm { font: 600 12px/1.2 var(--body); min-height: 2.4em; overflow-wrap: anywhere; }
   .tile.locked { background: #E6EAE2; }
   .tile.locked .em { filter: brightness(0); opacity: .22; }
   .tile.locked .nm { color: #8F9A93; letter-spacing: .1em; }
@@ -485,7 +506,7 @@
       <section>
         <h2>À essayer</h2>
         <ol>
-          <li><b>Parcourez la collection.</b> Les espèces non découvertes apparaissent en silhouette, comme dans un Pokédex.</li>
+          <li><b>Parcourez la collection.</b> Les espèces non découvertes apparaissent en silhouette, comme dans un Pokédex. Cherchez un animal par son nom, par exemple « aigle » ou « Panthera ».</li>
           <li><b>Ouvrez une fiche.</b> Noms, caractéristiques, habitat, comportement, anecdote et statut UICN.</li>
           <li><b>Touchez le bouton appareil photo.</b> Déclenchez ou importez une vraie photo depuis votre ordinateur, puis ajoutez l'espèce à votre collection.</li>
           <li><b>Regardez les badges.</b> Certaines captures en débloquent un, avec son animation.</li>
@@ -500,7 +521,8 @@
       </section>
       <section>
         <h2>Ce qui est simulé</h2>
-        <p>L'identification ne passe par aucune IA ici : la maquette choisit au hasard une espèce que vous n'avez pas encore. Les 22 espèces forment un « Dex » de démonstration ; la vraie app couvrira tout le règne animal. Les seuils de badges sont abaissés (3 / 10 / 25 par famille) pour que vous puissiez en débloquer pendant l'essai.</p>
+        <p>L'identification ne passe par aucune IA ici : la maquette choisit au hasard une espèce que vous n'avez pas encore. Les seuils de badges sont abaissés (3 / 10 / 25 par famille) pour que vous puissiez en débloquer pendant l'essai.</p>
+        <p style="margin-top:10px">Le catalogue contient environ 18 000 vraies espèces d'oiseaux, de mammifères et de reptiles, avec leurs noms tirés de Wikispecies (CC BY-SA 4.0), dont quelques espèces fossiles. 22 d'entre elles ont une fiche complète rédigée. Les effectifs mondiaux (≈ 1,5 million d'espèces) sont des ordres de grandeur. L'application réelle importe tout le règne animal depuis GBIF.</p>
       </section>
     </aside>
   </div>
@@ -508,16 +530,19 @@
 
 <script>
 const CATS = {
-  mam: { name: "Mammifères", c: "#B4622A", em: "🦊", pro: "Mammalogiste" },
-  ois: { name: "Oiseaux", c: "#3A77AE", em: "🦉", pro: "Ornithologue" },
-  rep: { name: "Reptiles", c: "#6E8B2A", em: "🦎", pro: "Herpétologue" },
-  amp: { name: "Amphibiens", c: "#23967A", em: "🐸", pro: "Batrachologue" },
-  poi: { name: "Poissons", c: "#1D7497", em: "🐟", pro: "Ichtyologue" },
-  ins: { name: "Insectes", c: "#C48A12", em: "🐞", pro: "Entomologiste" },
-  ara: { name: "Arachnides", c: "#7A4E8C", em: "🕷️", pro: "Arachnologue" },
-  cru: { name: "Crustacés", c: "#C1443A", em: "🦀", pro: "Carcinologue" },
-  mol: { name: "Mollusques", c: "#8A6F58", em: "🐌", pro: "Malacologue" },
+  mam: { name: "Mammifères", c: "#B4622A", em: "🦊", gen: "🐾", pro: "Mammalogiste", world: 6600 },
+  ois: { name: "Oiseaux", c: "#3A77AE", em: "🦉", gen: "🐦", pro: "Ornithologue", world: 11000 },
+  rep: { name: "Reptiles", c: "#6E8B2A", em: "🦎", gen: "🦎", pro: "Herpétologue", world: 12000 },
+  amp: { name: "Amphibiens", c: "#23967A", em: "🐸", gen: "🐸", pro: "Batrachologue", world: 8800 },
+  poi: { name: "Poissons", c: "#1D7497", em: "🐟", gen: "🐟", pro: "Ichtyologue", world: 36000 },
+  ins: { name: "Insectes", c: "#C48A12", em: "🐞", gen: "🪲", pro: "Entomologiste", world: 1000000 },
+  ara: { name: "Arachnides", c: "#7A4E8C", em: "🕷️", gen: "🕷️", pro: "Arachnologue", world: 110000 },
+  cru: { name: "Crustacés", c: "#C1443A", em: "🦀", gen: "🦐", pro: "Carcinologue", world: 70000 },
+  mol: { name: "Mollusques", c: "#8A6F58", em: "🐌", gen: "🐚", pro: "Malacologue", world: 85000 },
+  aut: { name: "Autres invertébrés", c: "#56708F", em: "🪼", gen: "🪼", pro: "Zoologiste", world: 160000 },
 };
+const WORLD_TOTAL = Object.values(CATS).reduce((n, c) => n + c.world, 0);
+const NCATS = Object.keys(CATS).length;
 
 const IUCN = {
   NE: ["Non évaluée", "#9AA39E"], DD: ["Données insuffisantes", "#8E9690"],
@@ -661,7 +686,43 @@ const SPECIES = [
     behavior: "Hermaphrodite, il hiberne scellé derrière un opercule calcaire.",
     fun: "En France, son ramassage est réglementé pour protéger les populations sauvages." },
 ];
-const byId = Object.fromEntries(SPECIES.map(s => [s.id, s]));
+SPECIES.forEach(s => { s.name = s.fr; });
+const CURATED = SPECIES.length;
+let byId = Object.fromEntries(SPECIES.map(s => [s.id, s]));
+let catalog = { status: "loading", source: "", license: "" };
+const inCatalog = Object.fromEntries(Object.keys(CATS).map(k => [k, SPECIES.filter(s => s.cat === k).length]));
+const norm = t => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+/* Catalogue réel : ~18 000 oiseaux, mammifères et reptiles (Wikispecies). */
+async function loadCatalogue() {
+  try {
+    const res = await fetch("catalogue.json");
+    if (!res.ok) throw new Error(res.status);
+    const data = await res.json();
+    const known = new Set(SPECIES.map(s => s.sci));
+    let id = CURATED;
+    for (const [cat, block] of Object.entries(data.species)) {
+      for (const line of block.split("\n")) {
+        const [sci, name, lang] = line.split("|");
+        if (known.has(sci)) continue;
+        SPECIES.push({ id: ++id, sci, cat, em: CATS[cat].gen, catalog: true,
+          fr: lang === "f" ? name : null, en: lang === "e" ? name : null,
+          name: name || null });
+        inCatalog[cat]++;
+      }
+    }
+    SPECIES.forEach(s => { s.key = norm(`${s.name || ""} ${s.en || ""} ${s.sci}`); });
+    byId = Object.fromEntries(SPECIES.map(s => [s.id, s]));
+    catalog = { status: "ok", source: data.source, license: data.license };
+  } catch (e) {
+    SPECIES.forEach(s => { s.key = norm(`${s.name} ${s.sci}`); });
+    catalog.status = "error";
+  }
+  if (state.view === "dex") render();
+}
+const displayName = sp => sp.name || sp.sci;
+const fmtInt = n => n.toLocaleString("fr-FR");
+const fmtWorld = n => n >= 950000 ? `≈ ${fmtInt(Math.round(n / 1e5) / 10)} M` : n >= 1e4 ? `≈ ${fmtInt(Math.round(n / 1000))} k` : `≈ ${fmtInt(n)}`;
 
 const SEED = {
   1: ["2026-03-02", "Parc de la Tête d'Or, Lyon"], 2: ["2026-05-18", "Forêt de Fontainebleau"],
@@ -679,7 +740,7 @@ const VOLUME = [[1, "Premier pas"], [10, "Explorateur"], [25, "Naturaliste"], [5
 
 let state;
 function resetState() {
-  state = { captured: {}, photos: {}, fresh: new Set(), view: "dex", filter: "all", fiche: 7, back: "dex", photo: null, scan: null };
+  state = { captured: {}, photos: {}, fresh: new Set(), view: "dex", filter: "all", query: "", limit: 60, fiche: 7, back: "dex", photo: null, scan: null };
   for (const [id, [d, p]] of Object.entries(SEED)) state.captured[id] = { date: d, place: p };
 }
 resetState();
@@ -701,7 +762,7 @@ function allBadges() {
   for (const [k, c] of Object.entries(CATS)) TIERS.forEach(([t, n, col]) =>
     list.push({ id: `${k}-${t}`, name: `${c.pro} ${t}`, desc: `${n} espèces de ${c.name.toLowerCase()}`, medal: { emo: c.em, m: col }, val: s => s.byCat[k], target: n }));
   list.push({ id: "garden", name: "Petites bêtes du jardin", desc: "Compléter le Dex du jardin (5 espèces)", medal: { emo: "🌿", m: "#4E8F3A" }, val: s => s.garden, target: GARDEN.length });
-  list.push({ id: "ark", name: "Arche de Noé", desc: "Au moins 1 espèce dans chacune des 9 familles", medal: { emo: "🌍", m: "#1D7497" }, val: s => s.cats, target: 9 });
+  list.push({ id: "ark", name: "Arche de Noé", desc: "Au moins 1 espèce dans 9 familles différentes", medal: { emo: "🌍", m: "#1D7497" }, val: s => s.cats, target: 9 });
   list.push({ id: "guard", name: "Gardien", desc: "Photographier une espèce vulnérable ou en danger", medal: { emo: "🛡️", m: "#C1443A" }, val: s => s.threatened, target: 1 });
   return list;
 }
@@ -723,41 +784,60 @@ function medal(m, off, cls = "") {
 
 function renderDex() {
   const s = stats();
-  const pct = Math.round(s.total / SPECIES.length * 100);
   const nb = unlockedIds().size;
   const last = Object.entries(state.captured).sort((a, b) => b[1].date.localeCompare(a[1].date))[0];
-  const list = SPECIES.filter(sp => state.filter === "all" || sp.cat === state.filter);
   const chip = (k, label, color, have, tot) =>
-    `<button type="button" class="chip ${state.filter === k ? "on" : ""}" data-filter="${k}" style="--c:${color}">${k === "all" ? "" : '<i class="dot"></i>'}${label} <small>${have}/${tot}</small></button>`;
+    `<button type="button" class="chip ${state.filter === k ? "on" : ""}" data-filter="${k}" style="--c:${color}">${k === "all" ? "" : '<i class="dot"></i>'}${label} <small>${have} / ${tot}</small></button>`;
+  const loaded = catalog.status === "ok" ? SPECIES.length : CURATED;
   return `
     <div class="dex-head">
       <div>
         <p class="kicker">Mon FaunaDex</p>
         <h2>${s.total} espèces</h2>
-        <p class="sub">sur ${SPECIES.length} dans le Dex « Faune de France »</p>
+        <p class="sub">capturées sur ${fmtWorld(WORLD_TOTAL).replace("M", "million")} d'espèces animales décrites</p>
       </div>
-      <div class="ring" style="--p:${pct}"><span>${pct}%</span></div>
+      <div class="ring" style="--p:${s.cats / NCATS * 100}" title="Familles découvertes"><span>${s.cats}/${NCATS}</span></div>
     </div>
     <div class="stats">
       <div class="stat"><b>${nb}</b><small>badges</small></div>
-      <div class="stat"><b>${s.cats}/9</b><small>familles</small></div>
+      <div class="stat"><b>${catalog.status === "loading" ? "…" : fmtInt(loaded)}</b><small>espèces à explorer</small></div>
       <div class="stat"><b>${byId[last[0]].em}</b><small>dernière capture</small></div>
     </div>
-    <div class="chips">
-      ${chip("all", "Tout", "", s.total, SPECIES.length)}
-      ${Object.entries(CATS).map(([k, c]) => chip(k, c.name, c.c, s.byCat[k], SPECIES.filter(x => x.cat === k).length)).join("")}
+    <div class="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input type="search" id="q" value="${esc(state.query)}" placeholder="Rechercher un animal…" aria-label="Rechercher un animal" autocomplete="off">
     </div>
+    <div class="chips">
+      ${chip("all", "Tout", "", s.total, fmtWorld(WORLD_TOTAL))}
+      ${Object.entries(CATS).map(([k, c]) => chip(k, c.name, c.c, s.byCat[k], fmtWorld(c.world))).join("")}
+    </div>
+    <div id="grid-wrap">${renderGrid()}</div>`;
+}
+
+function renderGrid() {
+  const q = norm(state.query.trim());
+  const list = SPECIES.filter(sp => (state.filter === "all" || sp.cat === state.filter) && (!q || sp.key.includes(q)));
+  const shown = list.slice(0, state.limit);
+  const cat = CATS[state.filter];
+  const missing = state.filter === "all"
+    ? WORLD_TOTAL - SPECIES.length
+    : cat.world - inCatalog[state.filter];
+  return `
+    <p class="count">${catalog.status === "loading" ? "Chargement du catalogue…" : `${fmtInt(list.length)} espèce${list.length > 1 ? "s" : ""}${q ? ` pour « ${esc(state.query.trim())} »` : ""}`}</p>
     <div class="grid">
-      ${list.map(sp => {
+      ${shown.map(sp => {
         const got = state.captured[sp.id];
-        return `<button type="button" class="tile ${got ? "" : "locked"}" data-fiche="${sp.id}" style="--c:${CATS[sp.cat].c}" aria-label="${got ? esc(sp.fr) : "Espèce non découverte"}">
+        return `<button type="button" class="tile ${got ? "" : "locked"}" data-fiche="${sp.id}" style="--c:${CATS[sp.cat].c}" aria-label="${esc(displayName(sp))}${got ? "" : ", non capturée"}">
           ${state.fresh.has(sp.id) ? '<span class="new">NOUVEAU</span>' : ""}
           <span class="no">${no(sp.id)}</span>
           <span class="em">${sp.em}</span>
-          <span class="nm">${got ? esc(sp.fr) : "? ? ?"}</span>
+          <span class="nm">${esc(displayName(sp))}</span>
         </button>`;
       }).join("")}
-    </div>`;
+    </div>
+    ${list.length > shown.length ? `<button type="button" class="more" data-more>Afficher ${Math.min(60, list.length - shown.length)} espèces de plus</button>` : ""}
+    ${!q && catalog.status !== "loading" && missing > 0 ? `<div class="gbif-note"><b>${fmtWorld(missing)} autres espèces${state.filter === "all" ? "" : (/^[aeiouyé]/i.test(cat.name) ? " d'" : " de ") + cat.name.toLowerCase()}</b>Dans l'application, le catalogue complet du règne animal est importé depuis GBIF. Cette maquette n'embarque que les oiseaux, mammifères et reptiles répertoriés par Wikispecies.</div>` : ""}
+    ${catalog.status === "error" ? '<div class="gbif-note"><b>Catalogue indisponible</b>Seules les 22 espèces de démonstration sont affichées.</div>' : ""}`;
 }
 
 const ICON = {
@@ -773,14 +853,17 @@ const ICON = {
 function renderFiche() {
   const sp = byId[state.fiche], cat = CATS[sp.cat], got = state.captured[sp.id];
   const top = `<div class="top"><button type="button" class="iconbtn" data-go="${state.back}" aria-label="Retour">${ICON.back}</button><span class="no">${no(sp.id)}</span><span style="width:38px"></span></div>`;
+  if (!got && sp.catalog) return renderCatalogFiche(sp, cat, got, top);
   if (!got) {
     return `<div class="hero" style="--c:${cat.c}">${top}
       <div class="pic locked"><span>${sp.em}</span></div>
-      <h2>Espèce non découverte</h2>
+      <h2>${esc(sp.fr)}</h2>
+      <p class="sci">${esc(sp.sci)}</p>
       <div class="tags"><span class="tag cat">${cat.name}</span></div></div>
       <div class="locked-note"><b>Photographiez-la pour débloquer sa fiche</b>Indice : on la trouve dans ces milieux : ${esc(sp.habitat.toLowerCase())}.</div>
       <div class="sources"></div>`;
   }
+  if (sp.catalog) return renderCatalogFiche(sp, cat, got, top);
   const photo = state.photos[sp.id];
   const scale = ["DD", "LC", "NT", "VU", "EN", "CR", "EW", "EX"];
   return `<div class="hero" style="--c:${cat.c}">${top}
@@ -802,6 +885,27 @@ function renderFiche() {
       <p class="iucn-label">${sp.st === "NE" ? "<b>Non évaluée</b> par l'UICN à l'échelle mondiale." : `<b>${IUCN[sp.st][0]}</b> (liste rouge UICN)`}</p>
     </div>
     <div class="sources">Sources : Wikipédia (CC BY-SA 4.0), Wikidata, GBIF, liste rouge de l'UICN. Fiche rédigée automatiquement puis relue.</div>`;
+}
+
+function renderCatalogFiche(sp, cat, got, top) {
+  const photo = got && state.photos[sp.id];
+  const genus = sp.sci.split(" ")[0];
+  return `<div class="hero" style="--c:${cat.c}">${top}
+      <div class="pic ${got ? "" : "locked"}" ${photo ? `style="background-image:url(${photo})"` : ""}>${photo ? "" : `<span>${sp.em}</span>`}</div>
+      <h2>${esc(displayName(sp))}</h2>
+      ${sp.name ? `<p class="sci">${esc(sp.sci)}</p>` : ""}
+      <div class="tags"><span class="tag cat">${cat.name}</span>${sp.fr ? "" : `<span class="tag">${sp.en ? "Nom anglais" : "Pas encore de nom commun"}</span>`}</div>
+    </div>
+    ${got ? `<div class="capinfo">${ICON.pin}<span>Capturée le <b>${fmtDate(got.date)}</b><br>${esc(got.place)}${photo ? " · votre photo" : ""}</span></div>` : ""}
+    <div class="sec"><h3>Classification</h3><div class="facts">
+      <div class="fact"><small>Règne</small><b>Animalia</b></div>
+      <div class="fact"><small>Groupe</small><b>${cat.name}</b></div>
+      <div class="fact"><small>Genre</small><b><i>${esc(genus)}</i></b></div>
+    </div></div>
+    ${got
+      ? `<div class="sec"><div class="fun"><h3>Fiche en cours de rédaction</h3><p>Pour les espèces rares, la fiche complète (description, habitat, comportement, anecdotes, statut UICN) est générée à la première capture à partir de Wikipédia, Wikidata, GBIF et de l'UICN. Elle apparaît ici quelques secondes plus tard.</p></div></div>`
+      : `<div class="sec"><div class="locked-note" style="margin:0"><b>Photographiez-la pour débloquer sa fiche</b>Description, habitat, comportement, anecdotes et statut de conservation.</div></div>`}
+    <div class="sources">Nom et classification : ${esc(catalog.source)} (${esc(catalog.license)}).</div>`;
 }
 
 function renderBadges() {
@@ -858,15 +962,20 @@ function renderCapture() {
   </div>`;
 }
 
-function render() {
+function render(keepScroll = false) {
   const v = state.view;
   $app.classList.toggle("dark", v === "capture");
   $tabbar.hidden = v === "capture";
   $tabbar.querySelectorAll(".tab").forEach(t => t.classList.toggle("on", t.dataset.go === v || (v === "fiche" && t.dataset.go === state.back)));
   $screen.innerHTML = v === "dex" ? renderDex() : v === "fiche" ? renderFiche() : v === "badges" ? renderBadges() : renderCapture();
-  if (v !== "capture") $screen.scrollTop = 0;
+  if (v !== "capture" && !keepScroll) $screen.scrollTop = 0;
   const f = document.getElementById("file");
   if (f) f.addEventListener("change", onFile);
+  const q = document.getElementById("q");
+  if (q) q.addEventListener("input", () => {
+    state.query = q.value; state.limit = 60;
+    document.getElementById("grid-wrap").innerHTML = renderGrid();
+  });
 }
 
 function go(view) {
@@ -899,12 +1008,15 @@ function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
 function showResult() {
   if (state.view !== "capture") return;
-  const missing = SPECIES.filter(s => !state.captured[s.id]);
-  const target = missing.length ? pick(missing) : pick(SPECIES);
+  const curatedLeft = SPECIES.slice(0, CURATED).filter(s => !state.captured[s.id]);
+  // Espèces portant un nom commun : presque toujours actuelles (les fossiles n'en ont pas).
+  const rest = SPECIES.slice(CURATED).filter(s => !state.captured[s.id] && s.name);
+  const target = curatedLeft.length && (Math.random() < .6 || !rest.length) ? pick(curatedLeft)
+    : rest.length ? pick(rest) : pick(SPECIES);
   const isNew = !state.captured[target.id];
   const conf = 86 + Math.floor(Math.random() * 12);
   const pool = SPECIES.filter(s => s.id !== target.id);
-  const same = pool.filter(s => s.cat === target.cat);
+  const same = pool.filter(s => s.cat === target.cat && s.sci.split(" ")[0] === target.sci.split(" ")[0]);
   const a1 = same.length ? pick(same) : pick(pool);
   const a2 = pick(pool.filter(s => s.id !== a1.id));
   const r1 = 2 + Math.floor(Math.random() * 6), r2 = 1 + Math.floor(Math.random() * 3);
@@ -918,7 +1030,7 @@ function showResult() {
       <div class="pic">${target.em}</div>
       <div>
         ${isNew ? '<span class="okpill newsp">Nouvelle espèce</span>' : '<span class="okpill">Déjà dans votre collection</span>'}
-        <h3>${esc(target.fr)}</h3>
+        <h3>${esc(displayName(target))}</h3>
         <p class="sci">${esc(target.sci)}</p>
       </div>
     </div>
@@ -950,8 +1062,8 @@ function doCapture(id) {
   $layer.innerHTML = `<div class="overlay"><div class="inner">
     <div class="burst"><span class="em">${sp.em}</span></div>
     <h2>${isNew ? "Capturée !" : "Observation ajoutée"}</h2>
-    <p>${esc(sp.fr)} ${isNew ? "rejoint votre collection" : "était déjà dans votre collection"}</p>
-    <div class="no">${no(id)} · ${total} / ${SPECIES.length} espèces</div>
+    <p>${esc(displayName(sp))} ${isNew ? "rejoint votre collection" : "était déjà dans votre collection"}</p>
+    <div class="no">${no(id)} · ${total} espèces capturées</div>
   </div></div>`;
   state.fiche = id;
   setTimeout(() => showBadges(gained, 0), 1700);
@@ -977,7 +1089,8 @@ document.addEventListener("click", e => {
   if (t.id === "reset") { resetState(); $layer.innerHTML = ""; render(); return; }
   if (t.id === "shoot") return shoot();
   if (t.dataset.fiche) { state.fiche = Number(t.dataset.fiche); state.fresh.delete(state.fiche); return go("fiche"); }
-  if (t.dataset.filter) { state.filter = t.dataset.filter; return render(); }
+  if (t.dataset.filter) { state.filter = t.dataset.filter; state.limit = 60; return render(); }
+  if ("more" in t.dataset) { state.limit += 60; document.getElementById("grid-wrap").innerHTML = renderGrid(); return; }
   if (t.dataset.capture) return doCapture(Number(t.dataset.capture));
   if ("retry" in t.dataset) { $layer.innerHTML = ""; state.scan = null; return render(); }
   if (t.dataset.nextbadge) return showBadges(state.pending, Number(t.dataset.nextbadge));
@@ -985,4 +1098,5 @@ document.addEventListener("click", e => {
 });
 
 render();
+loadCatalogue();
 </script>
