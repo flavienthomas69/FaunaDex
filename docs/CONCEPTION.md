@@ -1,0 +1,542 @@
+# FaunaDex — Document de conception
+
+> « Pokédex du vivant » : photographier un animal, l'identifier par IA, le capturer dans sa collection, consulter sa fiche, débloquer des badges.
+
+Sommaire :
+1. [Architecture globale et stack technique](#1-architecture-globale-et-stack-technique)
+2. [Modèle de données](#2-modèle-de-données)
+3. [Logique de déblocage des badges](#3-logique-de-déblocage-des-badges)
+4. [Plan de développement du MVP](#4-plan-de-développement-du-mvp)
+5. [Risques et points d'attention](#5-risques-et-points-dattention)
+
+---
+
+## 1. Architecture globale et stack technique
+
+### 1.1 Vue d'ensemble
+
+```
+┌──────────────────────────┐        HTTPS/JSON         ┌───────────────────────────────┐
+│  App mobile (Expo / RN)  │ ────────────────────────▶ │  API FaunaDex (TypeScript)    │
+│  - Caméra / galerie      │                           │  - Auth (JWT Supabase)        │
+│  - Collection hors-ligne │ ◀──────────────────────── │  - /observations (capture)    │
+│  - Fiches, badges        │   résultat + badges       │  - Moteur de badges           │
+└────────────┬─────────────┘                           └──────┬──────────┬─────────────┘
+             │ upload direct (URL signée)                     │          │
+             ▼                                                ▼          ▼
+     ┌───────────────┐                          ┌─────────────────┐  ┌──────────────────────┐
+     │ Stockage S3   │ ───── lecture image ───▶ │ Service Vision  │  │ PostgreSQL           │
+     │ (photos)      │                          │ (Python, GPU)   │  │ users, taxons,       │
+     └───────────────┘                          │ BioCLIP 2 +     │  │ captures, badges…    │
+                                                │ filtre géo      │  └──────────────────────┘
+                                                └─────────────────┘            ▲
+                                                                               │ jobs asynchrones
+                                                          ┌────────────────────┴───────────────┐
+                                                          │ Pipeline de contenu (workers)      │
+                                                          │ GBIF · Wikidata/Wikipedia · UICN   │
+                                                          │ + rédaction assistée par LLM       │
+                                                          └────────────────────────────────────┘
+```
+
+### 1.2 Frontend mobile
+
+| Choix | Recommandation | Pourquoi |
+|---|---|---|
+| Framework | **React Native + Expo (SDK récent), TypeScript** | Une seule base iOS/Android, `expo-camera`, `expo-image-picker`, `expo-location`, builds et mises à jour OTA via EAS. |
+| Navigation | Expo Router | Routage par fichiers, deep links vers une fiche (`/species/[id]`). |
+| Données serveur | TanStack Query | Cache, retry, mode hors-ligne partiel. |
+| État local | Zustand | Léger (file d'upload, préférences). |
+| Cache hors-ligne | `expo-sqlite` | La collection et les fiches déjà débloquées restent consultables sans réseau. |
+| Images | `expo-image` + `expo-image-manipulator` | Redimensionner à ~1024 px et compresser **avant** upload (coût, latence). |
+| Animations | Reanimated + Lottie | L'effet « capture réussie / badge débloqué » est central dans l'expérience. |
+
+Alternative : Flutter est tout aussi valable ; React Native est préféré ici pour partager TypeScript avec le backend.
+
+### 1.3 Backend
+
+**Recommandation MVP : Supabase (PostgreSQL managé + Auth + Storage) + une API TypeScript (Fastify ou NestJS).**
+
+- **PostgreSQL** : les règles métier (unicité d'une capture, compteurs, badges) sont transactionnelles — une base relationnelle est le bon outil. Extensions utiles : `ltree` (arbre taxonomique), `pg_trgm` (recherche floue de noms), `postgis` (lieux d'observation).
+- **Auth** : Supabase Auth (email, Apple, Google). Obligatoire : « Sign in with Apple » si un autre login social est proposé sur iOS.
+- **Stockage** : bucket S3-compatible ; l'app uploade directement via une URL signée, l'API ne transporte jamais les octets de l'image.
+- **API** : service TypeScript (Fastify) déployé sur Cloud Run / Fly.io. Il orchestre : upload → appel vision → validation → capture → badges. **La capture n'est jamais décidée par le client** (anti-triche).
+- **Jobs asynchrones** : une file (pg-boss sur Postgres suffit au début) pour la génération de fiches, les notifications push (Expo Push), le recalcul de badges.
+
+### 1.4 IA de vision
+
+Couvrir tout le règne animal (≈ 1,5 million d'espèces décrites) exclut d'entraîner son propre modèle au départ. Stratégie recommandée, en couches :
+
+1. **Modèle principal : BioCLIP 2** (open source, Imageomics, entraîné sur TreeOfLife — des centaines de milliers de taxons). Classification *zero-shot* sur l'arbre du vivant, auto-hébergeable sur GPU (Modal, RunPod, Replicate). Renvoie un top-k d'espèces avec scores.
+2. **Filtre géographique (« geo-prior »)** : on repondère le top-k avec les données d'occurrence **GBIF** autour de la position GPS (ou du pays). Un kangourou photographié en Bretagne est rétrogradé. C'est le gain de précision le moins cher qui existe.
+3. **Remontée taxonomique** : si la confiance au rang espèce est faible, on remonte au genre / à la famille (« Coccinelle — espèce incertaine »). L'utilisateur reçoit un résultat honnête et peut réessayer avec un meilleur angle.
+4. **Vérification optionnelle par un LLM multimodal** (ex. Claude) pour : rejeter les images non valides (dessin, peluche, capture d'écran, pas d'animal), départager deux candidats proches, extraire des indices (« aile visible, vue dorsale »). Ne jamais l'utiliser seul pour nommer l'espèce : risque d'hallucination.
+5. **Alternatives / compléments à évaluer** : API de vision d'iNaturalist (accès sur partenariat), Kindwise insect.id (insectes), SpeciesNet de Google (mammifères/oiseaux en pièges photo). L'interface `VisionProvider` côté service permet de brancher plusieurs moteurs.
+
+Seuils de décision (à calibrer sur un jeu de test) :
+
+| Confiance finale (après geo-prior) | Résultat |
+|---|---|
+| ≥ 0,80 au rang espèce | Capture validée automatiquement |
+| 0,50 – 0,80 | L'utilisateur choisit parmi les 3 meilleures propositions (photos de référence à l'appui) |
+| < 0,50 | Identification au genre/famille seulement, pas de capture d'espèce |
+
+### 1.5 Contenu encyclopédique
+
+Écrire 1,5 million de fiches à la main est impossible. Pipeline :
+
+- **Taxonomie et noms** : GBIF Backbone Taxonomy (ou Catalogue of Life) → table `taxa`. Noms vernaculaires FR/EN via GBIF + **Wikidata**.
+- **Texte** : résumé Wikipedia (CC BY-SA, attribution obligatoire) + données structurées Wikidata (taille, masse, longévité, aire de répartition) → **un LLM reformule en sections** (description, habitat, comportement, anecdotes) en s'appuyant *uniquement* sur ces sources, avec citation.
+- **Statut de conservation** : UICN Red List API. ⚠️ Les conditions d'utilisation de l'UICN restreignent l'usage commercial : à valider juridiquement avant monétisation (Wikidata expose aussi le statut UICN, avec les mêmes réserves sur l'origine).
+- **Stratégie de peuplement** : pré-générer des fiches complètes pour ~10 000 espèces « communes » (celles qu'on photographie réellement), et générer les autres **à la volée** lors de la première capture (fiche « en cours de rédaction » pendant quelques secondes).
+
+---
+
+## 2. Modèle de données
+
+### 2.1 Principes
+
+- **La taxonomie est un arbre** (Règne › Embranchement › Classe › Ordre › Famille › Genre › Espèce). On stocke tous les rangs dans une seule table `taxa` avec un chemin `ltree` → « toutes les espèces sous Aves » est une requête indexée.
+- **Les catégories affichées ≠ la taxonomie.** « Poissons » ou « Reptiles » ne sont pas des groupes taxonomiques propres (paraphylétiques). Une table `categories` associe chaque catégorie de jeu à un ou plusieurs taxons racines ; chaque espèce reçoit une catégorie dénormalisée.
+- **« Toute la famille » doit être un ensemble fini et atteignable.** Personne ne capturera le million d'espèces d'insectes. On introduit donc des **Dex** : listes curatées (« Oiseaux des jardins de France — 60 espèces », « Papillons d'Europe — 120 espèces ») sur lesquelles portent les badges de complétion.
+- **Observation ≠ capture.** Chaque photo soumise crée une `observation` (historique, audit, ré-identification). Une `capture` est l'unique ligne « l'utilisateur possède cette espèce ».
+- **Compteurs dénormalisés** pour que l'évaluation des badges soit en O(1), pas un `COUNT(*)` à chaque capture.
+
+### 2.2 Schéma (PostgreSQL)
+
+```sql
+CREATE EXTENSION IF NOT EXISTS ltree;
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE EXTENSION IF NOT EXISTS postgis;
+
+-- ───────────── Utilisateurs ─────────────
+CREATE TABLE users (
+  id            uuid PRIMARY KEY,               -- = auth.users.id (Supabase)
+  username      text UNIQUE NOT NULL,
+  avatar_url    text,
+  locale        text NOT NULL DEFAULT 'fr',
+  created_at    timestamptz NOT NULL DEFAULT now()
+);
+
+-- ───────────── Taxonomie ─────────────
+CREATE TYPE taxon_rank AS ENUM
+  ('kingdom','phylum','class','order','family','genus','species','subspecies');
+
+CREATE TABLE taxa (
+  id               bigserial PRIMARY KEY,
+  gbif_key         bigint UNIQUE,
+  parent_id        bigint REFERENCES taxa(id),
+  rank             taxon_rank NOT NULL,
+  scientific_name  text NOT NULL,
+  path             ltree NOT NULL,              -- ex. 'animalia.chordata.aves.passeriformes.paridae.parus.parus_major'
+  category_id      int,                         -- dénormalisé, rempli pour les espèces
+  rarity           smallint NOT NULL DEFAULT 1, -- 1 commun … 5 légendaire (dérivé occurrences GBIF + UICN)
+  is_capturable    boolean NOT NULL DEFAULT false  -- vrai pour rank = species
+);
+CREATE INDEX taxa_path_gist ON taxa USING gist (path);
+CREATE INDEX taxa_name_trgm ON taxa USING gin (scientific_name gin_trgm_ops);
+
+CREATE TABLE taxon_common_names (
+  taxon_id   bigint REFERENCES taxa(id) ON DELETE CASCADE,
+  locale     text NOT NULL,
+  name       text NOT NULL,
+  is_primary boolean NOT NULL DEFAULT false,
+  PRIMARY KEY (taxon_id, locale, name)
+);
+
+-- ───────────── Catégories de jeu ─────────────
+CREATE TABLE categories (
+  id         serial PRIMARY KEY,
+  code       text UNIQUE NOT NULL,              -- 'mammals', 'birds', 'insects', 'fish'…
+  name_fr    text NOT NULL,
+  icon       text,
+  sort_order int NOT NULL DEFAULT 0
+);
+-- Une catégorie = un ou plusieurs sous-arbres taxonomiques
+CREATE TABLE category_roots (
+  category_id int    REFERENCES categories(id),
+  taxon_id    bigint REFERENCES taxa(id),
+  PRIMARY KEY (category_id, taxon_id)
+);
+ALTER TABLE taxa ADD FOREIGN KEY (category_id) REFERENCES categories(id);
+
+-- ───────────── Fiches encyclopédiques ─────────────
+CREATE TYPE conservation_status AS ENUM ('NE','DD','LC','NT','VU','EN','CR','EW','EX');
+
+CREATE TABLE species_profiles (
+  taxon_id        bigint REFERENCES taxa(id) ON DELETE CASCADE,
+  locale          text NOT NULL,
+  summary         text,
+  key_facts       jsonb,        -- {"taille_cm":[12,14],"masse_g":[16,22],"longevite_ans":3,"regime":"insectivore"}
+  habitat         text,
+  distribution    text,
+  range_geojson   jsonb,        -- aire de répartition simplifiée pour la carte
+  behavior        text,
+  anecdotes       text[],
+  conservation    conservation_status,
+  sources         jsonb NOT NULL DEFAULT '[]',  -- [{"type":"wikipedia","url":…,"license":"CC BY-SA 4.0"}]
+  generation      text NOT NULL DEFAULT 'auto', -- 'auto' | 'reviewed' | 'manual'
+  updated_at      timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (taxon_id, locale)
+);
+
+CREATE TABLE species_media (
+  id        bigserial PRIMARY KEY,
+  taxon_id  bigint REFERENCES taxa(id),
+  url       text NOT NULL,
+  license   text NOT NULL,
+  author    text,
+  is_cover  boolean NOT NULL DEFAULT false
+);
+
+-- ───────────── Observations et captures ─────────────
+CREATE TYPE observation_status AS ENUM
+  ('pending','identified','needs_choice','uncertain','rejected');
+
+CREATE TABLE observations (
+  id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id            uuid NOT NULL REFERENCES users(id),
+  photo_path         text NOT NULL,
+  photo_phash        bigint,                    -- hash perceptuel (anti-doublon / anti-triche)
+  source             text NOT NULL,             -- 'camera' | 'gallery'
+  taken_at           timestamptz,               -- EXIF
+  location           geography(Point, 4326),
+  status             observation_status NOT NULL DEFAULT 'pending',
+  predictions        jsonb,                     -- top-k brut du modèle + scores après geo-prior
+  model_version      text,
+  identified_taxon_id bigint REFERENCES taxa(id),
+  confidence         real,
+  created_at         timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX observations_user ON observations (user_id, created_at DESC);
+CREATE INDEX observations_phash ON observations (photo_phash);
+
+CREATE TABLE captures (
+  user_id               uuid   NOT NULL REFERENCES users(id),
+  taxon_id              bigint NOT NULL REFERENCES taxa(id),
+  first_observation_id  uuid   NOT NULL REFERENCES observations(id),
+  best_observation_id   uuid   REFERENCES observations(id), -- photo affichée dans la collection
+  captured_at           timestamptz NOT NULL DEFAULT now(),
+  sightings_count       int NOT NULL DEFAULT 1,
+  PRIMARY KEY (user_id, taxon_id)               -- une espèce = une capture par utilisateur
+);
+
+-- ───────────── Dex (collections finies) ─────────────
+CREATE TABLE dex_sets (
+  id           serial PRIMARY KEY,
+  code         text UNIQUE NOT NULL,           -- 'birds_garden_fr'
+  name_fr      text NOT NULL,
+  category_id  int REFERENCES categories(id),
+  region       text,                            -- 'FR', 'EU', NULL = monde
+  species_count int NOT NULL DEFAULT 0          -- maintenu par trigger
+);
+CREATE TABLE dex_set_species (
+  dex_set_id int    REFERENCES dex_sets(id) ON DELETE CASCADE,
+  taxon_id   bigint REFERENCES taxa(id),
+  PRIMARY KEY (dex_set_id, taxon_id)
+);
+CREATE INDEX dex_set_species_taxon ON dex_set_species (taxon_id);
+
+-- ───────────── Compteurs de progression ─────────────
+CREATE TABLE user_stats (
+  user_id        uuid PRIMARY KEY REFERENCES users(id),
+  total_species  int NOT NULL DEFAULT 0,
+  total_sightings int NOT NULL DEFAULT 0,
+  xp             int NOT NULL DEFAULT 0
+);
+CREATE TABLE user_category_stats (
+  user_id      uuid REFERENCES users(id),
+  category_id  int  REFERENCES categories(id),
+  species_count int NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, category_id)
+);
+CREATE TABLE user_dex_progress (
+  user_id      uuid REFERENCES users(id),
+  dex_set_id   int  REFERENCES dex_sets(id),
+  captured     int NOT NULL DEFAULT 0,
+  completed_at timestamptz,
+  PRIMARY KEY (user_id, dex_set_id)
+);
+
+-- ───────────── Badges ─────────────
+CREATE TYPE badge_rule AS ENUM (
+  'total_species',      -- params: {"threshold": 50}
+  'category_species',   -- params: {"category_id": 3, "threshold": 25}
+  'dex_completion',     -- params: {"dex_set_id": 7, "percent": 100}
+  'conservation',       -- params: {"statuses": ["EN","CR"], "threshold": 1}
+  'rarity',             -- params: {"min_rarity": 5, "threshold": 1}
+  'category_diversity'  -- params: {"categories": 6}  (au moins 1 espèce dans 6 catégories)
+);
+
+CREATE TABLE badges (
+  id          serial PRIMARY KEY,
+  code        text UNIQUE NOT NULL,             -- 'total_100', 'birds_25', 'dex_birds_garden_fr'
+  name_fr     text NOT NULL,
+  description_fr text NOT NULL,
+  icon        text NOT NULL,
+  tier        text NOT NULL DEFAULT 'bronze',   -- bronze | argent | or | platine
+  rule        badge_rule NOT NULL,
+  params      jsonb NOT NULL,
+  -- clés d'indexation extraites de params pour ne charger que les badges concernés
+  category_id int REFERENCES categories(id),
+  dex_set_id  int REFERENCES dex_sets(id),
+  xp_reward   int NOT NULL DEFAULT 0,
+  is_active   boolean NOT NULL DEFAULT true
+);
+CREATE INDEX badges_rule ON badges (rule) WHERE is_active;
+
+CREATE TABLE user_badges (
+  user_id        uuid REFERENCES users(id),
+  badge_id       int  REFERENCES badges(id),
+  unlocked_at    timestamptz NOT NULL DEFAULT now(),
+  observation_id uuid REFERENCES observations(id), -- la capture qui l'a déclenché
+  seen           boolean NOT NULL DEFAULT false,   -- pour l'animation « nouveau badge »
+  PRIMARY KEY (user_id, badge_id)                   -- idempotence
+);
+```
+
+### 2.3 Catalogue de badges initial
+
+| Type | Exemples | Règle |
+|---|---|---|
+| Volume | Premier pas (1), Explorateur (10), Naturaliste (25), Biologiste (50), Centurion (100), 200, 500, 1000 | `total_species ≥ seuil` |
+| Catégorie — paliers | Ornithologue bronze/argent/or (5 / 25 / 100 oiseaux), Entomologiste (insectes), Herpétologue (reptiles + amphibiens), Arachnologue… | `category_species ≥ seuil` |
+| Catégorie — complétion | « Oiseaux des jardins : 100 % », « Papillons de France : 50 % / 100 % » | `dex_completion` sur un Dex fini |
+| Diversité | Arche de Noé (au moins 1 espèce dans 8 catégories) | `category_diversity` |
+| Conservation | Gardien (1 espèce menacée VU/EN/CR photographiée à l'état sauvage) | `conservation` |
+| Rareté | Chanceux (1 espèce de rareté 5) | `rarity` |
+
+Catégories initiales proposées : Mammifères, Oiseaux, Reptiles, Amphibiens, Poissons, Insectes, Arachnides, Crustacés, Mollusques, Autres invertébrés (vers, méduses, échinodermes…).
+
+---
+
+## 3. Logique de déblocage des badges
+
+### 3.1 Principes
+
+1. **Côté serveur uniquement**, dans la **même transaction** que la capture : pas d'état incohérent (capture sans badge, ou badge sans capture).
+2. **Seule une nouvelle espèce** fait progresser les badges d'espèces. Revoir une mésange déjà capturée incrémente `sightings_count`, rien de plus.
+3. **Évaluation incrémentale** : on ne réévalue que les badges touchés par les dimensions qui viennent de changer (le total, *la* catégorie de l'espèce, *les* Dex qui la contiennent). Avec les compteurs dénormalisés, c'est une poignée de comparaisons d'entiers.
+4. **Idempotence** : `INSERT … ON CONFLICT DO NOTHING RETURNING` sur `user_badges`. Un retry réseau ou un double-tap ne donne jamais deux fois le même badge.
+5. **Rétroactivité** : quand on crée un nouveau badge (ou un nouveau Dex), un job de rattrapage l'évalue pour tous les utilisateurs à partir des compteurs.
+
+### 3.2 Flux complet d'une capture
+
+```
+App                         API                             Vision            Postgres
+ │ 1. POST /uploads ────────▶│ URL signée                      │                  │
+ │ 2. PUT photo ──────────────────────────────────▶ S3          │                  │
+ │ 3. POST /observations ───▶│ insert observation(pending) ─────────────────────▶ │
+ │                           │ 4. identify(photo, gps) ───────▶│                  │
+ │                           │ ◀────────── top-k + scores ─────│                  │
+ │                           │ 5. geo-prior + seuils            │                  │
+ │                           │ 6. si ≥ seuil : TRANSACTION capture + badges ────▶ │
+ │ ◀── {species, isNew, newBadges[], progress} ──│              │                  │
+ │ 7. animation capture / badge                                                    │
+```
+
+Si la confiance est intermédiaire, l'étape 6 est déclenchée par `POST /observations/:id/confirm { taxonId }`, en vérifiant que `taxonId` fait bien partie du top-k renvoyé par le modèle (le client ne peut pas inventer une espèce).
+
+### 3.3 Implémentation (TypeScript, service API)
+
+```ts
+// capture.service.ts
+import type { PoolClient } from 'pg';
+
+export interface CaptureResult {
+  taxonId: number;
+  isNewSpecies: boolean;
+  newBadges: UnlockedBadge[];
+  progress: { totalSpecies: number; categorySpecies: number; dex: DexProgress[] };
+}
+
+export async function recordCapture(
+  db: PoolClient,
+  userId: string,
+  observationId: string,
+  taxonId: number,
+): Promise<CaptureResult> {
+  await db.query('BEGIN');
+  try {
+    // 1. Tenter la capture. RETURNING ne renvoie une ligne que si l'espèce est nouvelle.
+    const inserted = await db.query(
+      `INSERT INTO captures (user_id, taxon_id, first_observation_id, best_observation_id)
+       VALUES ($1, $2, $3, $3)
+       ON CONFLICT (user_id, taxon_id) DO NOTHING
+       RETURNING taxon_id`,
+      [userId, taxonId, observationId],
+    );
+    const isNewSpecies = inserted.rowCount === 1;
+
+    if (!isNewSpecies) {
+      await db.query(
+        `UPDATE captures SET sightings_count = sightings_count + 1
+         WHERE user_id = $1 AND taxon_id = $2`,
+        [userId, taxonId],
+      );
+      await db.query(
+        `UPDATE user_stats SET total_sightings = total_sightings + 1 WHERE user_id = $1`,
+        [userId],
+      );
+      await db.query('COMMIT');
+      return { taxonId, isNewSpecies, newBadges: [], progress: await readProgress(db, userId, taxonId) };
+    }
+
+    // 2. Mettre à jour les compteurs (une seule ligne verrouillée par dimension).
+    const { rows: [taxon] } = await db.query(
+      `SELECT category_id, rarity, sp.conservation
+       FROM taxa t LEFT JOIN species_profiles sp ON sp.taxon_id = t.id AND sp.locale = 'fr'
+       WHERE t.id = $1`,
+      [taxonId],
+    );
+
+    const { rows: [stats] } = await db.query(
+      `INSERT INTO user_stats (user_id, total_species, total_sightings) VALUES ($1, 1, 1)
+       ON CONFLICT (user_id) DO UPDATE
+         SET total_species = user_stats.total_species + 1,
+             total_sightings = user_stats.total_sightings + 1
+       RETURNING total_species`,
+      [userId],
+    );
+
+    const { rows: [cat] } = await db.query(
+      `INSERT INTO user_category_stats (user_id, category_id, species_count) VALUES ($1, $2, 1)
+       ON CONFLICT (user_id, category_id) DO UPDATE
+         SET species_count = user_category_stats.species_count + 1
+       RETURNING species_count`,
+      [userId, taxon.category_id],
+    );
+
+    const { rows: dexRows } = await db.query(
+      `INSERT INTO user_dex_progress (user_id, dex_set_id, captured)
+       SELECT $1, dss.dex_set_id, 1 FROM dex_set_species dss WHERE dss.taxon_id = $2
+       ON CONFLICT (user_id, dex_set_id) DO UPDATE
+         SET captured = user_dex_progress.captured + 1
+       RETURNING dex_set_id, captured`,
+      [userId, taxonId],
+    );
+
+    // 3. Évaluer uniquement les badges candidats, en une requête.
+    const { rows: newBadges } = await db.query(
+      `WITH ctx AS (
+         SELECT $2::int AS total, $3::int AS cat_id, $4::int AS cat_count,
+                $5::int AS rarity, $6::text AS status
+       ),
+       dex AS (
+         SELECT d.id, p.captured, d.species_count
+         FROM user_dex_progress p JOIN dex_sets d ON d.id = p.dex_set_id
+         WHERE p.user_id = $1 AND p.dex_set_id = ANY($7::int[])
+       ),
+       eligible AS (
+         SELECT b.id FROM badges b, ctx
+         WHERE b.is_active AND (
+              (b.rule = 'total_species'    AND ctx.total     >= (b.params->>'threshold')::int)
+           OR (b.rule = 'category_species' AND b.category_id = ctx.cat_id
+                                           AND ctx.cat_count >= (b.params->>'threshold')::int)
+           OR (b.rule = 'rarity'           AND ctx.rarity    >= (b.params->>'min_rarity')::int)
+           OR (b.rule = 'conservation'     AND ctx.status = ANY (
+                 ARRAY(SELECT jsonb_array_elements_text(b.params->'statuses'))))
+           OR (b.rule = 'dex_completion'   AND EXISTS (
+                 SELECT 1 FROM dex WHERE dex.id = b.dex_set_id
+                   AND dex.captured * 100 >= dex.species_count * (b.params->>'percent')::int))
+           OR (b.rule = 'category_diversity' AND
+                 (SELECT count(*) FROM user_category_stats
+                  WHERE user_id = $1 AND species_count > 0) >= (b.params->>'categories')::int)
+         )
+       )
+       INSERT INTO user_badges (user_id, badge_id, observation_id)
+       SELECT $1, id, $8 FROM eligible
+       ON CONFLICT (user_id, badge_id) DO NOTHING
+       RETURNING badge_id`,
+      [userId, stats.total_species, taxon.category_id, cat.species_count,
+       taxon.rarity, taxon.conservation, dexRows.map(r => r.dex_set_id), observationId],
+    );
+
+    // 4. XP + marquage des Dex complétés + événement pour les notifications push.
+    await applyRewards(db, userId, taxon, newBadges.map(b => b.badge_id));
+    await markCompletedDex(db, userId, dexRows);
+    await enqueueOutbox(db, 'capture.created', { userId, taxonId, badgeIds: newBadges.map(b => b.badge_id) });
+
+    await db.query('COMMIT');
+    return {
+      taxonId,
+      isNewSpecies,
+      newBadges: await loadBadges(db, newBadges.map(b => b.badge_id)),
+      progress: await readProgress(db, userId, taxonId),
+    };
+  } catch (e) {
+    await db.query('ROLLBACK');
+    throw e;
+  }
+}
+```
+
+Remarques :
+
+- Les seuils « déjà dépassés » sont naturellement filtrés par `ON CONFLICT DO NOTHING` : seuls les badges **nouvellement** débloqués reviennent dans `RETURNING`, ce qui pilote l'animation côté app.
+- Les `INSERT … ON CONFLICT DO UPDATE` sur les compteurs verrouillent la ligne concernée : deux captures simultanées du même utilisateur ne peuvent pas produire un compteur faux.
+- Le badge `conservation` peut être restreint aux photos prises à l'état sauvage (`source = 'camera'` + zone hors zoo connue) pour garder du sens.
+- **Rattrapage** (nouveau badge publié) : un job exécute la même clause `eligible` en mode ensembliste sur `user_stats` / `user_category_stats` / `user_dex_progress` pour tous les utilisateurs, avec `observation_id = NULL`.
+- **Retrait d'une capture** (modération, fraude) : décrémenter les compteurs dans une transaction et, par choix produit, **ne pas** retirer les badges déjà obtenus sauf fraude avérée.
+
+### 3.4 Progression affichée
+
+Pour les barres de progression (« Ornithologue argent : 18 / 25 »), une requête `GET /me/badges` joint `badges` aux compteurs et renvoie pour chaque badge non obtenu `current` et `target`. Aucune logique de calcul dupliquée côté client.
+
+---
+
+## 4. Plan de développement du MVP
+
+Objectif du MVP : **prouver la boucle photo → identification fiable → capture → fiche → badge**, sur un périmètre géographique restreint (France / Europe de l'Ouest) tout en acceptant n'importe quel animal.
+
+### Phase 0 — Validation technique (1–2 semaines) ⚠️ la plus importante
+- Constituer un jeu de test de ~500 photos réelles (smartphone, conditions réelles) couvrant les 10 catégories.
+- Mesurer la précision top-1 / top-3 de BioCLIP 2, avec et sans geo-prior GBIF, et d'une ou deux alternatives.
+- Mesurer latence et coût par identification sur GPU serverless.
+- **Critère de sortie** : ≥ 80 % top-3 au rang espèce sur les espèces communes, < 4 s de bout en bout. Sinon, revoir le fournisseur avant d'écrire l'app.
+
+### Phase 1 — Fondations (2 semaines)
+- Monorepo : `apps/mobile` (Expo), `services/api` (Fastify), `services/vision` (Python/FastAPI), `packages/shared` (types, schémas zod).
+- Supabase : projet, auth (email + Apple + Google), bucket photos, migrations SQL (schéma ci-dessus).
+- Import taxonomique GBIF (règne Animalia) + noms FR/EN + catégories et `category_roots`.
+- CI : lint, typecheck, tests, migrations.
+
+### Phase 2 — Boucle de capture (3 semaines)
+- Écran caméra + import galerie, compression, lecture EXIF/GPS (avec consentement).
+- Upload signé → `POST /observations` → service vision → résultat.
+- Écran résultat : validé / choix parmi 3 / incertain.
+- `recordCapture` transactionnel + tests d'intégration (nouvelle espèce, doublon, concurrence).
+
+### Phase 3 — Fiches et collection (2 semaines)
+- Pipeline de contenu : Wikidata + Wikipedia + UICN → LLM → `species_profiles`, pré-généré pour ~2 000 espèces communes d'Europe, à la volée pour les autres.
+- Écran fiche (nom commun/scientifique, photo de l'utilisateur + photo de référence, description, habitat + carte, comportement, anecdotes, statut UICN coloré, sources/licences).
+- Écran collection : grille par catégorie, silhouettes pour les espèces non capturées des Dex, recherche.
+
+### Phase 4 — Gamification (1–2 semaines)
+- Seed du catalogue de badges (volume, paliers par catégorie, 3–5 Dex régionaux curatés).
+- Évaluation dans la transaction + écran badges avec progression + animation de déblocage.
+- Notifications push (badge débloqué, rappel « 3 espèces de plus pour Ornithologue argent »).
+
+### Phase 5 — Durcissement et bêta (2 semaines)
+- Anti-triche minimal : hash perceptuel (même image resoumise ou partagée entre comptes), EXIF absent pour les imports galerie → capture marquée « importée », limite de débit.
+- Hors-ligne : collection et fiches en cache SQLite ; file d'upload différée.
+- Observabilité (Sentry, logs des prédictions pour améliorer les seuils), RGPD (suppression de compte, floutage de la position exacte des espèces sensibles).
+- Bêta fermée TestFlight / Play Console (50–200 testeurs), mesure du taux d'identification correcte signalé par les utilisateurs.
+
+**Total indicatif : 12–14 semaines** pour un·e développeur·se full-stack expérimenté·e, ~8 semaines à deux.
+
+### Hors MVP (v2+)
+Profils publics, amis et classements ; défis saisonniers ; carte communautaire des observations ; mode « expert » avec validation communautaire ; entraînement d'un modèle affiné sur les photos validées de l'app ; contribution des observations à GBIF/iNaturalist (avec consentement) ; contenu multilingue ; sons (chants d'oiseaux).
+
+---
+
+## 5. Risques et points d'attention
+
+| Risque | Mitigation |
+|---|---|
+| Précision IA insuffisante sur insectes/araignées (espèces très proches) | Remontée au genre, choix parmi le top-3, badges adaptés (paliers plutôt que complétion) ; Phase 0 bloquante. |
+| Triche (photos trouvées sur Internet) | Hash perceptuel, EXIF, distinction « capturé » vs « importé », éventuellement recherche d'image inversée sur les captures rares. |
+| Animaux captifs (zoo, aquarium, animaleries) | Option « animal en captivité » ou détection par géofencing des zoos ; captures valides mais exclues des badges « sauvage ». |
+| Licences des données | Wikipedia CC BY-SA → attribution sur chaque fiche ; UICN → accord nécessaire pour un usage commercial ; photos de référence uniquement sous licence libre. |
+| Espèces sensibles (braconnage) | Ne jamais exposer la localisation précise des espèces menacées ; flouter à 10 km. |
+| Hallucinations du LLM dans les fiches | Génération contrainte aux sources fournies, citations, relecture humaine des fiches des espèces les plus capturées (`generation = 'reviewed'`). |
+| Coût GPU | Redimensionnement côté client, cache par hash d'image, instances serverless avec scale-to-zero. |
