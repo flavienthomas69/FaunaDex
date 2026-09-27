@@ -268,7 +268,8 @@ CREATE TYPE badge_rule AS ENUM (
   'zone_species',       -- params: {"zone_id": 1, "threshold": 25}      (cf. §2.4)
   'zone_diversity',     -- params: {"zones": 6}
   'fossil_count',       -- params: {"threshold": 5}                     (cf. §2.5)
-  'museum_countries'    -- params: {"countries": 3}
+  'museum_countries',   -- params: {"countries": 3}
+  'micro_count'         -- params: {"threshold": 5}                     (cf. §2.6)
 );
 
 CREATE TABLE badges (
@@ -391,6 +392,21 @@ Reconnaissance d'un squelette (flux distinct du vivant) :
 4. Une capture fossile n'est valide que si le squelette est `is_active`. Les photos importées de la galerie sans position de musée sont refusées, ce qui empêche de capturer un dinosaure depuis une image trouvée en ligne.
 
 Contenu du référentiel : partir d'une liste curatée de squelettes célèbres (Sue à Chicago, Sophie à Londres, le Diplodocus de Paris…), puis l'enrichir avec Wikidata, qui décrit de nombreux spécimens avec leur musée (propriétés « collection » et « lieu d'exposition »), et avec les musées partenaires. Badges dédiés : `fossil_count` (1, 5, tout le Paléo-Dex) et `museum_countries` (squelettes photographiés dans 3 pays).
+
+### 2.6 Micro-Dex : le monde microscopique
+
+Un troisième onglet recense ce qu'on trouve au microscope dans une goutte d'eau de mare, une touffe de mousse ou de la poussière : animaux microscopiques (tardigrades, rotifères, nématodes, daphnies, acariens…) et, parce qu'on les croise dans les mêmes prélèvements, des protistes (paramécies, amibes, vorticelles) et des algues (diatomées, volvox). Ces derniers ne sont pas des animaux, ce que la fiche indique.
+
+Données :
+- Liste curatée d'organismes courants (`micro_dex_entries` : taxon, groupe, taille, grossissement conseillé, habitat de prélèvement, méthode). Les protistes et les algues sortent du règne Animalia : l'import GBIF (`services/catalog`) doit alors inclure aussi les taxons listés des règnes Protozoa, Chromista et Plantae.
+- L'identification se fait souvent au **genre** (« *Vorticella* sp. ») : c'est le niveau réaliste pour une photo au microscope, et la remontée taxonomique du §1.4 s'applique.
+
+Capture en mode microscope :
+1. La photo doit être prise par l'appareil photo de l'app, à travers l'oculaire ou avec une lentille macro. Le service de vision vérifie la présence du **champ circulaire de l'oculaire** (disque éclairé sur fond noir), ce qui écarte la plupart des images récupérées sur Internet.
+2. Le modèle estime le grossissement à partir de la taille apparente, et rejette une identification incohérente (une daphnie de 2 mm ne remplit pas le champ à ×400).
+3. Le **lieu du prélèvement** (position au moment de la photo) est enregistré. Le contrôle anti-captivité (`services/captivity`) ne s'applique pas : un prélèvement de mare est par nature sauvage.
+
+Badges dédiés : `micro_count` (1, 5, tout le Micro-Dex) et des badges d'espèce emblématique (« Chasseur d'oursons d'eau » pour un tardigrade).
 
 ---
 

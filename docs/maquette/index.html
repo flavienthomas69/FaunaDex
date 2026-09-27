@@ -400,7 +400,7 @@
     display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: rgba(0, 0, 0, .4); backdrop-filter: blur(6px);
   }
   .camseg button {
-    border: 0; background: none; cursor: pointer; border-radius: 999px; padding: 8px 12px;
+    border: 0; background: none; cursor: pointer; border-radius: 999px; padding: 8px 11px;
     font: 600 12px/1 var(--body); color: rgba(255, 255, 255, .8) !important;
   }
   .camseg button.on { background: #fff; color: var(--ink) !important; }
@@ -430,6 +430,47 @@
   .sheet .why { margin: 14px 0 0; font-size: 13.5px; line-height: 1.5; }
   .sheet .why b { font-weight: 700; }
   .sheet.refuse .cta { background: var(--ink); }
+
+  /* Micro-Dex */
+  .howto.micro { background: #E5EBF2; border-color: #C9D5E3; color: #3B4A5C; }
+  .howto.micro .howto-actions button:first-child { background: #22344A; }
+  .mtile { background: #E9EEF4; border-bottom: 4px solid var(--c); }
+  .mtile .no { color: #56708F; }
+  .mtile .nm { font-size: 11px; overflow-wrap: normal; hyphens: auto; }
+  .mtile .per { font: 500 9.5px/1 var(--mono); color: #5E6B78; }
+  .mtile.locked { background: #E3E6EA; }
+  .mhero { background: linear-gradient(180deg, #D5DFEA 0%, var(--bg) 100%); }
+  .mhero .no { color: #56708F; }
+  .pic.lens {
+    background: radial-gradient(circle at 50% 50%, #FDFCF3 0%, #EEF0DC 55%, #C9CDB8 72%, #2A2E28 74%, #111 100%) !important;
+    box-shadow: 0 0 0 6px rgba(255, 255, 255, .7);
+  }
+  .res .pic.lens { border-radius: 50%; box-shadow: none; }
+  .method { margin-top: 10px !important; font-size: 13px !important; color: var(--muted); }
+  .bhead .back { background: var(--card); border: 1px solid var(--line); margin-bottom: 12px; }
+  .viewfinder.scope { background: #050605; }
+  .scopefield {
+    position: absolute; z-index: 1; left: 50%; top: 44%; transform: translate(-50%, -50%);
+    width: 290px; height: 290px; border-radius: 50%; overflow: hidden;
+    background: radial-gradient(circle at 50% 50%, #F4F3DF 0%, #E6E7C7 60%, #B9BC9B 88%, #6E715C 100%);
+    box-shadow: 0 0 40px 10px rgba(0, 0, 0, .9) inset;
+  }
+  .scopefield i {
+    position: absolute; border-radius: 50%; border: 2px solid rgba(80, 110, 60, .45);
+    background: rgba(140, 170, 100, .25);
+  }
+  .scopefield i:nth-child(1) { width: 60px; height: 26px; left: 70px; top: 90px; transform: rotate(-20deg); }
+  .scopefield i:nth-child(2) { width: 22px; height: 22px; left: 190px; top: 160px; }
+  .scopefield i:nth-child(3) { width: 40px; height: 16px; left: 110px; top: 200px; transform: rotate(35deg); }
+  .scopefield i:nth-child(4) { width: 14px; height: 14px; left: 200px; top: 80px; }
+  .scopescan {
+    position: absolute; z-index: 2; left: 50%; top: 44%; transform: translate(-50%, -50%);
+    width: 290px; height: 290px; border-radius: 50%; border: 3px solid var(--amber);
+    box-shadow: 0 0 18px 4px rgba(242, 165, 65, .6); animation: pulse 1s ease-in-out infinite alternate;
+  }
+  @keyframes pulse { from { opacity: .4; } to { opacity: 1; } }
+  .overlay.micro { background: radial-gradient(circle at 50% 42%, #3A5577 0%, #22344A 60%, #0F1824 100%); }
+  @media (prefers-reduced-motion: reduce) { .scopescan { animation: none; } }
 
   /* Capture */
   .cam { position: absolute; inset: 0; background: #0D1411; color: #fff; display: flex; flex-direction: column; }
@@ -594,9 +635,9 @@
           <button class="shutter-tab" data-go="capture" type="button" aria-label="Capturer un animal">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.8"/></svg>
           </button>
-          <button class="tab" data-go="museums" type="button">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10 12 4l9 6"/><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8"/><path d="M3 20h18"/></svg>
-            Musées
+          <button class="tab" data-go="micros" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h4l-1 6h-2z"/><path d="M11 9v3"/><circle cx="11" cy="14" r="2"/><path d="M6 21h12"/><path d="M15 20a6 6 0 0 0 1-9"/><path d="M8 21v-2h6"/></svg>
+            Micro
           </button>
           <button class="tab" data-go="badges" type="button">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9" r="6"/><path d="M8.5 13.8 7 22l5-3 5 3-1.5-8.2"/></svg>
@@ -615,7 +656,8 @@
           <li><b>Ouvrez une fiche.</b> Noms, caractéristiques, habitat, comportement, anecdote et statut UICN.</li>
           <li><b>Touchez le bouton appareil photo.</b> Déclenchez ou importez une vraie photo depuis votre ordinateur, puis ajoutez l'espèce à votre collection.</li>
           <li><b>Essayez de tricher.</b> Dans l'appareil photo, touchez la position simulée pour choisir le zoo ou l'aquarium de Lyon : la photo est refusée, car seuls les animaux en liberté comptent.</li>
-          <li><b>Ouvrez l'onglet Paléo.</b> Le Paléo-Dex liste 16 dinosaures dont un squelette est exposé dans un musée. On les capture en photographiant ce squelette (mode « Squelette (musée) » de l'appareil photo). L'onglet Musées indique où aller.</li>
+          <li><b>Ouvrez l'onglet Paléo.</b> Le Paléo-Dex liste 16 dinosaures dont un squelette est exposé dans un musée. On les capture en photographiant ce squelette (mode « Squelette (musée) » de l'appareil photo). Le bouton « Voir les musées » indique où aller.</li>
+          <li><b>Ouvrez l'onglet Micro.</b> Le Micro-Dex liste 15 organismes à trouver au microscope dans l'eau de mare, la mousse ou la poussière : tardigrades, rotifères, paramécies, diatomées… Chaque fiche explique comment faire le prélèvement.</li>
           <li><b>Regardez les badges.</b> Certaines captures en débloquent un, avec son animation.</li>
         </ol>
         <div class="jump">
@@ -623,6 +665,7 @@
           <button type="button" data-go="fiche">Fiche espèce</button>
           <button type="button" data-go="capture">Capture</button>
           <button type="button" data-go="dinos">Paléo-Dex</button>
+          <button type="button" data-go="micros">Micro-Dex</button>
           <button type="button" data-go="badges">Badges</button>
           <button type="button" id="reset">Réinitialiser</button>
         </div>
@@ -951,6 +994,92 @@ const DINOS = [
     fun: "C'est l'un des dinosaures les mieux connus de France, fouillé près d'Espéraza depuis les années 1990." },
 ];
 const dinoById = Object.fromEntries(DINOS.map(d => [d.id, d]));
+/* ── Micro-Dex : ce qu'on trouve au microscope ── */
+const MGROUPS = {
+  ani: { name: "Animaux", one: "Animal", c: "#1F5C46" },
+  pro: { name: "Protistes", one: "Protiste", c: "#7A4E8C" },
+  alg: { name: "Algues", one: "Algue microscopique", c: "#3F8A2E" },
+};
+const MICROS = [
+  { id: 1, fr: "Tardigrade", sci: "Hypsibius exemplaris", em: "🐻", g: "ani", phylum: "Tardigrades", size: "≈ 0,25 mm", eye: "Invisible à l'œil nu", mag: "×40 à ×100",
+    where: "Mousses et lichens, surtout sur les murs et les toits",
+    how: "Laissez tremper une touffe de mousse sèche dans un peu d'eau pendant une nuit, pressez-la au-dessus d'une boîte de Petri, puis cherchez au plus faible grossissement.",
+    desc: "Petit animal à huit pattes griffues, surnommé « ourson d'eau » pour sa démarche pataude.",
+    fun: "Desséché, il entre en cryptobiose et résiste au froid extrême, aux radiations et même au vide spatial, comme l'a montré une expérience en orbite en 2007." },
+  { id: 2, fr: "Rotifère bdelloïde", sci: "Adineta vaga", em: "⚙️", g: "ani", phylum: "Rotifères", size: "0,2–0,4 mm", eye: "Invisible à l'œil nu", mag: "×100",
+    where: "Mousses, gouttières, eau de pluie stagnante",
+    how: "Même méthode que pour le tardigrade : l'eau exprimée d'une mousse humidifiée en contient presque toujours.",
+    desc: "Animal minuscule dont la tête porte deux couronnes de cils qui, en battant, donnent l'impression de roues qui tournent.",
+    fun: "Les bdelloïdes se reproduisent sans mâles depuis des dizaines de millions d'années. Un rotifère de ce groupe a été ranimé après 24 000 ans dans le pergélisol sibérien." },
+  { id: 3, fr: "Daphnie", sci: "Daphnia pulex", em: "🦐", g: "ani", phylum: "Arthropodes (crustacés)", size: "1–3 mm", eye: "Point visible à l'œil nu", mag: "×20 à ×40",
+    where: "Mares, étangs, bassins de jardin",
+    how: "Passez un filet fin ou un bocal dans une mare au printemps. Les daphnies nagent par saccades, d'où leur nom de « puces d'eau ».",
+    desc: "Petit crustacé transparent qui nage en battant de ses grandes antennes.",
+    fun: "Son corps est si transparent qu'on voit son cœur battre et ses œufs se développer au microscope." },
+  { id: 4, fr: "Cyclope", sci: "Cyclops", genus: true, em: "👁️", g: "ani", phylum: "Arthropodes (crustacés)", size: "0,5–3 mm", eye: "Point visible à l'œil nu", mag: "×20 à ×40",
+    where: "Mares, fossés, lacs",
+    how: "Présent dans presque tous les échantillons d'eau douce stagnante. Les femelles portent souvent deux sacs d'œufs à l'arrière.",
+    desc: "Copépode au corps en forme de poire, qui se déplace par bonds rapides.",
+    fun: "Il doit son nom à son œil unique, au milieu du front, comme le géant de la mythologie grecque." },
+  { id: 5, fr: "Nématode C. elegans", sci: "Caenorhabditis elegans", em: "🪱", g: "ani", phylum: "Nématodes", size: "≈ 1 mm", eye: "Tout juste visible", mag: "×40 à ×100",
+    where: "Fruits pourrissants, compost, sol riche",
+    how: "Déposez un peu de compost ou un morceau de fruit pourri dans une goutte d'eau et observez les vers qui s'agitent en S.",
+    desc: "Petit ver transparent, l'un des animaux les plus étudiés en biologie.",
+    fun: "C'est le premier animal dont le génome a été entièrement séquencé, en 1998. L'adulte hermaphrodite compte exactement 959 cellules, hors cellules reproductrices." },
+  { id: 6, fr: "Acarien de la poussière", sci: "Dermatophagoides pteronyssinus", em: "🕷️", g: "ani", phylum: "Arthropodes (arachnides)", size: "0,2–0,3 mm", eye: "Invisible à l'œil nu", mag: "×40 à ×100",
+    where: "Poussière de maison, matelas, tapis",
+    how: "Passez un ruban adhésif sur un matelas ou un tapis, collez-le sur une lame et observez.",
+    desc: "Minuscule arachnide à huit pattes qui se nourrit de squames de peau humaine.",
+    fun: "Ce ne sont pas les acariens eux-mêmes mais leurs déjections qui provoquent la plupart des allergies à la poussière." },
+  { id: 7, fr: "Demodex", sci: "Demodex folliculorum", em: "🧫", g: "ani", phylum: "Arthropodes (arachnides)", size: "0,3–0,4 mm", eye: "Invisible à l'œil nu", mag: "×100",
+    where: "Follicules des cils et de la peau du visage humain",
+    how: "Un cil tombé ou un peu de sébum prélevé sur le nez, posé dans une goutte d'huile, en révèle souvent.",
+    desc: "Acarien vermiforme qui vit dans les follicules pileux du visage.",
+    fun: "La plupart des adultes en hébergent sans le savoir : ils sortent la nuit pour s'accoupler à la surface de la peau." },
+  { id: 8, fr: "Hydre d'eau douce", sci: "Hydra vulgaris", em: "🪸", g: "ani", phylum: "Cnidaires", size: "jusqu'à 1 cm", eye: "Visible à l'œil nu", mag: "×10 à ×40",
+    where: "Mares et étangs, fixée sous les feuilles de plantes aquatiques",
+    how: "Laissez reposer quelques plantes de mare dans un bocal : les hydres se fixent sur les parois et déploient leurs tentacules.",
+    desc: "Petit cousin des méduses, en forme de tube terminé par une couronne de tentacules urticants.",
+    fun: "Elle renouvelle sans cesse ses cellules et ne semble pas vieillir, ce qui en fait un modèle d'étude de la longévité." },
+  { id: 9, fr: "Paramécie", sci: "Paramecium caudatum", em: "🦠", g: "pro", phylum: "Ciliés", size: "0,2–0,3 mm", eye: "Invisible à l'œil nu", mag: "×100",
+    where: "Eau de mare, infusion de foin",
+    how: "Faites tremper une poignée de foin ou de salade dans de l'eau pendant une semaine : l'infusion en grouille.",
+    desc: "Cellule en forme de semelle, couverte de milliers de cils qui la propulsent en tournoyant.",
+    fun: "Elle possède deux noyaux : un grand pour le fonctionnement courant, un petit qui sert à la reproduction." },
+  { id: 10, fr: "Amibe", sci: "Amoeba proteus", em: "🫧", g: "pro", phylum: "Amibozoaires", size: "0,2–0,7 mm", eye: "Invisible à l'œil nu", mag: "×100",
+    where: "Fond vaseux des mares, dessous des feuilles immergées",
+    how: "Prélevez un peu de dépôt au fond d'une mare et observez sans lamelle, à faible lumière.",
+    desc: "Cellule sans forme fixe qui avance en poussant des « faux pieds », les pseudopodes.",
+    fun: "Elle capture ses proies en les entourant de ses pseudopodes, puis les digère à l'intérieur d'une vacuole." },
+  { id: 11, fr: "Euglène", sci: "Euglena gracilis", em: "🍃", g: "pro", phylum: "Euglénozoaires", size: "35–55 µm", eye: "Invisible à l'œil nu", mag: "×400",
+    where: "Mares riches en matière organique, flaques vertes",
+    how: "Une flaque ou une mare teintée de vert au soleil en contient souvent des milliers.",
+    desc: "Cellule verte munie d'un flagelle et d'une tache rouge sensible à la lumière.",
+    fun: "Elle fait la photosynthèse comme une plante à la lumière, et se nourrit comme un animal dans l'obscurité." },
+  { id: 12, fr: "Vorticelle", sci: "Vorticella", genus: true, em: "🔔", g: "pro", phylum: "Ciliés", size: "30–150 µm", eye: "Invisible à l'œil nu", mag: "×100 à ×400",
+    where: "Fixée sur les plantes et débris des mares",
+    how: "Observez le bord d'une feuille de plante aquatique : elle ressemble à une cloche au bout d'une tige.",
+    desc: "Cilié en forme de cloche, fixé par une longue tige contractile.",
+    fun: "Sa tige se rétracte en ressort en quelques millisecondes, l'un des mouvements les plus rapides du monde vivant rapporté à sa taille." },
+  { id: 13, fr: "Stentor bleu", sci: "Stentor coeruleus", em: "🎺", g: "pro", phylum: "Ciliés", size: "jusqu'à 2 mm", eye: "Tout juste visible", mag: "×40 à ×100",
+    where: "Eaux calmes et propres, parmi les plantes aquatiques",
+    how: "Cherchez de petits points bleus fixés sur les plantes d'une mare claire.",
+    desc: "Cellule géante en forme de trompette, colorée de bleu par un pigment.",
+    fun: "Coupé en morceaux, chaque fragment contenant un bout de noyau peut régénérer un stentor complet." },
+  { id: 14, fr: "Volvox", sci: "Volvox aureus", em: "🟢", g: "alg", phylum: "Algues vertes", size: "0,3–0,5 mm", eye: "Point visible à l'œil nu", mag: "×40 à ×100",
+    where: "Mares et étangs en été",
+    how: "Des sphères vertes qui roulent lentement dans l'eau d'une mare : ce sont des colonies de volvox.",
+    desc: "Colonie sphérique de centaines à milliers de cellules à flagelles, qui roule en nageant.",
+    fun: "On voit souvent des colonies filles se former à l'intérieur de la sphère mère avant d'en être libérées." },
+  { id: 15, fr: "Diatomée", sci: "Navicula", genus: true, em: "💠", g: "alg", phylum: "Diatomées", size: "10–100 µm", eye: "Invisible à l'œil nu", mag: "×400",
+    where: "Film brun sur les pierres des ruisseaux, eau de mer",
+    how: "Grattez le film brunâtre d'une pierre de ruisseau et observez-le à fort grossissement.",
+    desc: "Algue unicellulaire enfermée dans une coque de verre (silice) finement ciselée.",
+    fun: "Les diatomées produiraient environ un cinquième de l'oxygène de la planète." },
+];
+const microById = Object.fromEntries(MICROS.map(m => [m.id, m]));
+const MICRO_SEED = { 3: ["2026-05-09", "Mare du jardin, Villeurbanne"], 9: ["2026-06-14", "Infusion de foin"] };
+
 const DINO_SEED = { 3: ["2026-04-12", "mnhn"], 5: ["2026-07-02", "irsnb"] };
 // Positions proposées dans l'appareil photo de la démo (le vrai contrôle : services/captivity/).
 const POSITIONS = [
@@ -969,6 +1098,8 @@ function resetState() {
   for (const [id, [d, p]] of Object.entries(SEED)) state.captured[id] = { date: d, place: p };
   state.dinos = {}; state.dino = 1; state.camMode = "live"; state.period = "all"; state.pos = 0;
   for (const [id, [d, m]] of Object.entries(DINO_SEED)) state.dinos[id] = { date: d, museum: m };
+  state.micros = {}; state.micro = 1; state.mgroup = "all";
+  for (const [id, [d, pl]] of Object.entries(MICRO_SEED)) state.micros[id] = { date: d, place: pl };
 }
 resetState();
 
@@ -985,6 +1116,8 @@ function stats() {
     france: ids.filter(i => (byId[i].zones || []).includes("fr")).length,
     dinos: Object.keys(state.dinos).length,
     museums: new Set(Object.values(state.dinos).map(d => MUSEUMS[d.museum].country)).size,
+    micros: Object.keys(state.micros).length,
+    tardigrade: state.micros[1] ? 1 : 0,
     threatened: ids.filter(i => ["VU", "EN", "CR"].includes(byId[i].st)).length,
   };
 }
@@ -996,6 +1129,10 @@ function allBadges() {
   list.push({ id: "ark", name: "Arche de Noé", desc: "Au moins 1 espèce dans 9 familles différentes", medal: { emo: "🌍", m: "#1D7497" }, val: s => s.cats, target: 9 });
   list.push({ id: "globe", name: "Globe-trotter", desc: "Des espèces de 6 zones du monde différentes", medal: { emo: "🧭", m: "#3A77AE" }, val: s => s.zones, target: 6 });
   list.push({ id: "france", name: "Faune de France", desc: "25 espèces présentes en France", medal: { emo: "📍", m: "#1F5C46" }, val: s => s.france, target: 25 });
+  list.push({ id: "micro1", name: "Premier regard", desc: "Photographier un organisme au microscope", medal: { emo: "🔬", m: "#56708F" }, val: s => s.micros, target: 1 });
+  list.push({ id: "micro5", name: "Microscopiste", desc: "5 organismes dans le Micro-Dex", medal: { emo: "🦠", m: "#7A4E8C" }, val: s => s.micros, target: 5 });
+  list.push({ id: "microAll", name: "Micro-Dex complet", desc: `Les ${MICROS.length} organismes répertoriés`, medal: { emo: "💠", m: "#D9A82B" }, val: s => s.micros, target: MICROS.length });
+  list.push({ id: "tardi", name: "Chasseur d'oursons d'eau", desc: "Trouver un tardigrade", medal: { emo: "🐻", m: "#9A7B4F" }, val: s => s.tardigrade, target: 1 });
   list.push({ id: "fossil1", name: "Premier fossile", desc: "Photographier un squelette de dinosaure", medal: { emo: "🦴", m: "#9A7B4F" }, val: s => s.dinos, target: 1 });
   list.push({ id: "fossil5", name: "Paléontologue", desc: "5 dinosaures dans le Paléo-Dex", medal: { emo: "🦕", m: "#9A7B4F" }, val: s => s.dinos, target: 5 });
   list.push({ id: "fossilAll", name: "Paléo-Dex complet", desc: `Les ${DINOS.length} dinosaures répertoriés`, medal: { emo: "🦖", m: "#D9A82B" }, val: s => s.dinos, target: DINOS.length });
@@ -1214,6 +1351,10 @@ function renderBadges() {
       <div class="vol">${vol.map(b => `<div class="b ${un.has(b.id) ? "on" : ""}">${medal(b.medal, !un.has(b.id))}<small>${b.name}</small></div>`).join("")}</div>
       ${nextVol ? `<div class="next"><div class="row"><span>Prochain : <b style="font-family:var(--body)">${nextVol.name}</b></span><b>${s.total} / ${nextVol.target}</b></div><div class="bar"><i style="width:${Math.min(100, s.total / nextVol.target * 100)}%"></i></div></div>` : ""}
     </div>
+    <div class="bsec"><h3>Microscopie</h3><div class="blist">
+      ${BADGES.filter(b => ["micro1", "micro5", "microAll", "tardi"].includes(b.id)).map(b => { const v = Math.min(b.val(s), b.target), ok = un.has(b.id);
+        return `<div class="brow">${medal(b.medal, !ok)}<div><div class="t"><b>${b.name}</b><span>${v} / ${b.target}</span></div><p>${b.desc}</p><div class="bar"><i style="width:${v / b.target * 100}%"></i></div></div></div>`; }).join("")}
+    </div></div>
     <div class="bsec"><h3>Paléontologie</h3><div class="blist">
       ${BADGES.filter(b => ["fossil1", "fossil5", "fossilAll", "museums"].includes(b.id)).map(b => { const v = Math.min(b.val(s), b.target), ok = un.has(b.id);
         return `<div class="brow">${medal(b.medal, !ok)}<div><div class="t"><b>${b.name}</b><span>${v} / ${b.target}</span></div><p>${b.desc}</p><div class="bar"><i style="width:${v / b.target * 100}%"></i></div></div></div>`; }).join("")}
@@ -1241,37 +1382,113 @@ function renderBadges() {
 
 function renderCapture() {
   const scanning = state.scan === "scan";
-  const fossil = state.camMode === "fossil";
+  const mode = state.camMode;
+  const fossil = mode === "fossil", micro = mode === "micro";
   const bg = state.photo ? `style="background-image:url(${state.photo})"` : "";
+  const TEXT = {
+    live: { close: "dex", pill: "Cadrez l'animal", hint: "Approchez-vous sans déranger l'animal", m1: "Photo", m2: "sauvage",
+      steps: ["Vérification du lieu : pas de zoo ni d'aquarium", "Comparaison avec 450 000 taxons", "Filtre géographique · Lyon"] },
+    fossil: { close: "dinos", pill: "Cadrez le squelette entier", hint: "Incluez si possible le cartel du musée", m1: "Musée", m2: "squelette",
+      steps: ["Détection d'un squelette monté", `Comparaison avec ${DINOS.length} squelettes répertoriés`, "Vérification du musée"] },
+    micro: { close: "micros", pill: "Collez l'objectif à l'oculaire", hint: "Faites la mise au point avant de déclencher", m1: "Microscope", m2: "oculaire",
+      steps: ["Détection du champ de l'oculaire", `Comparaison avec ${MICROS.length} organismes répertoriés`, "Estimation du grossissement"] },
+  }[mode];
+  const seg = [["live", "Animal"], ["fossil", "Squelette"], ["micro", "Microscope"]];
   return `<div class="cam">
-    <div class="viewfinder ${state.photo ? "photo" : ""} ${fossil ? "museum" : ""}" ${bg}></div>
+    <div class="viewfinder ${state.photo ? "photo" : ""} ${fossil ? "museum" : ""} ${micro ? "scope" : ""}" ${bg}></div>
+    ${micro && !state.photo ? '<div class="scopefield"><i></i><i></i><i></i><i></i></div>' : ""}
     <div class="topbar">
-      <button type="button" class="iconbtn" data-go="${fossil ? "dinos" : "dex"}" aria-label="Fermer">${ICON.close}</button>
-      <span class="pill">${scanning ? "Identification…" : fossil ? "Cadrez le squelette entier" : "Cadrez l'animal"}</span>
+      <button type="button" class="iconbtn" data-go="${TEXT.close}" aria-label="Fermer">${ICON.close}</button>
+      <span class="pill">${scanning ? "Identification…" : TEXT.pill}</span>
       <span style="width:38px"></span>
     </div>
     ${scanning ? "" : `<div class="camseg" role="tablist" aria-label="Type de capture">
-      <button type="button" role="tab" aria-selected="${!fossil}" class="${fossil ? "" : "on"}" data-cammode="live">Animal vivant</button>
-      <button type="button" role="tab" aria-selected="${fossil}" class="${fossil ? "on" : ""}" data-cammode="fossil">Squelette (musée)</button>
+      ${seg.map(([k, label]) => `<button type="button" role="tab" aria-selected="${mode === k}" class="${mode === k ? "on" : ""}" data-cammode="${k}">${label}</button>`).join("")}
     </div>`}
-    ${!fossil && !scanning ? `<button type="button" class="pospill" data-pos>
-      <span class="posdot ${POSITIONS[state.pos].verdict}"></span>
-      <span><b>${esc(POSITIONS[state.pos].label)}</b><small>Position simulée · toucher pour changer</small></span>
+    ${mode !== "fossil" && !scanning ? `<button type="button" class="pospill" data-pos>
+      <span class="posdot ${micro ? "ok" : POSITIONS[state.pos].verdict}"></span>
+      <span><b>${micro ? "Prélèvement : " : ""}${esc(POSITIONS[state.pos].label)}</b><small>Position simulée · toucher pour changer</small></span>
     </button>` : ""}
-    <div class="reticle"><i></i><i></i><i></i><i></i>${scanning ? '<div class="scanline"></div>' : ""}</div>
+    ${micro ? "" : `<div class="reticle"><i></i><i></i><i></i><i></i>${scanning ? '<div class="scanline"></div>' : ""}</div>`}
+    ${micro && scanning ? '<div class="scopescan"></div>' : ""}
     <div class="hint">${scanning
-      ? (fossil
-        ? `<div class="steps"><span class="on" id="st1">Détection d'un squelette monté</span><span id="st2">Comparaison avec ${DINOS.length} squelettes répertoriés</span><span id="st3">Vérification du musée</span></div>`
-        : '<div class="steps"><span class="on" id="st1">Vérification du lieu : pas de zoo ni d\'aquarium</span><span id="st2">Comparaison avec 450 000 taxons</span><span id="st3">Filtre géographique · Lyon</span></div>')
-      : (state.photo ? "Photo importée, prête à être analysée" : fossil ? "Incluez si possible le cartel du musée" : "Approchez-vous sans déranger l'animal")}</div>
+      ? `<div class="steps">${TEXT.steps.map((t, i) => `<span class="${i ? "" : "on"}" id="st${i + 1}">${esc(t)}</span>`).join("")}</div>`
+      : (state.photo ? "Photo importée, prête à être analysée" : TEXT.hint)}</div>
     <div class="controls">
       <label class="gal" title="Importer depuis la galerie">${ICON.image}<input type="file" accept="image/*" id="file" aria-label="Importer une photo"></label>
       <button type="button" class="shoot" id="shoot" ${scanning ? "disabled" : ""} aria-label="Prendre la photo"><i></i></button>
-      <span class="mode">${fossil ? "Musée" : "Photo"}<br><span style="opacity:.6">${fossil ? "squelette" : "sauvage"}</span></span>
+      <span class="mode">${TEXT.m1}<br><span style="opacity:.6">${TEXT.m2}</span></span>
     </div>
   </div>`;
 }
 
+
+
+const mno = id => "M-" + String(id).padStart(3, "0");
+const sciLabel = m => m.genus ? `${m.sci} sp.` : m.sci;
+
+function renderMicros() {
+  const got = Object.keys(state.micros).length;
+  const list = MICROS.filter(m => state.mgroup === "all" || m.g === state.mgroup);
+  const chip = (k, label, color) => {
+    const all = MICROS.filter(m => k === "all" || m.g === k);
+    return `<button type="button" class="chip ${state.mgroup === k ? "on" : ""}" data-mgroup="${k}" style="--c:${color || "var(--moss)"}">${k === "all" ? "" : '<i class="dot"></i>'}${label} <small>${all.filter(m => state.micros[m.id]).length} / ${all.length}</small></button>`;
+  };
+  return `
+    <div class="dex-head">
+      <div>
+        <p class="kicker" style="color:#56708F">Micro-Dex</p>
+        <h2>${got} organisme${got > 1 ? "s" : ""}</h2>
+        <p class="sub">sur ${MICROS.length} à découvrir au microscope</p>
+      </div>
+      <div class="ring" style="--p:${got / MICROS.length * 100}"><span>${got}/${MICROS.length}</span></div>
+    </div>
+    <div class="howto micro">
+      <b>Comment les trouver ?</b>
+      Prélevez un peu d'eau de mare, de mousse ou de poussière, puis photographiez à travers l'oculaire d'un microscope (×40 à ×400) ou avec une lentille macro à clipser sur le téléphone.
+      <div class="howto-actions"><button type="button" data-microcam>Photographier au microscope</button></div>
+    </div>
+    <div class="chips">${chip("all", "Tout")}${Object.entries(MGROUPS).map(([k, g]) => chip(k, g.name, g.c)).join("")}</div>
+    <div class="grid">
+      ${list.map(m => {
+        const g = state.micros[m.id];
+        return `<button type="button" class="tile mtile ${g ? "" : "locked"}" data-micro="${m.id}" style="--c:${MGROUPS[m.g].c}" aria-label="${esc(m.fr)}${g ? "" : ", non trouvé"}">
+          <span class="no">${mno(m.id)}</span>
+          <span class="em">${m.em}</span>
+          <span class="nm">${esc(m.fr)}</span>
+          <span class="per">${m.size}</span>
+        </button>`;
+      }).join("")}
+    </div>
+    <div class="bpad"></div>`;
+}
+
+function renderMicro() {
+  const m = microById[state.micro], grp = MGROUPS[m.g], g = state.micros[m.id];
+  const photo = g && state.microPhotos && state.microPhotos[m.id];
+  return `<div class="hero mhero" style="--c:${grp.c}">
+      <div class="top"><button type="button" class="iconbtn" data-go="micros" aria-label="Retour">${ICON.back}</button><span class="no">${mno(m.id)}</span><span style="width:38px"></span></div>
+      <div class="pic lens ${g ? "" : "locked"}" ${photo ? `style="background-image:url(${photo})"` : ""}>${photo ? "" : `<span>${m.em}</span>`}</div>
+      <h2>${esc(m.fr)}</h2>
+      <p class="sci">${esc(sciLabel(m))}</p>
+      <div class="tags"><span class="tag cat">${grp.one}</span><span class="tag">${esc(m.phylum)}</span></div>
+    </div>
+    ${g
+      ? `<div class="capinfo">${ICON.pin}<span>Observé le <b>${fmtDate(g.date)}</b><br>Prélèvement : ${esc(g.place)}</span></div>`
+      : `<div class="locked-note"><b>Pas encore dans votre Micro-Dex</b>Suivez la méthode ci-dessous, puis photographiez-le au microscope.</div>`}
+    <div class="sec"><h3>Où le chercher</h3><div class="habitat">
+      <div>${ICON.leaf}<p>${esc(m.where)}</p></div></div>
+      <p class="method">${esc(m.how)}</p></div>
+    <div class="sec"><h3>Au microscope</h3><div class="facts">
+      <div class="fact"><small>Taille</small><b>${m.size}</b></div>
+      <div class="fact"><small>Grossissement</small><b>${m.mag}</b></div>
+      <div class="fact"><small>À l'œil nu</small><b>${m.eye}</b></div>
+    </div></div>
+    ${g ? `
+    <div class="sec"><h3>Description</h3><p>${esc(m.desc)}</p></div>
+    <div class="sec"><div class="fun"><h3>Le saviez-vous ?</h3><p>${esc(m.fun)}</p></div></div>` : ""}
+    <div class="sources">${m.g === "ani" ? "Animal microscopique." : "Ce n'est pas un animal : " + (m.g === "pro" ? "les protistes sont des êtres vivants unicellulaires." : "c'est une algue.") + " Il figure dans le Micro-Dex parce qu'on le rencontre dans les mêmes prélèvements."} Tailles et grossissements indicatifs.</div>`;
+}
 
 function museumLabel(key) { const m = MUSEUMS[key]; return `${m.name}, ${m.city}`; }
 
@@ -1344,7 +1561,7 @@ function renderMuseums() {
   for (const [k, m] of Object.entries(MUSEUMS)) (byCountry[m.country] ||= []).push(k);
   const countries = Object.keys(byCountry).sort((a, b) => (b === "France") - (a === "France") || a.localeCompare(b, "fr"));
   return `
-    <div class="bhead"><p class="kicker" style="color:#8A6A3B">Paléo-Dex</p><h2>Musées</h2><p class="sub">${Object.keys(MUSEUMS).length} musées exposent les squelettes répertoriés</p></div>
+    <div class="bhead"><button type="button" class="iconbtn back" data-go="dinos" aria-label="Retour au Paléo-Dex">${ICON.back}</button><p class="kicker" style="color:#8A6A3B">Paléo-Dex</p><h2>Musées</h2><p class="sub">${Object.keys(MUSEUMS).length} musées exposent les squelettes répertoriés</p></div>
     ${countries.map(c => `<div class="bsec"><h3>${c}</h3><div class="blist">
       ${byCountry[c].map(k => {
         const m = MUSEUMS[k];
@@ -1360,9 +1577,10 @@ function render(keepScroll = false) {
   const v = state.view;
   $app.classList.toggle("dark", v === "capture");
   $tabbar.hidden = v === "capture";
-  $tabbar.querySelectorAll(".tab").forEach(t => t.classList.toggle("on", t.dataset.go === v || (v === "fiche" && t.dataset.go === state.back) || (v === "dino" && t.dataset.go === "dinos")));
+  $tabbar.querySelectorAll(".tab").forEach(t => t.classList.toggle("on", t.dataset.go === v || (v === "fiche" && t.dataset.go === state.back) || (v === "dino" && t.dataset.go === "dinos") || (v === "museums" && t.dataset.go === "dinos") || (v === "micro" && t.dataset.go === "micros")));
   $screen.innerHTML = v === "dex" ? renderDex() : v === "fiche" ? renderFiche() : v === "badges" ? renderBadges()
-    : v === "dinos" ? renderDinos() : v === "dino" ? renderDino() : v === "museums" ? renderMuseums() : renderCapture();
+    : v === "dinos" ? renderDinos() : v === "dino" ? renderDino() : v === "museums" ? renderMuseums()
+    : v === "micros" ? renderMicros() : v === "micro" ? renderMicro() : renderCapture();
   if (v !== "capture" && !keepScroll) $screen.scrollTop = 0;
   const f = document.getElementById("file");
   if (f) f.addEventListener("change", onFile);
@@ -1376,7 +1594,7 @@ function render(keepScroll = false) {
 function go(view) {
   $layer.innerHTML = "";
   if (view === "fiche") { state.back = state.view === "badges" ? "badges" : "dex"; }
-  if (view === "capture") { state.scan = null; if (state.view !== "capture") state.camMode = ["dinos", "dino", "museums"].includes(state.view) ? "fossil" : "live"; }
+  if (view === "capture") { state.scan = null; if (state.view !== "capture") state.camMode = ["dinos", "dino", "museums"].includes(state.view) ? "fossil" : ["micros", "micro"].includes(state.view) ? "micro" : "live"; }
   if (view !== "capture") state.photo = null;
   state.view = view;
   render();
@@ -1404,6 +1622,7 @@ function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 function showResult() {
   if (state.view !== "capture") return;
   if (state.camMode === "fossil") return showFossilResult();
+  if (state.camMode === "micro") return showMicroResult();
   if (POSITIONS[state.pos].verdict !== "ok") return showRefusal(POSITIONS[state.pos]);
   const curatedLeft = SPECIES.slice(0, CURATED).filter(s => !state.captured[s.id]);
   // Espèces portant un nom commun : presque toujours actuelles (les fossiles n'en ont pas).
@@ -1467,6 +1686,55 @@ function showRefusal(pos) {
       : "Sans position, impossible de vérifier que l'animal n'est pas dans un zoo. Activez la localisation, puis reprenez la photo."}</p>
     <button type="button" class="cta" data-retry>Reprendre une photo</button>
   </div>`;
+}
+
+function showMicroResult() {
+  const left = MICROS.filter(m => !state.micros[m.id]);
+  const m = left.length ? pick(left) : pick(MICROS);
+  const isNew = !state.micros[m.id];
+  const conf = 82 + Math.floor(Math.random() * 15);
+  const mags = m.mag.match(/×\d+/g);
+  state.scan = "done";
+  const pill = document.querySelector(".cam .pill"); if (pill) pill.textContent = "Organisme reconnu";
+  document.querySelector(".scopescan")?.remove();
+  $layer.innerHTML = `<div class="sheet" style="--c:${MGROUPS[m.g].c}">
+    <div class="grab"></div>
+    <div class="res">
+      <div class="pic lens">${m.em}</div>
+      <div>
+        ${isNew ? '<span class="okpill newsp">Nouvel organisme</span>' : '<span class="okpill">Déjà dans votre Micro-Dex</span>'}
+        <h3>${esc(m.fr)}</h3>
+        <p class="sci">${esc(sciLabel(m))}</p>
+      </div>
+    </div>
+    <div class="conf">
+      <div class="row"><span>Confiance de l'identification</span><b>${conf} %</b></div>
+      <div class="bar"><i style="width:${conf}%"></i></div>
+    </div>
+    <div class="alts">
+      <div><span style="font-family:var(--body);font-size:12px">Grossissement estimé : <b style="color:var(--ink)">${mags[mags.length - 1]}</b> · taille ${m.size}</span></div>
+      <div><span style="font-family:var(--body);font-size:12px">Prélèvement : <b style="color:var(--ink)">${esc(POSITIONS[state.pos].label)}</b></span></div>
+    </div>
+    <button type="button" class="cta" data-mcapture="${m.id}">${isNew ? "Ajouter au Micro-Dex" : "Enregistrer l'observation"}</button>
+    <button type="button" class="ghost" data-retry>Ce n'est pas ça, reprendre</button>
+  </div>`;
+}
+
+function doMicroCapture(id) {
+  const before = unlockedIds();
+  const isNew = !state.micros[id];
+  const m = microById[id];
+  if (isNew) state.micros[id] = { date: "2026-09-27", place: POSITIONS[state.pos].label };
+  if (state.photo) (state.microPhotos ||= {})[id] = state.photo;
+  const gained = BADGES.filter(b => unlockedIds().has(b.id) && !before.has(b.id));
+  $layer.innerHTML = `<div class="overlay micro"><div class="inner">
+    <div class="burst"><span class="em">${m.em}</span></div>
+    <h2>${isNew ? "Organisme trouvé !" : "Observation ajoutée"}</h2>
+    <p>${esc(m.fr)} ${isNew ? "rejoint votre Micro-Dex" : "était déjà dans votre Micro-Dex"}</p>
+    <div class="no">${mno(id)} · ${Object.keys(state.micros).length} / ${MICROS.length} organismes</div>
+  </div></div>`;
+  state.micro = id; state.after = "micro";
+  setTimeout(() => showBadges(gained, 0), 1700);
 }
 
 function showFossilResult() {
@@ -1572,6 +1840,10 @@ document.addEventListener("click", e => {
   if (t.dataset.period) { state.period = t.dataset.period; return render(); }
   if ("pos" in t.dataset) { state.pos = (state.pos + 1) % POSITIONS.length; return render(); }
   if (t.dataset.cammode) { state.camMode = t.dataset.cammode; return render(); }
+  if (t.dataset.mcapture) return doMicroCapture(Number(t.dataset.mcapture));
+  if (t.dataset.micro) { state.micro = Number(t.dataset.micro); return go("micro"); }
+  if (t.dataset.mgroup) { state.mgroup = t.dataset.mgroup; return render(); }
+  if ("microcam" in t.dataset) { go("capture"); state.camMode = "micro"; return render(); }
   if ("fossilcam" in t.dataset) { go("capture"); state.camMode = "fossil"; return render(); }
   if ("retry" in t.dataset) { $layer.innerHTML = ""; state.scan = null; return render(); }
   if (t.dataset.nextbadge) return showBadges(state.pending, Number(t.dataset.nextbadge));
