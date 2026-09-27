@@ -264,7 +264,9 @@ CREATE TYPE badge_rule AS ENUM (
   'dex_completion',     -- params: {"dex_set_id": 7, "percent": 100}
   'conservation',       -- params: {"statuses": ["EN","CR"], "threshold": 1}
   'rarity',             -- params: {"min_rarity": 5, "threshold": 1}
-  'category_diversity'  -- params: {"categories": 6}  (au moins 1 espèce dans 6 catégories)
+  'category_diversity', -- params: {"categories": 6}  (au moins 1 espèce dans 6 catégories)
+  'zone_species',       -- params: {"zone_id": 1, "threshold": 25}      (cf. §2.4)
+  'zone_diversity'      -- params: {"zones": 6}
 );
 
 CREATE TABLE badges (
@@ -306,6 +308,43 @@ CREATE TABLE user_badges (
 | Rareté | Chanceux (1 espèce de rareté 5) | `rarity` |
 
 Catégories initiales proposées : Mammifères, Oiseaux, Reptiles, Amphibiens, Poissons, Insectes, Arachnides, Crustacés, Mollusques, Autres invertébrés (vers, méduses, échinodermes…).
+
+### 2.4 Zones géographiques
+
+Le joueur peut parcourir sa collection **par zone** (France, Europe, Afrique, Océans…), comme un Pokédex régional. Une zone regroupe les espèces dont **l'aire de répartition** la couvre ; le lieu où la photo a été prise est une autre information, stockée dans `observations.location`.
+
+```sql
+CREATE TABLE zones (
+  id        serial PRIMARY KEY,
+  code      text UNIQUE NOT NULL,      -- 'fr', 'eu', 'af', 'mer'…
+  name_fr   text NOT NULL,
+  kind      text NOT NULL,             -- 'continent' | 'ocean' | 'country' | 'region'
+  parent_id int REFERENCES zones(id),  -- France → Europe
+  geom      geography(MultiPolygon, 4326)
+);
+
+CREATE TABLE taxon_zones (
+  taxon_id  bigint REFERENCES taxa(id) ON DELETE CASCADE,
+  zone_id   int    REFERENCES zones(id),
+  status    text NOT NULL DEFAULT 'native',  -- 'native' | 'introduced' | 'vagrant'
+  source    text NOT NULL,                   -- 'mdd' | 'gbif_occurrences' | 'iucn_range'
+  PRIMARY KEY (taxon_id, zone_id)
+);
+CREATE INDEX taxon_zones_zone ON taxon_zones (zone_id);
+
+CREATE TABLE user_zone_stats (
+  user_id       uuid REFERENCES users(id),
+  zone_id       int  REFERENCES zones(id),
+  species_count int NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, zone_id)
+);
+```
+
+Sources de répartition, par ordre de préférence :
+1. **Listes de référence par groupe** : Mammal Diversity Database pour les mammifères (continents et pays, CC BY 4.0), cartes de l'UICN quand la licence le permet.
+2. **Occurrences GBIF** pour tous les autres groupes : une espèce est rattachée à une zone si elle y compte un nombre minimal d'observations validées (par exemple 5, hors spécimens de zoo ou de musée). Le calcul se fait par lots avec l'API d'agrégats GBIF, puis il est rafraîchi chaque trimestre.
+
+Chaque capture incrémente `user_zone_stats` pour toutes les zones de l'espèce, dans la même transaction que les autres compteurs (§3.3). Deux nouvelles règles de badges s'appuient dessus : `zone_species` (« Faune de France : 25 espèces présentes en France ») et `zone_diversity` (« Globe-trotter : des espèces de 6 zones du monde »).
 
 ---
 
