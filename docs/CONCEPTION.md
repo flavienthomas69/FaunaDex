@@ -419,6 +419,8 @@ App                         API                             Vision            Po
  │ 7. animation capture / badge                                                    │
 ```
 
+**Contrôle anti-captivité**, entre les étapes 3 et 4 : l'API vérifie avec `captivity_check` que la photo n'a pas été prise dans un zoo, un aquarium ou un parc animalier (contours OpenStreetMap dans PostGIS). Une photo sans position, trop imprécise ou prise dans un de ces lieux est refusée avant même l'identification, et un déclencheur en base empêche toute capture qui n'aurait pas passé ce contrôle. Règles et code : `services/captivity/`.
+
 Si la confiance est intermédiaire, l'étape 6 est déclenchée par `POST /observations/:id/confirm { taxonId }`, en vérifiant que `taxonId` fait bien partie du top-k renvoyé par le modèle (le client ne peut pas inventer une espèce).
 
 ### 3.3 Implémentation (TypeScript, service API)
@@ -620,7 +622,7 @@ Profils publics, amis et classements ; défis saisonniers ; carte communautaire 
 |---|---|
 | Précision IA insuffisante sur insectes/araignées (espèces très proches) | Remontée au genre, choix parmi le top-3, badges adaptés (paliers plutôt que complétion) ; Phase 0 bloquante. |
 | Triche (photos trouvées sur Internet) | Hash perceptuel, EXIF, distinction « capturé » vs « importé », éventuellement recherche d'image inversée sur les captures rares. |
-| Animaux captifs (zoo, aquarium, animaleries) | Option « animal en captivité » ou détection par géofencing des zoos ; captures valides mais exclues des badges « sauvage ». |
+| Animaux captifs (zoo, aquarium, parc animalier) | **Refus systématique** : la position de la photo est comparée aux contours des zoos et aquariums d'OpenStreetMap, une photo sans position est refusée, et la base bloque toute capture non vérifiée (`services/captivity/`). |
 | Licences des données | Wikipedia CC BY-SA → attribution sur chaque fiche ; UICN → accord nécessaire pour un usage commercial ; photos de référence uniquement sous licence libre. |
 | Espèces sensibles (braconnage) | Ne jamais exposer la localisation précise des espèces menacées ; flouter à 10 km. |
 | Hallucinations du LLM dans les fiches | Génération contrainte aux sources fournies, citations, relecture humaine des fiches des espèces les plus capturées (`generation = 'reviewed'`). |

@@ -413,6 +413,24 @@
   }
   .overlay.fossil { background: radial-gradient(circle at 50% 42%, #6B5436 0%, #3D2F1C 60%, #1E170D 100%); }
 
+  .pospill {
+    position: absolute; z-index: 2; left: 50%; transform: translateX(-50%); bottom: 132px;
+    display: flex; align-items: center; gap: 10px; text-align: left; cursor: pointer;
+    max-width: calc(100% - 40px); padding: 8px 14px 8px 12px; border-radius: 16px; border: 0;
+    background: rgba(0, 0, 0, .45); backdrop-filter: blur(6px); color: #fff !important;
+  }
+  .pospill b { display: block; font: 600 12.5px/1.25 var(--body); }
+  .pospill small { display: block; font-size: 10.5px; opacity: .7; }
+  .posdot { flex: 0 0 auto; width: 10px; height: 10px; border-radius: 50%; background: #7FD8A4; box-shadow: 0 0 0 3px rgba(127, 216, 164, .3); }
+  .posdot.captive { background: #FF7A66; box-shadow: 0 0 0 3px rgba(255, 122, 102, .3); }
+  .posdot.no_location { background: #C9D0C8; box-shadow: 0 0 0 3px rgba(201, 208, 200, .3); }
+  .sheet.refuse .pic.no { background: #FBE3DF; color: #B3261E; }
+  .sheet.refuse .pic.no svg { width: 38px; height: 38px; }
+  .okpill.bad { background: #FBE3DF; color: #B3261E; }
+  .sheet .why { margin: 14px 0 0; font-size: 13.5px; line-height: 1.5; }
+  .sheet .why b { font-weight: 700; }
+  .sheet.refuse .cta { background: var(--ink); }
+
   /* Capture */
   .cam { position: absolute; inset: 0; background: #0D1411; color: #fff; display: flex; flex-direction: column; }
   .viewfinder {
@@ -596,6 +614,7 @@
           <li><b>Parcourez la collection.</b> Les espèces non découvertes apparaissent en silhouette, comme dans un Pokédex. Cherchez un animal par son nom, par exemple « aigle » ou « Panthera », ou basculez sur « Par zone » pour parcourir la faune de France, d'Afrique ou des océans.</li>
           <li><b>Ouvrez une fiche.</b> Noms, caractéristiques, habitat, comportement, anecdote et statut UICN.</li>
           <li><b>Touchez le bouton appareil photo.</b> Déclenchez ou importez une vraie photo depuis votre ordinateur, puis ajoutez l'espèce à votre collection.</li>
+          <li><b>Essayez de tricher.</b> Dans l'appareil photo, touchez la position simulée pour choisir le zoo ou l'aquarium de Lyon : la photo est refusée, car seuls les animaux en liberté comptent.</li>
           <li><b>Ouvrez l'onglet Paléo.</b> Le Paléo-Dex liste 16 dinosaures dont un squelette est exposé dans un musée. On les capture en photographiant ce squelette (mode « Squelette (musée) » de l'appareil photo). L'onglet Musées indique où aller.</li>
           <li><b>Regardez les badges.</b> Certaines captures en débloquent un, avec son animation.</li>
         </ol>
@@ -933,6 +952,13 @@ const DINOS = [
 ];
 const dinoById = Object.fromEntries(DINOS.map(d => [d.id, d]));
 const DINO_SEED = { 3: ["2026-04-12", "mnhn"], 5: ["2026-07-02", "irsnb"] };
+// Positions proposées dans l'appareil photo de la démo (le vrai contrôle : services/captivity/).
+const POSITIONS = [
+  { id: "wild", label: "Monts du Lyonnais", verdict: "ok" },
+  { id: "zoo", label: "Zoo du parc de la Tête d'Or, Lyon", verdict: "captive", site: "le zoo du parc de la Tête d'Or" },
+  { id: "aquarium", label: "Aquarium de Lyon, La Mulatière", verdict: "captive", site: "l'aquarium de Lyon" },
+  { id: "none", label: "Localisation désactivée", verdict: "no_location" },
+];
 const GARDEN = [10, 11, 13, 19, 22];
 const TIERS = [["bronze", 3, "#B87333"], ["argent", 10, "#9AA4AB"], ["or", 25, "#D9A82B"]];
 const VOLUME = [[1, "Premier pas"], [10, "Explorateur"], [25, "Naturaliste"], [50, "Biologiste"], [100, "Centurion"]];
@@ -941,7 +967,7 @@ let state;
 function resetState() {
   state = { captured: {}, photos: {}, fresh: new Set(), view: "dex", group: "cat", zone: "all", filter: "all", query: "", limit: 60, fiche: 7, back: "dex", photo: null, scan: null };
   for (const [id, [d, p]] of Object.entries(SEED)) state.captured[id] = { date: d, place: p };
-  state.dinos = {}; state.dino = 1; state.camMode = "live"; state.period = "all";
+  state.dinos = {}; state.dino = 1; state.camMode = "live"; state.period = "all"; state.pos = 0;
   for (const [id, [d, m]] of Object.entries(DINO_SEED)) state.dinos[id] = { date: d, museum: m };
 }
 resetState();
@@ -1228,11 +1254,15 @@ function renderCapture() {
       <button type="button" role="tab" aria-selected="${!fossil}" class="${fossil ? "" : "on"}" data-cammode="live">Animal vivant</button>
       <button type="button" role="tab" aria-selected="${fossil}" class="${fossil ? "on" : ""}" data-cammode="fossil">Squelette (musée)</button>
     </div>`}
+    ${!fossil && !scanning ? `<button type="button" class="pospill" data-pos>
+      <span class="posdot ${POSITIONS[state.pos].verdict}"></span>
+      <span><b>${esc(POSITIONS[state.pos].label)}</b><small>Position simulée · toucher pour changer</small></span>
+    </button>` : ""}
     <div class="reticle"><i></i><i></i><i></i><i></i>${scanning ? '<div class="scanline"></div>' : ""}</div>
     <div class="hint">${scanning
       ? (fossil
         ? `<div class="steps"><span class="on" id="st1">Détection d'un squelette monté</span><span id="st2">Comparaison avec ${DINOS.length} squelettes répertoriés</span><span id="st3">Vérification du musée</span></div>`
-        : '<div class="steps"><span class="on" id="st1">Analyse de l\'image</span><span id="st2">Comparaison avec 450 000 taxons</span><span id="st3">Filtre géographique · Lyon</span></div>')
+        : '<div class="steps"><span class="on" id="st1">Vérification du lieu : pas de zoo ni d\'aquarium</span><span id="st2">Comparaison avec 450 000 taxons</span><span id="st3">Filtre géographique · Lyon</span></div>')
       : (state.photo ? "Photo importée, prête à être analysée" : fossil ? "Incluez si possible le cartel du musée" : "Approchez-vous sans déranger l'animal")}</div>
     <div class="controls">
       <label class="gal" title="Importer depuis la galerie">${ICON.image}<input type="file" accept="image/*" id="file" aria-label="Importer une photo"></label>
@@ -1374,6 +1404,7 @@ function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 function showResult() {
   if (state.view !== "capture") return;
   if (state.camMode === "fossil") return showFossilResult();
+  if (POSITIONS[state.pos].verdict !== "ok") return showRefusal(POSITIONS[state.pos]);
   const curatedLeft = SPECIES.slice(0, CURATED).filter(s => !state.captured[s.id]);
   // Espèces portant un nom commun : presque toujours actuelles (les fossiles n'en ont pas).
   const rest = SPECIES.slice(CURATED).filter(s => !state.captured[s.id] && s.name);
@@ -1410,6 +1441,31 @@ function showResult() {
     </div>
     <button type="button" class="cta" data-capture="${target.id}">${isNew ? "Ajouter à mon FaunaDex" : "Enregistrer l'observation"}</button>
     <button type="button" class="ghost" data-retry>Ce n'est pas ça, reprendre</button>
+  </div>`;
+}
+
+function showRefusal(pos) {
+  state.scan = "done";
+  const pill = document.querySelector(".cam .pill"); if (pill) pill.textContent = "Photo refusée";
+  document.querySelector(".scanline")?.remove();
+  const captive = pos.verdict === "captive";
+  $layer.innerHTML = `<div class="sheet refuse">
+    <div class="grab"></div>
+    <div class="res">
+      <div class="pic no">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">${captive
+          ? '<path d="M4 4h16M4 20h16M7 4v16M12 4v16M17 4v16"/>'
+          : '<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><path d="M4 4l16 16"/>'}</svg>
+      </div>
+      <div>
+        <span class="okpill bad">${captive ? "Animal en captivité" : "Position introuvable"}</span>
+        <h3>Photo refusée</h3>
+      </div>
+    </div>
+    <p class="why">${captive
+      ? `Cette photo a été prise dans <b>${esc(pos.site)}</b>. FaunaDex ne compte que les animaux observés en liberté : les zoos, aquariums et parcs animaliers sont exclus.`
+      : "Sans position, impossible de vérifier que l'animal n'est pas dans un zoo. Activez la localisation, puis reprenez la photo."}</p>
+    <button type="button" class="cta" data-retry>Reprendre une photo</button>
   </div>`;
 }
 
@@ -1466,7 +1522,7 @@ function doCapture(id) {
   const isNew = !state.captured[id];
   const sp = byId[id];
   if (isNew) {
-    state.captured[id] = { date: "2026-09-27", place: "Position actuelle (démo)" };
+    state.captured[id] = { date: "2026-09-27", place: POSITIONS[state.pos].label };
     state.fresh.add(id);
   }
   if (state.photo) state.photos[id] = state.photo;
@@ -1514,6 +1570,7 @@ document.addEventListener("click", e => {
   if (t.dataset.dcapture) return doDinoCapture(Number(t.dataset.dcapture), t.dataset.museum);
   if (t.dataset.dino) { state.dino = Number(t.dataset.dino); return go("dino"); }
   if (t.dataset.period) { state.period = t.dataset.period; return render(); }
+  if ("pos" in t.dataset) { state.pos = (state.pos + 1) % POSITIONS.length; return render(); }
   if (t.dataset.cammode) { state.camMode = t.dataset.cammode; return render(); }
   if ("fossilcam" in t.dataset) { go("capture"); state.camMode = "fossil"; return render(); }
   if ("retry" in t.dataset) { $layer.innerHTML = ""; state.scan = null; return render(); }

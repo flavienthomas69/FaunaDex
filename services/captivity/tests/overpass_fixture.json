@@ -1,0 +1,10 @@
+{"elements": [
+  {"type": "way", "id": 101, "tags": {"tourism": "zoo", "name": "Zoo de test"},
+   "geometry": [{"lat": 45.771, "lon": 4.850}, {"lat": 45.771, "lon": 4.853}, {"lat": 45.773, "lon": 4.853}, {"lat": 45.773, "lon": 4.850}, {"lat": 45.771, "lon": 4.850}]},
+  {"type": "node", "id": 202, "lat": 45.75, "lon": 4.80, "tags": {"tourism": "aquarium", "name": "Aquarium de test"}},
+  {"type": "relation", "id": 303, "tags": {"tourism": "zoo", "zoo": "safari_park", "name": "Safari de test"},
+   "bounds": {"minlat": 45.60, "minlon": 4.60, "maxlat": 45.61, "maxlon": 4.62}},
+  {"type": "way", "id": 404, "tags": {"attraction": "animal"}, "geometry": [{"lat": 45.0, "lon": 4.0}]},
+  {"type": "way", "id": 101, "tags": {"tourism": "zoo", "name": "Doublon"},
+   "geometry": [{"lat": 45.0, "lon": 4.0}, {"lat": 45.0, "lon": 4.1}, {"lat": 45.1, "lon": 4.1}]}
+]}
