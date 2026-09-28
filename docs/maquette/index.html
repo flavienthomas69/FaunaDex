@@ -635,7 +635,18 @@
     background: rgba(255, 255, 255, .92); font: 700 18px/1 var(--body); color: var(--ink) !important;
     box-shadow: 0 2px 6px rgba(0, 0, 0, .2);
   }
+  .mapctl button.on { background: var(--amber); }
   .maphint { position: absolute; left: 8px; bottom: 6px; margin: 0; font-size: 10.5px; color: #fff; background: rgba(0, 0, 0, .45); padding: 4px 8px; border-radius: 8px; pointer-events: none; }
+
+  .biomes { display: flex; flex-wrap: wrap; gap: 6px; }
+  .biome {
+    display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px 6px 6px; border-radius: 999px;
+    border: 1px dashed #C4CCC0; font: 600 12px/1 var(--body); color: #9AA59E; background: var(--card);
+  }
+  .biome i { font-style: normal; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; background: #E6EAE2; filter: grayscale(1); opacity: .6; }
+  .biome.on { border: 1px solid var(--line); color: var(--ink); }
+  .biome.on i { background: var(--b); filter: none; opacity: 1; }
+  .biome small { font: 500 10.5px/1 var(--mono); color: var(--muted); }
 
   /* Sanctuaire 3D */
   .world3d { position: relative; margin: 12px 20px 0; height: 340px; border-radius: 18px; overflow: hidden; border: 1px solid var(--line); background: #BFE3F2; }
@@ -1943,6 +1954,7 @@ function renderMap() {
         <button type="button" data-mapzoom="0.625" aria-label="Dézoomer">−</button>
         <button type="button" data-mapreset aria-label="Autour de moi">⌖</button>
         <button type="button" data-mapall aria-label="Vue d'ensemble">⤢</button>
+        <button type="button" data-nofog aria-pressed="${!!state.noFog}" aria-label="Aperçu sans brouillard" title="Aperçu sans brouillard (démo)" class="${state.noFog ? "on" : ""}">👁</button>
       </div>
       <p class="maphint">Glissez pour vous déplacer · pincez ou molette pour zoomer</p>
     </div>
@@ -1950,6 +1962,7 @@ function renderMap() {
       <div class="stat"><b>${sectors}</b><small>secteurs de 50 km explorés</small></div>
       <div class="stat"><b>${pts.length}</b><small>lieux d'observation</small></div>
     </div>
+    ${biomeLegend(m, labels)}
     ${state.mapView === "france" ? `<div class="bsec"><h3>Hotspots autour de vous</h3>
       ${sel ? `<div class="hotcard"><b>${esc(sel.family)}</b><span>${sel.observers} passionnés en ont photographié ce mois-ci dans ce secteur.</span><small>Secteur de 50 km, position exacte jamais affichée.</small></div>` : '<p class="count" style="margin:0 0 8px">Touchez un cercle sur la carte.</p>'}
       <div class="blist">${hot.map((h, i) => `<button type="button" class="hotrow ${state.hot === i ? "sel" : ""}" data-hot="${i}"><b>${esc(h.family)}</b><span>${h.observers} passionnés</span></button>`).join("")}</div>
@@ -1966,24 +1979,79 @@ function mapPaths(view) {
   return (MAPCACHE[view] = {
     land: P(m.land), borders: P(m.borders), grat: P(m.graticule), lakes: P(m.lakes),
     rivers: m.rivers.map(P), ranges: m.ranges.map(r => ({ p: P(r.d), name: r.name, xy: r.xy })),
+    biomes: Object.fromEntries(Object.entries(m.biomes || {}).map(([b, d]) => [b, P(d)])),
   });
 }
 let mapPatterns = null;
+// Environnements de la carte : couleur de fond et motif dessiné (arbres, champs, dunes, immeubles, vagues…)
+const BIOME_STYLE = {
+  forest: { base: "#8DB86C", name: "Forêt", icon: "🌳" },
+  taiga: { base: "#7FA27A", name: "Forêt boréale", icon: "🌲" },
+  rainforest: { base: "#4E9A52", name: "Forêt tropicale", icon: "🌴" },
+  countryside: { base: "#DCE6A9", name: "Campagne", icon: "🌾" },
+  savanna: { base: "#DCCB8C", name: "Savane", icon: "🦒" },
+  steppe: { base: "#DDD9A4", name: "Steppe et prairie", icon: "🌿" },
+  desert: { base: "#EDD9A3", name: "Désert", icon: "🏜️" },
+  mountain: { base: "#C4B393", name: "Montagne", icon: "⛰️" },
+  tundra: { base: "#CBD3C2", name: "Toundra", icon: "❄️" },
+  ice: { base: "#EEF4F8", name: "Glaces", icon: "🧊" },
+  city: { base: "#CFC9C0", name: "Ville", icon: "🏙️" },
+  sea: { base: "#8FBCD1", name: "Littoral et mer", icon: "🌊" },
+};
+function tile(size, draw) { const c = document.createElement("canvas"); c.width = c.height = size; draw(c.getContext("2d"), size); return c; }
+const rnd = (() => { let sd = 7; return () => (sd = (sd * 16807) % 2147483647) / 2147483647; })();
 function makePatterns(ctx) {
-  const grain = document.createElement("canvas"); grain.width = grain.height = 96;
-  const g = grain.getContext("2d");
-  for (let i = 0; i < 1400; i++) {
-    const v = Math.random();
-    g.fillStyle = v < .5 ? `rgba(70,110,50,${.05 + Math.random() * .12})` : v < .8 ? `rgba(150,130,80,${.05 + Math.random() * .1})` : `rgba(255,255,240,${.08 + Math.random() * .12})`;
-    g.fillRect(Math.random() * 96, Math.random() * 96, 1 + Math.random() * 2, 1 + Math.random() * 2);
-  }
-  // petites forêts : touffes plus sombres
-  for (let i = 0; i < 26; i++) { g.fillStyle = "rgba(60,100,45,.22)"; g.beginPath(); g.arc(Math.random() * 96, Math.random() * 96, 2 + Math.random() * 4, 0, 7); g.fill(); }
-  const peaks = document.createElement("canvas"); peaks.width = peaks.height = 22;
-  const q = peaks.getContext("2d");
-  q.strokeStyle = "rgba(110,80,50,.55)"; q.lineWidth = 1.1;
-  [[5, 9], [15, 19]].forEach(([x, y]) => { q.beginPath(); q.moveTo(x - 4, y); q.lineTo(x, y - 5); q.lineTo(x + 4, y); q.stroke(); q.fillStyle = "rgba(255,255,255,.6)"; q.beginPath(); q.moveTo(x - 1.4, y - 3.2); q.lineTo(x, y - 5); q.lineTo(x + 1.4, y - 3.2); q.fill(); });
-  mapPatterns = { grain: ctx.createPattern(grain, "repeat"), peaks: ctx.createPattern(peaks, "repeat") };
+  const tree = (g, x, y, r, crown, trunk) => {
+    g.fillStyle = "rgba(0,0,0,.18)"; g.beginPath(); g.ellipse(x + r * .4, y + r * .9, r, r * .45, 0, 0, 7); g.fill();
+    g.fillStyle = trunk; g.fillRect(x - .6, y, 1.2, r * .9);
+    g.fillStyle = crown; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
+    g.fillStyle = "rgba(255,255,255,.18)"; g.beginPath(); g.arc(x - r * .3, y - r * .3, r * .45, 0, 7); g.fill();
+  };
+  const fir = (g, x, y, h, c) => {
+    g.fillStyle = "rgba(0,0,0,.18)"; g.beginPath(); g.ellipse(x + h * .25, y + h * .05, h * .35, h * .14, 0, 0, 7); g.fill();
+    g.fillStyle = c; g.beginPath(); g.moveTo(x, y - h); g.lineTo(x + h * .38, y); g.lineTo(x - h * .38, y); g.closePath(); g.fill();
+  };
+  const biomes = {
+    forest: tile(36, g => { for (let i = 0; i < 9; i++) tree(g, rnd() * 36, rnd() * 36, 3 + rnd() * 1.6, rnd() < .5 ? "#4F8A3A" : "#5E9A42", "#6B4A2E"); }),
+    taiga: tile(32, g => { for (let i = 0; i < 9; i++) fir(g, rnd() * 32, rnd() * 32 + 4, 6 + rnd() * 3, rnd() < .5 ? "#355E3E" : "#41704A"); }),
+    rainforest: tile(32, g => { for (let i = 0; i < 14; i++) tree(g, rnd() * 32, rnd() * 32, 3 + rnd() * 2.4, ["#2F7A3A", "#3C8A3E", "#27693A"][i % 3], "#4A3A22"); }),
+    countryside: tile(48, g => {
+      const cols = ["#CFDF96", "#E3E0A0", "#BFD58A", "#D9CF8A", "#C8DDA0"];
+      for (let y = 0; y < 48; y += 12) for (let x = -8; x < 48; x += 16) { g.fillStyle = cols[Math.floor(rnd() * cols.length)]; g.fillRect(x + (y / 12 % 2) * 8, y, 16, 12); }
+      g.strokeStyle = "rgba(90,120,60,.45)"; g.lineWidth = 1;
+      for (let y = 0; y <= 48; y += 12) { g.beginPath(); g.moveTo(0, y); g.lineTo(48, y); g.stroke(); }
+      for (let i = 0; i < 3; i++) tree(g, rnd() * 48, rnd() * 48, 1.8, "#5E9A42", "#6B4A2E");
+    }),
+    savanna: tile(48, g => {
+      g.strokeStyle = "rgba(150,120,60,.5)";
+      for (let i = 0; i < 40; i++) { const x = rnd() * 48, y = rnd() * 48; g.beginPath(); g.moveTo(x, y); g.lineTo(x + 1, y - 3); g.stroke(); }
+      const x = rnd() * 30 + 8, y = rnd() * 30 + 10;
+      g.fillStyle = "#6B4A2E"; g.fillRect(x - .6, y - 5, 1.2, 6); g.fillStyle = "#7F9A48"; g.beginPath(); g.ellipse(x, y - 6, 6, 2.2, 0, 0, 7); g.fill();
+    }),
+    steppe: tile(32, g => { g.strokeStyle = "rgba(140,140,70,.45)"; for (let i = 0; i < 30; i++) { const x = rnd() * 32, y = rnd() * 32; g.beginPath(); g.moveTo(x - 2, y); g.lineTo(x + 2, y); g.stroke(); } }),
+    desert: tile(40, g => { g.strokeStyle = "rgba(190,150,80,.6)"; g.lineWidth = 1.2; for (let y = 6; y < 40; y += 10) for (let x = (y / 10 % 2) * 10 - 10; x < 40; x += 20) { g.beginPath(); g.arc(x + 10, y + 6, 9, Math.PI * 1.15, Math.PI * 1.85); g.stroke(); } }),
+    mountain: tile(26, g => { [[6, 11], [18, 23]].forEach(([x, y]) => { g.fillStyle = "rgba(120,95,65,.45)"; g.beginPath(); g.moveTo(x - 6, y); g.lineTo(x, y - 8); g.lineTo(x + 6, y); g.fill(); g.fillStyle = "rgba(255,255,255,.85)"; g.beginPath(); g.moveTo(x - 2, y - 5.3); g.lineTo(x, y - 8); g.lineTo(x + 2, y - 5.3); g.fill(); }); }),
+    tundra: tile(28, g => { for (let i = 0; i < 26; i++) { g.fillStyle = rnd() < .5 ? "rgba(120,130,100,.4)" : "rgba(255,255,255,.6)"; g.beginPath(); g.arc(rnd() * 28, rnd() * 28, .8 + rnd(), 0, 7); g.fill(); } }),
+    ice: tile(40, g => { g.strokeStyle = "rgba(140,180,210,.5)"; for (let i = 0; i < 6; i++) { g.beginPath(); g.moveTo(rnd() * 40, rnd() * 40); g.lineTo(rnd() * 40, rnd() * 40); g.stroke(); } }),
+    city: tile(24, g => {
+      g.fillStyle = "#E8E4DC"; g.fillRect(0, 10, 24, 3); g.fillRect(10, 0, 3, 24);
+      for (const [x, y] of [[2, 2], [15, 2], [2, 15], [15, 15]]) { g.fillStyle = "#A9A195"; g.fillRect(x, y, 6, 6); g.fillStyle = "rgba(0,0,0,.18)"; g.fillRect(x + 6, y + 1, 1, 6); }
+    }),
+  };
+  const sea = tile(40, g => {
+    g.fillStyle = "#8FBCD1"; g.fillRect(0, 0, 40, 40); g.strokeStyle = "rgba(255,255,255,.35)"; g.lineWidth = 1;
+    for (let y = 8; y < 40; y += 14) for (let x = (y / 14 % 2) * 10 - 10; x < 40; x += 20) { g.beginPath(); g.arc(x + 5, y, 4, Math.PI * 1.1, Math.PI * 1.9); g.stroke(); g.beginPath(); g.arc(x + 13, y, 4, Math.PI * 1.1, Math.PI * 1.9); g.stroke(); }
+  });
+  const pat = c => ctx.createPattern(c, "repeat");
+  mapPatterns = { sea: pat(sea), biomes: Object.fromEntries(Object.entries(biomes).map(([b, c]) => [b, pat(c)])) };
+}
+function biomeLegend(m, labels) {
+  const counts = {};
+  labels.forEach(l => { const b = (m.placeBiome && m.placeBiome[l]) || "sea"; counts[b] = (counts[b] || 0) + 1; });
+  const found = Object.keys(counts);
+  const all = Object.keys(BIOME_STYLE);
+  return `<div class="bsec"><h3>Environnements découverts · ${found.length} / ${all.length}</h3>
+    <div class="biomes">${all.map(b => `<span class="biome ${counts[b] ? "on" : ""}" style="--b:${BIOME_STYLE[b].base}"><i>${BIOME_STYLE[b].icon}</i>${BIOME_STYLE[b].name}${counts[b] ? ` <small>${counts[b]}</small>` : ""}</span>`).join("")}</div></div>`;
 }
 let mapFog = null, mapQueued = false;
 function scheduleMap() { if (!mapQueued) { mapQueued = true; requestAnimationFrame(() => { mapQueued = false; drawMap(); }); } }
@@ -2026,12 +2094,18 @@ function drawMap() {
   ctx.fillStyle = "#8FBCD1"; ctx.fillRect(0, 0, cv.width, cv.height);
   toMap();
   ctx.lineWidth = 0.6 / s; ctx.strokeStyle = "rgba(255,255,255,.3)"; ctx.stroke(P.grat);
-  ctx.fillStyle = "#D5E2B6"; ctx.fill(P.land);
+  // Textures à taille d'écran constante, accrochées à la carte quand on la déplace
   const inv = new DOMMatrix([1 / k, 0, 0, 1 / k, 0, 0]);
-  mapPatterns.grain.setTransform(inv.translate(vb[0] * k, vb[1] * k)); ctx.fillStyle = mapPatterns.grain; ctx.fill(P.land);
-  P.ranges.forEach(rg => { ctx.fillStyle = "rgba(176,142,98,.38)"; ctx.fill(rg.p); });
-  mapPatterns.peaks.setTransform(inv.translate(vb[0] * k, vb[1] * k)); ctx.fillStyle = mapPatterns.peaks;
-  P.ranges.forEach(rg => ctx.fill(rg.p));
+  mapPatterns.sea.setTransform(inv); ctx.fillStyle = mapPatterns.sea; ctx.fillRect(vb[0] - 5, vb[1] - 5, vb[2] + 10, vb[3] + 10);
+  ctx.fillStyle = "#D5E2B6"; ctx.fill(P.land);
+  // Environnements : forêts, campagnes, villes, savanes, déserts, montagnes, toundras, glaces…
+  ctx.save(); ctx.clip(P.land);
+  for (const [b, path] of Object.entries(P.biomes)) {
+    const pat = mapPatterns.biomes[b]; if (!pat) continue;
+    ctx.fillStyle = BIOME_STYLE[b].base; ctx.fill(path);
+    pat.setTransform(inv); ctx.fillStyle = pat; ctx.fill(path);
+  }
+  ctx.restore();
   if (P.lakes) { ctx.fillStyle = "#6FA8C8"; ctx.fill(P.lakes); }
   ctx.lineCap = ctx.lineJoin = "round"; ctx.strokeStyle = "#5C9DC4";
   [2.2, 1.5, 1, 0.7].forEach((w, i) => { if (!P.rivers[i] || (i === 3 && z < 2.2) || (i === 2 && z < 1.5)) return; ctx.lineWidth = w / s; ctx.stroke(P.rivers[i]); });
@@ -2042,7 +2116,7 @@ function drawMap() {
   if (mapFog.width !== cv.width || mapFog.height !== cv.height) { mapFog.width = cv.width; mapFog.height = cv.height; }
   const f = mapFog.getContext("2d");
   f.globalCompositeOperation = "source-over"; f.clearRect(0, 0, mapFog.width, mapFog.height);
-  f.fillStyle = "rgba(26,37,31,.86)"; f.fillRect(0, 0, mapFog.width, mapFog.height);
+  f.fillStyle = state.noFog ? "rgba(26,37,31,0)" : "rgba(26,37,31,.8)"; f.fillRect(0, 0, mapFog.width, mapFog.height);
   f.globalCompositeOperation = "destination-out";
   pts.forEach(([x, y]) => {
     const [sx, sy] = toScreen(x, y), R = r * s * dpr;
@@ -2053,18 +2127,25 @@ function drawMap() {
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(mapFog, 0, 0);
   // Étiquettes et symboles, en coordonnées écran
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const discovered = (x, y) => pts.some(([px, py]) => Math.hypot(px - x, py - y) < r * .85);
-  const label = (text, x, y, size, color, weight = 600) => {
+  const discovered = (x, y) => state.noFog || pts.some(([px, py]) => Math.hypot(px - x, py - y) < r * .85);
+  const placed = [];
+  const label = (text, x, y, size, color, weight = 600, force = false) => {
     ctx.font = `${weight} ${size}px Figtree, system-ui, sans-serif`; ctx.textAlign = "center";
+    const w = ctx.measureText(text).width + 4, box = [x - w / 2, y - size, x + w / 2, y + 2];
+    if (!force && placed.some(b => box[0] < b[2] && box[2] > b[0] && box[1] < b[3] && box[3] > b[1])) return false;
+    placed.push(box);
     ctx.lineWidth = 3; ctx.strokeStyle = "rgba(255,253,245,.9)"; ctx.strokeText(text, x, y); ctx.fillStyle = color; ctx.fillText(text, x, y);
+    return true;
   };
   if (z >= 1.3) P.ranges.forEach(rg => { if (discovered(rg.xy[0], rg.xy[1]) || z >= 3) { const [x, y] = toScreen(...rg.xy); if (discovered(rg.xy[0], rg.xy[1])) label(rg.name.toUpperCase(), x, y, 9, "#6E5232", 700); } });
-  const minPop = z >= 4 ? 4e4 : z >= 2.5 ? 2e5 : z >= 1.5 ? 1e6 : 5e6;
+  const minPop = state.mapView === "world" ? (z >= 4 ? 2e6 : z >= 2 ? 5e6 : 1e7) : z >= 4 ? 4e4 : z >= 2.5 ? 2e5 : z >= 1.5 ? 1e6 : 5e6;
+  // Les lieux du joueur sont prioritaires : on réserve leur place avant les villes
+  pts.forEach(([x, y], i) => { if (z >= 2) { const [sx, sy] = toScreen(x, y); const w = placeName(labels[i]).length * 5.5; placed.push([sx - w / 2, sy + 5, sx + w / 2, sy + 17]); } });
   m.towns.forEach(([x, y, name, pop]) => {
     if (pop < minPop || !discovered(x, y)) return;
     const [sx, sy] = toScreen(x, y);
-    ctx.fillStyle = "#3A3A32"; ctx.beginPath(); ctx.arc(sx, sy, pop > 1e6 ? 2.6 : 1.8, 0, 7); ctx.fill();
-    label(name, sx, sy - 5, pop > 1e6 ? 11 : 10, "#2D3A32");
+    if (sx < -20 || sy < -20 || sx > cw + 20 || sy > ch + 20) return;
+    if (label(name, sx, sy - 5, pop > 1e6 ? 11 : 10, "#2D3A32")) { ctx.fillStyle = "#3A3A32"; ctx.beginPath(); ctx.arc(sx, sy, pop > 1e6 ? 2.6 : 1.8, 0, 7); ctx.fill(); }
   });
   const hot = state.mapView === "france" ? m.hotspots : [];
   hot.forEach((h, i) => {
@@ -2077,7 +2158,7 @@ function drawMap() {
   pts.forEach(([x, y], i) => {
     const [sx, sy] = toScreen(x, y);
     ctx.beginPath(); ctx.arc(sx, sy, 4, 0, 7); ctx.fillStyle = "#F2A541"; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = "#fff"; ctx.stroke();
-    if (z >= 2) label(placeName(labels[i]), sx, sy + 15, 10, "#8A4B00", 700);
+    if (z >= 2) label(placeName(labels[i]), sx, sy + 15, 10, "#8A4B00", 700, true);
   });
 }
 function attachMapNav() {
@@ -2348,53 +2429,447 @@ function createWorld() {
   }
   island.add(tufts);
 
-  // ── Mammifères : torse modelé, pattes articulées, tête détaillée, queue
+  function fishTexture(id, c0, c1) {
+    const c = document.createElement("canvas"); c.width = 64; c.height = 256; const g = c.getContext("2d");
+    g.fillStyle = c0; g.fillRect(0, 0, 64, 256);
+    if (id === 17) [70, 130, 200].forEach(y => { g.fillStyle = "#111"; g.fillRect(0, y - 14, 64, 28); g.fillStyle = c1; g.fillRect(0, y - 10, 64, 20); });
+    if (id === 18) for (let i = 0; i < 120; i++) { g.fillStyle = "rgba(245,245,235,.9)"; g.beginPath(); g.arc(Math.random() * 64, Math.random() * 256, 1.5 + Math.random() * 2, 0, 7); g.fill(); }
+    const t = new T.CanvasTexture(c); t.encoding = T.sRGBEncoding; return t;
+  }
+  // ── Squelettes : un corps continu (maillage « skinné ») déformé par une chaîne d'os
+  const UPV = new T.Vector3(0, 1, 0), FWDV = new T.Vector3(0, 0, 1);
+  function skinTube(pts, radii, colorFn, tex = "fur", o = {}) {
+    const segs = o.segs || 5, radial = o.radial || 20;
+    const V = pts.map(p => new T.Vector3(...p));
+    const curve = new T.CatmullRomCurve3(V, false, "catmullrom", .5);
+    const n = V.length, rings = (n - 1) * segs + 1;
+    const pos = [], col = [], uv = [], si = [], sw = [], idx = [], tmp = new T.Color();
+    for (let r = 0; r < rings; r++) {
+      const seg = Math.min(n - 2, Math.floor(r / segs)), f = r / segs - seg, u = r / (rings - 1);
+      const P = curve.getPoint(u), Tn = curve.getTangent(u).normalize();
+      const ref = Math.abs(Tn.dot(UPV)) > .92 ? FWDV : UPV;
+      const side = new T.Vector3().crossVectors(Tn, ref).normalize();
+      const up = new T.Vector3().crossVectors(side, Tn).normalize();
+      const e = f * f * (3 - 2 * f);
+      const rx = radii[seg][0] + (radii[seg + 1][0] - radii[seg][0]) * e;
+      const ry = radii[seg][1] + (radii[seg + 1][1] - radii[seg][1]) * e;
+      for (let k = 0; k <= radial; k++) {
+        const a = k / radial * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a);
+        const p = P.clone().addScaledVector(side, ca * rx).addScaledVector(up, sa * ry);
+        pos.push(p.x, p.y, p.z);
+        tmp.set(colorFn ? colorFn(u, sa, ca) : "#ffffff").convertSRGBToLinear(); col.push(tmp.r, tmp.g, tmp.b);
+        uv.push(k / radial, u * (o.vRepeat || 3));
+        si.push(seg, seg + 1, 0, 0); sw.push(1 - e, e, 0, 0);
+      }
+    }
+    for (let r = 0; r < rings - 1; r++) for (let k = 0; k < radial; k++) {
+      const a = r * (radial + 1) + k, b = a + radial + 1;
+      idx.push(a, b, a + 1, b, b + 1, a + 1);
+    }
+    const geo = new T.BufferGeometry();
+    geo.setIndex(idx);
+    geo.setAttribute("position", new T.Float32BufferAttribute(pos, 3));
+    geo.setAttribute("color", new T.Float32BufferAttribute(col, 3));
+    geo.setAttribute("uv", new T.Float32BufferAttribute(uv, 2));
+    geo.setAttribute("skinIndex", new T.Uint16BufferAttribute(si, 4));
+    geo.setAttribute("skinWeight", new T.Float32BufferAttribute(sw, 4));
+    geo.computeVertexNormals();
+    const bones = V.map((v, i) => { const b = new T.Bone(); b.position.copy(i ? v.clone().sub(V[i - 1]) : v); return b; });
+    bones.forEach((b, i) => { if (i) bones[i - 1].add(b); });
+    const m = new T.SkinnedMesh(geo, new T.MeshStandardMaterial({
+      vertexColors: true, skinning: true, roughness: o.rough ?? .8, metalness: 0,
+      map: o.map || TEX[tex], bumpMap: TEX[tex], bumpScale: tex === "fur" ? .012 : .006,
+    }));
+    m.add(bones[0]); m.bind(new T.Skeleton(bones));
+    m.castShadow = true; m.frustumCulled = false;
+    return { mesh: m, bones, pts: V };
+  }
+  // Attache un objet à un os en le plaçant à une position donnée (coordonnées du modèle au repos)
+  function attach(bone, bonePos, obj, at) { obj.position.set(at[0] - bonePos.x, at[1] - bonePos.y, at[2] - bonePos.z); obj.castShadow = true; bone.add(obj); return obj; }
+  const lerpTo = (cur, target, k) => cur + (target - cur) * k;
+
+  // Articulation rigide (insectes, araignées, crabes) : chaque segment tourne autour de son articulation
+  function jointLeg(parent, base, segsDef, color, tex = "smooth") {
+    const joints = []; let host = parent, at = base;
+    segsDef.forEach(([dx, dy, dz, r0, r1]) => {
+      const j = new T.Group(); j.position.set(...at); host.add(j);
+      limb(j, [0, 0, 0], [dx, dy, dz], r0, r1, color, tex);
+      joints.push(j); host = j; at = [dx, dy, dz];
+    });
+    return joints;
+  }
+
+  // ── Mammifère quadrupède : colonne, cou, tête, 4 pattes à 3 articulations, queue
   function quad(pal, o) {
-    const g = new T.Group(), [c0, c1] = [pal[0], pal[1] || pal[0]], dark = shade(c0, .45), tex = "fur";
-    const { w, len, h } = o;
-    put(g, ball(w, c0, tex, 1, .92, len / w), 0, h, 0);
-    put(g, ball(w * 1.02, c0, tex, 1, 1.02, 1), 0, h + w * .06, len * .55);
-    put(g, ball(w * 1.06, c0, tex, 1, .98, 1.08), 0, h + w * .03, -len * .55);
-    put(g, ball(w * .78, c1, tex, .92, .55, len / w * .8), 0, h - w * .38, .04);
-    put(g, ball(w * .5, c1, tex, 1, 1.05, .6), 0, h + w * .02, len * .9);
-    const neckTop = [0, h + o.neck + w * .45, len * .98 + o.neck * .4];
-    limb(g, [0, h + w * .3, len * .7], neckTop, w * .66, o.hs * .7, c0, tex);
-    const head = new T.Group(); head.position.set(...neckTop); g.add(head);
-    put(head, ball(o.hs, c0, tex, .92, .86, 1), 0, o.hs * .15, o.hs * .15);
-    const muz = new T.Mesh(new T.CylinderGeometry(o.hs * .2, o.hs * .5, o.muz, 16), mat(c0, tex)); muz.rotation.x = Math.PI / 2; muz.position.set(0, 0, o.hs * .75 + o.muz * .45); muz.castShadow = true; head.add(muz);
-    put(head, ball(o.hs * .42, c1, tex, 1, .55, 1.5), 0, -o.hs * .22, o.hs * .7 + o.muz * .3);
-    put(head, ball(o.hs * .15, "#1b1512", "smooth", 1.15, .8, .9, { roughness: .25 }), 0, o.hs * .04, o.hs * .75 + o.muz * .92);
+    const g = new T.Group(), [c0, c1] = [pal[0], pal[1] || pal[0]];
+    const { w, len, h, neck, hs, muz } = o;
+    const headY = h + neck + w * .35, headZ = len * .62 + neck * .45 + hs * .3;
+    const pts = [
+      [0, h + w * .05, -len * .66], [0, h + w * .1, -len * .45], [0, h, -len * .05], [0, h + w * .06, len * .32],
+      [0, h + w * .3 + neck * .3, len * .52 + neck * .15], [0, h + neck * .8 + w * .3, len * .58 + neck * .38],
+      [0, headY, headZ], [0, headY - hs * .12, headZ + hs * .55 + muz * .35], [0, headY - hs * .2, headZ + hs * .62 + muz],
+    ];
+    const radii = [[w * .25, w * .3], [w * .85, w * .92], [w * .88, w * .95], [w * .95, w * 1.08], [w * .6, w * .72],
+      [hs * .58, hs * .66], [hs * .92, hs * .86], [hs * .42, hs * .36], [hs * .1, hs * .09]];
+    const lightMuzzle = o.muzzleLight !== false;
+    const body = skinTube(pts, radii, (u, sa) => {
+      if (u < .6 && u > .08 && sa < -.35) return c1;          // ventre
+      if (u >= .5 && u < .7 && sa < -.1) return c1;           // gorge
+      if (u > .8 && lightMuzzle && sa < .2) return c1;        // museau, joues
+      if (u > .96) return "#1b1512";                          // truffe
+      return c0;
+    }, "fur", { segs: 6 });
+    g.add(body.mesh);
+    const B = body.bones, P = body.pts, head = B[6];
     [1, -1].forEach(sd => {
-      eye(head, sd * o.hs * .44, o.hs * .38, o.hs * .7, o.hs * .12, o.iris);
-      const ear = new T.Mesh(new T.ConeGeometry(o.ear[0], o.ear[1], 18), mat(c0, tex)); ear.scale.z = .45;
-      ear.position.set(sd * o.hs * .48, o.hs * .95 + o.ear[1] * .3, o.hs * .02); ear.rotation.z = -sd * .28; ear.castShadow = true; head.add(ear);
-      const inner = new T.Mesh(new T.ConeGeometry(o.ear[0] * .6, o.ear[1] * .75, 14), mat(o.earIn || c1, tex)); inner.scale.z = .3;
-      inner.position.set(sd * o.hs * .48, o.hs * .9 + o.ear[1] * .26, o.hs * .06); inner.rotation.z = -sd * .28; head.add(inner);
+      const ey = new T.Group(); attach(head, P[6], ey, [sd * hs * .47, headY + hs * .28, headZ + hs * .45]); eye(ey, 0, 0, 0, hs * .13, o.iris);
+      const ear = new T.Mesh(new T.ConeGeometry(o.ear[0], o.ear[1], 18), mat(c0, "fur")); ear.scale.z = .45; ear.rotation.z = -sd * .25;
+      attach(head, P[6], ear, [sd * hs * .52, headY + hs * .72 + o.ear[1] * .35, headZ - hs * .12]);
+      const inner = new T.Mesh(new T.ConeGeometry(o.ear[0] * .6, o.ear[1] * .72, 14), mat(o.earIn || c1, "fur")); inner.scale.z = .3; inner.rotation.z = -sd * .25;
+      attach(head, P[6], inner, [sd * hs * .52, headY + hs * .68 + o.ear[1] * .32, headZ - hs * .06]);
+      if (o.antlers) {
+        const an = new T.Group(); attach(head, P[6], an, [sd * hs * .3, headY + hs * .75, headZ - hs * .15]);
+        limb(an, [0, 0, 0], [sd * hs * .35, hs * 1.1, -hs * .25], .03, .02, "#6B4A2E"); limb(an, [sd * hs * .14, hs * .5, -hs * .1], [sd * hs * .02, hs * .95, hs * .25], .02, .014, "#6B4A2E");
+      }
     });
-    if (o.antlers) [1, -1].forEach(sd => { limb(head, [sd * o.hs * .3, o.hs * .9, 0], [sd * o.hs * .55, o.hs * 1.9, -o.hs * .2], .03, .02, "#6B4A2E"); limb(head, [sd * o.hs * .42, o.hs * 1.35, -o.hs * .1], [sd * o.hs * .3, o.hs * 1.75, o.hs * .25], .02, .015, "#6B4A2E"); });
-    const legs = [], pawR = w * .17, L = h - w * .1 - pawR * .6;
-    [[1, 1], [-1, 1], [1, -1], [-1, -1]].forEach(([sx, sz], i) => {
-      const piv = new T.Group(); piv.position.set(sx * w * .58, h - w * .1, sz > 0 ? len * .55 : -len * .52); g.add(piv);
-      const knee = [0, -L * .52, sz > 0 ? .02 : -.07];
-      limb(piv, [0, 0, 0], knee, w * .36, w * .19, c0, tex);
-      limb(piv, knee, [0, -L, .02], w * .18, w * .13, o.socks ? dark : c0, tex);
-      put(piv, ball(pawR, o.socks ? dark : shade(c0, .8), tex, 1, .55, 1.4), 0, -L - pawR * .15, pawR * .5);
-      legs.push({ piv, phase: [0, Math.PI, Math.PI, 0][i] });
+    // Pattes : épaule/hanche → coude/grasset → poignet/jarret → pied
+    const legs = [];
+    [[1, true], [-1, true], [1, false], [-1, false]].forEach(([sx, front], i) => {
+      const x = sx * w * .55, z = front ? len * .3 : -len * .42;
+      const LP = front
+        ? [[x, h, z], [x, h * .56, z - .03], [x, h * .24, z + .01], [x, .07, z + .02], [x, .035, z + w * .35]]
+        : [[x, h + w * .08, z], [x, h * .62, z + h * .15], [x, h * .3, z - h * .1], [x, .07, z - h * .05], [x, .035, z + w * .3]];
+      const LR = front
+        ? [[w * .36, w * .42], [w * .2, w * .22], [w * .12, w * .13], [w * .13, w * .12], [w * .1, w * .06]]
+        : [[w * .48, w * .56], [w * .27, w * .32], [w * .13, w * .14], [w * .13, w * .12], [w * .1, w * .06]];
+      const leg = skinTube(LP, LR, u => (o.socks && u > .42) ? shade(c0, .3) : u > .8 ? shade(c0, .7) : c0, "fur", { segs: 4, radial: 14 });
+      g.add(leg.mesh);
+      legs.push({ bones: leg.bones, front, phase: [0, Math.PI, Math.PI, 0][i] });
     });
-    const tail = new T.Group(); tail.position.set(0, h + w * .25, -len * .95 - w * .25); g.add(tail);
-    const n = 9, pts = [], rad = [], col = [];
+    // Queue articulée
+    const tb = [0, h + w * .2, -len * .62], TP = [], TR = [], n = 7;
     for (let i = 0; i < n; i++) {
       const t = i / (n - 1);
-      pts.push([0, o.tailUp ? t * o.tail * 1.1 - t * t * o.tail * .2 : -t * o.tail * .55 + t * t * o.tail * .25, -t * o.tail * (o.tailUp ? .45 : 1)]);
-      rad.push(o.tailR * (o.bushy ? .55 + Math.sin(t * Math.PI * .85) * .75 : 1 - t * .75));
-      col.push(o.tip && i >= n - 2 ? c1 : c0);
+      TP.push([0, tb[1] + (o.tailUp ? t * o.tail * 1.05 - t * t * o.tail * .25 : -t * o.tail * .5 + t * t * o.tail * .2), tb[2] - t * o.tail * (o.tailUp ? .5 : .95)]);
+      const r = o.tailR * (o.bushy ? .5 + Math.sin(t * Math.PI * .85) * .8 : 1 - t * .8);
+      TR.push([Math.max(r, .012), Math.max(r, .012)]);
     }
-    chain(tail, pts, rad, col, tex);
-    return { group: g, parts: { legs, tail, head, wings: [] } };
+    TR[n - 1] = [.01, .01];
+    const tail = skinTube(TP, TR, u => o.tip && u > .82 ? c1 : c0, "fur", { segs: 4, radial: 14 });
+    g.add(tail.mesh);
+    let walk = 0, grazeUntil = 0, look = 0;
+    function update({ t, dt, moving, speed, sleeping, turn }) {
+      walk += dt * (moving ? 7 * speed + 2 : 0);
+      const k = moving ? 1 : 0;
+      legs.forEach(l => {
+        const ph = walk + l.phase, lift = Math.max(0, -Math.cos(ph)) * k;
+        const hip = sleeping ? (l.front ? -1.2 : 1.1) : Math.sin(ph) * .45 * k;
+        l.bones[0].rotation.x = lerpTo(l.bones[0].rotation.x, hip, .2);
+        l.bones[1].rotation.x = lerpTo(l.bones[1].rotation.x, sleeping ? (l.front ? 2.2 : -2) : l.front ? lift * .9 : lift * .5, .2);
+        l.bones[2].rotation.x = lerpTo(l.bones[2].rotation.x, sleeping ? 0 : l.front ? lift * .6 : -lift * .9, .2);
+      });
+      B[2].rotation.y = lerpTo(B[2].rotation.y, turn * .25, .1);
+      B[3].rotation.y = lerpTo(B[3].rotation.y, turn * .25, .1);
+      B[3].scale.setScalar(1 + Math.sin(t * (sleeping ? 1.4 : 2.4)) * .018);
+      if (!moving && !sleeping && t > grazeUntil + 6 && Math.random() < .004) grazeUntil = t + 3;
+      const grazing = !moving && t < grazeUntil;
+      B[4].rotation.x = lerpTo(B[4].rotation.x, sleeping ? .7 : grazing ? .75 : 0, .05);
+      B[5].rotation.x = lerpTo(B[5].rotation.x, grazing ? .45 : 0, .05);
+      look = lerpTo(look, sleeping ? 0 : Math.sin(t * .45) * .5, .05);
+      head.rotation.y = look;
+      tail.bones.forEach((b, i) => { b.rotation.y = sleeping ? .35 : Math.sin(t * (moving ? 7 : 2.5) - i * .7) * (.05 + .03 * i); b.rotation.x = sleeping ? .2 : 0; });
+      g.position.y = sleeping ? -h * .42 : 0;
+    }
+    return { group: g, parts: { update, wings: [] } };
   }
+
+  // ── Oiseau : corps skinné, cou articulé, ailes à épaule/coude/poignet qui se replient, pattes à tarse
+  function bird(pal, o) {
+    const g = new T.Group(), [c0, c1, c2] = [pal[0], pal[1] || pal[0], pal[2] || pal[0]], s = o.s;
+    const by = o.leg + s * .34;
+    const neckH = o.neck || 0;
+    const pts = [[0, by + s * .04, -s * .42], [0, by, -s * .22], [0, by + s * .02, 0], [0, by + s * .04, s * .18]];
+    const radii = [[s * .05, s * .04], [s * .24, s * .24], [s * .31, s * .3], [s * .27, s * .28]];
+    const nN = neckH ? 5 : 1;
+    for (let i = 1; i <= nN; i++) {
+      const t = i / nN;
+      pts.push([0, by + s * .12 + t * (neckH || s * .14), s * .26 + t * (neckH * .3 + s * .06) + (o.swan ? Math.sin(t * Math.PI) * neckH * .22 : 0)]);
+      radii.push([s * (.16 - .05 * t), s * (.17 - .05 * t)]);
+    }
+    const hk = o.headK || 1, hIdx = pts.length;
+    const hp = pts[pts.length - 1];
+    pts.push([0, hp[1] + s * .06, hp[2] + s * .05], [0, hp[1] + s * .05, hp[2] + s * .18 * hk]);
+    radii.push([s * .17 * hk, s * .16 * hk], [s * .07 * hk, s * .07 * hk]);
+    const nb = pts.length;
+    const body = skinTube(pts, radii, (u, sa) => {
+      const iHead = (hIdx - .5) / (nb - 1), iNeck = 3.4 / (nb - 1);
+      if (u >= iHead) return o.cheek && sa < .3 && sa > -.6 ? o.cheek : c2;
+      if (u > iNeck && o.neckC) return o.neckC;
+      if (o.collar && u > iNeck - .05 && u < iNeck + .08) return o.collar;
+      return sa < -.15 ? c1 : c0;
+    }, "feather", { segs: 5 });
+    g.add(body.mesh);
+    const B = body.bones, P = body.pts, head = B[hIdx];
+    const beak = new T.Mesh(new T.ConeGeometry(s * .05 * (o.beakW || 1), o.beak, 16), mat(o.beakC, "smooth", { roughness: .35 }));
+    beak.rotation.x = Math.PI / 2; attach(head, P[hIdx], beak, [0, P[hIdx].y - s * .02, P[hIdx].z + s * .14 * hk + o.beak * .45]);
+    [1, -1].forEach(sd => { const ey = new T.Group(); attach(head, P[hIdx], ey, [sd * s * .1 * hk, P[hIdx].y + s * .04 * hk, P[hIdx].z + s * .08 * hk]); eye(ey, 0, 0, 0, s * .035 * hk, o.iris); });
+    if (o.crown) attach(head, P[hIdx], ball(s * .07, o.crown, "feather", 1, .45, 1.1), [0, P[hIdx].y + s * .15 * hk, P[hIdx].z - s * .02]);
+    if (o.disc) attach(head, P[hIdx], ball(s * .15 * hk, o.disc, "feather", 1, 1, .35), [0, P[hIdx].y, P[hIdx].z + s * .09 * hk]);
+    // Queue en éventail sur l'os arrière
+    for (let i = -2; i <= 2; i++) { const f = ball(s * .07, shade(c0, .85), "feather", 1, .2, 3.2); f.rotation.y = i * .13; attach(B[0], P[0], f, [i * s * .045, P[0].y, P[0].z - s * .16]); }
+    // Ailes : épaule → coude → poignet → pointe ; la section est aplatie (corde de l'aile)
+    const wings = [];
+    [1, -1].forEach(sd => {
+      const WP = [[sd * s * .2, by + s * .12, s * .06], [sd * s * .5, by + s * .14, 0], [sd * s * .78, by + s * .13, -s * .04], [sd * s * 1.05, by + s * .1, -s * .12]];
+      const WR = [[s * .2, s * .05], [s * .22, s * .035], [s * .18, s * .025], [s * .05, s * .01]];
+      const wing = skinTube(WP, WR, (u, sa) => u > .55 ? shade(c0, .6) : sa < 0 ? shade(c1, .95) : c0, "feather", { segs: 5, radial: 16 });
+      g.add(wing.mesh);
+      for (let k = 0; k < 4; k++) { const f = ball(s * .05, shade(c0, .55), "feather", .9, .15, 3.4); f.rotation.y = sd * (.2 + k * .18); attach(wing.bones[2], wing.pts[2], f, [WP[2][0] + sd * s * .12, WP[2][1], WP[2][2] - s * .14 - k * s * .02]); }
+      wings.push({ bones: wing.bones, sd });
+    });
+    // Pattes : tarse articulé + doigts
+    const legC = o.legC || "#8a6f4a", legs = [];
+    [1, -1].forEach((sd, i) => {
+      const j = jointLeg(g, [sd * s * .1, by - s * .18, s * .02], [[0, -(by - s * .18 - .05) * .55, -s * .05, s * .045, s * .03], [0, -(by - s * .18 - .05) * .45, s * .06, s * .03, s * .022]], legC);
+      [-.55, 0, .55].forEach(a => limb(j[1], [0, -(by - s * .18 - .05) * .45, s * .06], [Math.sin(a) * s * .12, -(by - s * .18 - .05) * .45 - .02, s * .06 + Math.cos(a) * s * .12], s * .014, s * .01, legC));
+      legs.push({ j, phase: i * Math.PI });
+    });
+    let walk = 0, flap = 0;
+    function update({ t, dt, moving, sleeping, flying }) {
+      walk += dt * (moving && !flying ? 9 : 0);
+      flap += dt * (flying ? 16 : 0);
+      wings.forEach(({ bones: wb, sd }) => {
+        const folded = !flying;
+        wb[0].rotation.y = lerpTo(wb[0].rotation.y, folded ? sd * 1.25 : sd * .15, .15);
+        wb[1].rotation.y = lerpTo(wb[1].rotation.y, folded ? -sd * 2.3 : 0, .15);
+        wb[2].rotation.y = lerpTo(wb[2].rotation.y, folded ? sd * 2.1 : 0, .15);
+        wb[0].rotation.z = flying ? sd * Math.sin(flap) * .75 : lerpTo(wb[0].rotation.z, 0, .15);
+        wb[2].rotation.z = flying ? sd * Math.sin(flap - .8) * .4 : lerpTo(wb[2].rotation.z, 0, .15);
+      });
+      legs.forEach(l => {
+        l.j[0].rotation.x = flying ? lerpTo(l.j[0].rotation.x, -1.2, .1) : Math.sin(walk + l.phase) * .5 * (moving ? 1 : 0);
+        l.j[1].rotation.x = flying ? lerpTo(l.j[1].rotation.x, 1.8, .1) : Math.max(0, -Math.cos(walk + l.phase)) * .8 * (moving ? 1 : 0);
+      });
+      B[1].scale.setScalar(1 + Math.sin(t * 3) * .02);
+      const peck = !moving && !flying && Math.sin(t * .9 + s) > .92;
+      B[hIdx - 1].rotation.x = lerpTo(B[hIdx - 1].rotation.x, sleeping ? .5 : peck ? .8 : 0, .12);
+      head.rotation.y = sleeping ? 2.3 : Math.sin(t * 1.3) * .6 * (moving ? .3 : 1);
+      g.position.y = moving && !flying ? Math.abs(Math.sin(walk)) * .03 : 0;
+    }
+    return { group: g, parts: { update, fly: o.fly, wings: [] } };
+  }
+
+  // ── Poisson : corps skinné qui ondule, nageoires
+  function fish(id, pal) {
+    const g = new T.Group(), [c0, c1] = pal, k = id === 18 ? 2.4 : 1;
+    const pts = [[0, 0, .55], [0, 0, .38], [0, 0, .15], [0, 0, -.1], [0, 0, -.32], [0, 0, -.5]].map(p => p.map(v => v * k));
+    const radii = [[.03, .03], [.14, .17], [.2, .24], [.17, .2], [.09, .1], [.04, .05]].map(([a, b]) => [a * k * .75, b * k]);
+    const body = skinTube(pts, radii, null, "smooth", { segs: 6, map: fishTexture(id, c0, c1), vRepeat: 1, rough: .3 });
+    g.add(body.mesh);
+    const B = body.bones, P = body.pts;
+    const fin = (pts2, c) => { const sh = new T.Shape(); pts2.forEach(([x, y], i) => i ? sh.lineTo(x * k, y * k) : sh.moveTo(x * k, y * k)); const m = new T.Mesh(new T.ShapeGeometry(sh), mat(c, "smooth", { side: T.DoubleSide, roughness: .4 })); return m; };
+    const tf = fin([[0, 0], [.28, .22], [.18, 0], [.28, -.22]], id === 17 ? c0 : shade(c0, .8)); tf.rotation.y = Math.PI / 2;
+    attach(B[5], P[5], tf, [0, 0, P[5].z]);
+    const df = fin([[0, 0], [-.18, .2], [-.34, 0]], shade(c0, .85)); df.rotation.y = Math.PI / 2;
+    attach(B[2], P[2], df, [0, .2 * k, .1 * k]);
+    [1, -1].forEach(sd => { const pf = ball(.1 * k, shade(c0, .85), "smooth", .15, .5, 1); pf.rotation.z = sd * .6; attach(B[1], P[1], pf, [sd * .12 * k, -.06 * k, .22 * k]); const ey = new T.Group(); attach(B[1], P[1], ey, [sd * .1 * k, .06 * k, .38 * k]); eye(ey, 0, 0, 0, .035 * k); });
+    function update({ t, moving }) {
+      const f = moving ? 7 : 3, a = moving ? .16 : .07;
+      B.forEach((b, i) => { if (i) b.rotation.y = Math.sin(t * f - i * .9) * a * (i / 5); });
+    }
+    return { group: g, parts: { update, wings: [] } };
+  }
+
+  // ── Lézard : colonne et queue qui ondulent, pattes écartées articulées
+  function lizard(pal) {
+    const g = new T.Group(), [c0, c1] = pal;
+    const pts = [[0, .2, .9], [0, .22, .72], [0, .2, .5], [0, .19, .25], [0, .18, 0], [0, .15, -.25], [0, .12, -.55], [0, .09, -.85], [0, .06, -1.15], [0, .04, -1.4]];
+    const radii = [[.03, .03], [.1, .09], [.11, .1], [.15, .11], [.15, .11], [.12, .09], [.08, .07], [.05, .045], [.03, .03], [.01, .01]];
+    const body = skinTube(pts, radii, (u, sa) => sa < -.3 ? c1 : (Math.round(u * 40) % 3 === 0 && sa > .5 ? shade(c0, .7) : c0), "scale", { segs: 5 });
+    g.add(body.mesh);
+    const B = body.bones, P = body.pts;
+    [1, -1].forEach(sd => { const ey = new T.Group(); attach(B[1], P[1], ey, [sd * .08, .28, .76]); eye(ey, 0, 0, 0, .03, "#b8962e"); });
+    const legs = [];
+    [[1, 2], [-1, 2], [1, 5], [-1, 5]].forEach(([sd, bi], i) => {
+      const z = P[bi].z;
+      const j = jointLeg(B[bi], [sd * .1, 0, 0], [[sd * .22, .02, .04, .045, .035], [sd * .06, -.2, .08, .035, .025]], c0, "scale");
+      legs.push({ j, sd, phase: [0, Math.PI, Math.PI, 0][i] });
+    });
+    let walk = 0;
+    function update({ t, dt, moving }) {
+      walk += dt * (moving ? 10 : 0);
+      const k = moving ? 1 : 0;
+      B.forEach((b, i) => { if (i > 1) b.rotation.y = Math.sin(walk - i * .55) * .12 * k + (i > 5 ? Math.sin(t * 1.5 - i * .5) * .06 : 0); });
+      legs.forEach(l => { l.j[0].rotation.y = Math.sin(walk + l.phase) * .6 * k * l.sd; l.j[0].rotation.z = Math.max(0, Math.cos(walk + l.phase)) * .4 * k * l.sd; });
+      B[1].rotation.x = moving ? 0 : Math.sin(t * .8) * .1;
+    }
+    return { group: g, parts: { update, wings: [] } };
+  }
+
+  // ── Insectes : 3 paires de pattes à 3 articulations, démarche en tripode ; ailes battantes
+  function insect(id, pal) {
+    const g = new T.Group(), [c0, c1] = pal, dark = "#1c1a16", wings = [], legs = [];
+    const hopper = id === 13, bee = id === 11 || id === 23, L = hopper ? 1.4 : 1;
+    if (id === 10) {
+      put(g, ball(.32, c0, "smooth", 1, .62, 1.12, { roughness: .22 }), 0, .22, 0);
+      [[.14, .1], [-.14, .1], [.12, -.16], [-.12, -.16], [0, .3], [.2, -.3], [-.2, -.3]].forEach(([x, z]) => put(g, ball(.055, c1, "smooth", 1, .35, 1, { roughness: .3 }), x, .39 - Math.abs(z) * .15, z));
+      put(g, ball(.16, dark, "smooth", 1.1, .7, .8, { roughness: .3 }), 0, .18, .36);
+      [1, -1].forEach(sd => put(g, ball(.05, "#fff", "smooth", 1, .6, 1), sd * .07, .25, .38));
+    } else if (id === 12) {
+      chain(g, [[0, .5, .22], [0, .5, .1], [0, .5, -.05], [0, .49, -.2], [0, .48, -.33]], [.07, .06, .05, .045, .035], dark, "fur");
+      [1, -1].forEach(sd => { const piv = new T.Group(); piv.position.set(sd * .04, .52, 0); g.add(piv); const w = wingPlane(1.2, .6, wingTexture("butterfly", c0, c1)); w.scale.x = sd; w.position.x = sd * .6; piv.add(w); wings.push({ piv, sd }); });
+      [1, -1].forEach(sd => limb(g, [sd * .02, .54, .26], [sd * .12, .75, .5], .008, .006, dark));
+    } else {
+      put(g, ball(.13, dark, "smooth", 1, 1, 1.1), 0, .45, .36 * L);
+      [1, -1].forEach(sd => put(g, ball(.075, "#3a2a1a", "smooth", .8, 1.1, .9, { roughness: .15 }), sd * .09, .48, .4 * L));
+      put(g, ball(.17, bee ? c1 : c0, bee ? "fur" : "smooth", 1, .95, 1.1), 0, .46, .12 * L);
+      const segs = hopper ? 5 : 4;
+      for (let k = 0; k < segs; k++) put(g, ball(.2 - k * .02, k % 2 ? c1 : c0, bee ? "fur" : "smooth", 1, .9, .7), 0, .42 - k * .01, (-.1 - k * .13) * L);
+      if (id === 23) put(g, ball(.12, "#f4f0e0", "fur", 1, .9, .7), 0, .39, -.1 - segs * .13);
+      if (!hopper) [1, -1].forEach(sd => { const piv = new T.Group(); piv.position.set(sd * .06, .6, .1); g.add(piv); const w = wingPlane(.62, .24, wingTexture("clear")); w.scale.x = sd; w.position.x = sd * .3; w.position.z = -.08; piv.add(w); wings.push({ piv, sd }); });
+      [1, -1].forEach(sd => limb(g, [sd * .05, .55, .45 * L], [sd * .2, hopper ? .9 : .7, hopper ? 1.3 : .62], .01, .008, dark));
+    }
+    // Pattes : hanche (coxa) → fémur → tibia
+    const bodyY = id === 10 ? .18 : id === 12 ? .46 : .38;
+    for (let i = 0; i < (id === 12 ? 0 : 6); i++) {
+      const sd = i < 3 ? 1 : -1, k = i % 3, big = hopper && k === 2, z = (.18 - k * .16) * L;
+      const j = jointLeg(g, [sd * .08, bodyY, z], [
+        [sd * .06, 0, 0, .025, .022],
+        [sd * (big ? .18 : .16), big ? .32 : .14, big ? -.2 : (1 - k) * .05, big ? .045 : .022, .018],
+        [sd * (big ? .06 : .1), -(bodyY + (big ? .32 : .14)) + .02, big ? -.25 : (1 - k) * .06, .018, .01],
+      ], big ? c0 : dark);
+      legs.push({ j, sd, phase: (k + (sd > 0 ? 0 : 1)) % 2 ? Math.PI : 0 });
+    }
+    if (id === 24) g.scale.setScalar(.85);
+    let walk = 0, flap = 0;
+    function update({ t, dt, moving, flying }) {
+      walk += dt * (moving && !flying ? 14 : 0); flap += dt * (flying ? (id === 12 ? 9 : 40) : 0);
+      wings.forEach(({ piv, sd }) => { piv.rotation.z = flying ? Math.sin(flap) * (id === 12 ? .9 : .6) * sd : lerpTo(piv.rotation.z, id === 12 ? sd * -1.1 : 0, .1); });
+      legs.forEach(l => {
+        const k = moving && !flying ? 1 : 0;
+        l.j[0].rotation.y = Math.sin(walk + l.phase) * .35 * k;
+        l.j[1].rotation.z = (Math.max(0, Math.cos(walk + l.phase)) * .35 * k + (flying ? .6 : 0)) * l.sd;
+      });
+      if (hopper && moving) g.position.y = Math.max(0, Math.sin(t * 3)) * .6;
+    }
+    return { group: g, parts: { update, fly: id !== 10 && id !== 13, wings: [] } };
+  }
+
+  // ── Araignée : 8 pattes à 3 articulations
+  function spider(pal) {
+    const g = new T.Group(), [c0, c1] = pal, legC = shade(c0, .6), legs = [];
+    put(g, ball(.36, c0, "fur", 1, .85, 1.15), 0, .45, -.25);
+    [[0, .78, -.1], [0, .76, -.28], [.12, .74, -.2], [-.12, .74, -.2], [0, .7, -.45]].forEach(p => put(g, ball(.05, c1, "smooth", 1, .5, 1), ...p));
+    put(g, ball(.2, shade(c0, .8), "fur", 1, .8, 1.1), 0, .35, .25);
+    for (let i = 0; i < 8; i++) {
+      const sd = i < 4 ? 1 : -1, k = i % 4, z = .38 - k * .12, spread = (1.5 - k) * .35;
+      const j = jointLeg(g, [sd * .1, .38, z * .6], [
+        [sd * .08, .02, spread * .1, .04, .035],
+        [sd * .38, .3, spread * .35, .035, .03],
+        [sd * .32, -.68, spread * .35, .03, .012],
+      ], legC, "fur");
+      legs.push({ j, sd, phase: (k + (sd > 0 ? 0 : 1)) % 2 ? Math.PI : 0 });
+    }
+    let walk = 0;
+    function update({ dt, moving }) {
+      walk += dt * (moving ? 12 : 0); const k = moving ? 1 : 0;
+      legs.forEach(l => { l.j[0].rotation.y = Math.sin(walk + l.phase) * .3 * k; l.j[1].rotation.z = Math.max(0, Math.cos(walk + l.phase)) * .3 * k * l.sd; });
+    }
+    return { group: g, parts: { update, wings: [] } };
+  }
+
+  // ── Crabe : marche de côté, pinces qui s'ouvrent
+  function crab(pal) {
+    const g = new T.Group(), [c0, c1] = pal, legs = [], claws = [];
+    put(g, ball(.42, c0, "smooth", 1.25, .45, .95, { roughness: .4 }), 0, .34, 0);
+    [1, -1].forEach(sd => {
+      limb(g, [sd * .12, .47, .3], [sd * .14, .64, .38], .02, .02, c0); put(g, ball(.045, "#111"), sd * .14, .66, .38);
+      const arm = jointLeg(g, [sd * .35, .32, .25], [[sd * .2, .05, .2, .06, .05], [sd * .05, .02, .15, .05, .05]], c0);
+      put(arm[1], ball(.14, c1, "smooth", 1, .7, 1.3, { roughness: .35 }), sd * .05, .02, .2);
+      const pincer = new T.Group(); pincer.position.set(sd * .05, .02, .32); arm[1].add(pincer);
+      limb(pincer, [0, 0, 0], [0, -.02, .15], .04, .02, c1); claws.push(pincer);
+      for (let k = 0; k < 3; k++) {
+        const j = jointLeg(g, [sd * .4, .3, .1 - k * .15], [[sd * .3, .1, -k * .04, .04, .035], [sd * .22, -.38, -k * .05, .035, .018]], c0);
+        legs.push({ j, sd, phase: k % 2 ? Math.PI : 0 });
+      }
+    });
+    let walk = 0;
+    function update({ t, dt, moving }) {
+      walk += dt * (moving ? 12 : 0); const k = moving ? 1 : 0;
+      legs.forEach(l => { l.j[0].rotation.x = Math.sin(walk + l.phase) * .35 * k; l.j[0].rotation.z = Math.max(0, Math.cos(walk + l.phase)) * .3 * k * l.sd; });
+      claws.forEach((c, i) => { c.rotation.x = Math.max(0, Math.sin(t * 2 + i)) * .4; });
+    }
+    return { group: g, parts: { update, sideways: true, wings: [] } };
+  }
+
+  // ── Grenouille : pattes arrière repliées qui se détendent à chaque saut
+  function frog(pal) {
+    const g = new T.Group(), [c0, c1] = pal, o = { roughness: .35 };
+    const body = new T.Group(); g.add(body);
+    put(body, ball(.4, c0, "smooth", 1, .62, 1.15, o), 0, .3, 0);
+    put(body, ball(.34, shade(c1, 1.5), "smooth", .95, .5, 1.05, o), 0, .22, .05);
+    put(body, ball(.3, c0, "smooth", 1.1, .6, .9, o), 0, .36, .32);
+    const throat = put(body, ball(.16, shade(c1, 1.6), "smooth", 1.2, .6, 1, o), 0, .2, .42);
+    [[.1, -.1], [-.12, .1], [.05, .2]].forEach(([x, z]) => put(body, ball(.05, shade(c0, .55), "smooth", 1, .3, 1), x, .52, z));
+    const hind = [];
+    [1, -1].forEach(sd => {
+      put(body, ball(.11, c0, "smooth", 1, 1, 1, o), sd * .17, .5, .38); eye(body, sd * .19, .53, .44, .07, "#c9a13a");
+      limb(body, [sd * .2, .22, .35], [sd * .26, .02, .48], .04, .03, c0);
+      const j = jointLeg(body, [sd * .3, .22, -.2], [[sd * .12, -.05, .15, .11, .08], [sd * .05, -.12, -.3, .08, .05], [sd * .02, -.03, .22, .05, .03]], c0);
+      hind.push({ j, sd });
+    });
+    let hop = 0;
+    function update({ t, dt, moving }) {
+      hop = moving ? (hop + dt * 3.2) % 1 : 0;
+      const air = moving ? Math.sin(hop * Math.PI) : 0;
+      body.position.y = air * .45;
+      body.rotation.x = moving ? -air * .35 : 0;
+      hind.forEach(l => { l.j[0].rotation.x = air * 1.1; l.j[1].rotation.x = -air * .9; });
+      throat.scale.y = .6 + Math.max(0, Math.sin(t * 5)) * .25;
+    }
+    return { group: g, parts: { update, wings: [] } };
+  }
+
+  // ── Escargot : corps qui s'étire, tentacules oculaires mobiles
+  function snail(pal) {
+    const g = new T.Group(), [c0] = pal;
+    const foot = put(g, ball(.2, "#9a8c7c", "smooth", .7, .45, 2.3, { roughness: .3 }), 0, .1, .1);
+    const shell = new T.Group(); shell.position.set(0, .4, -.08); g.add(shell);
+    [[.2, .12, 0, 0], [.12, .08, .05, .06], [.06, .045, .09, .1]].forEach(([R, tube, x, y], i) => {
+      const w = new T.Mesh(new T.TorusGeometry(R, tube, 16, 40), mat(i % 2 ? shade(c0, .82) : c0, "smooth", { roughness: .35 }));
+      w.rotation.y = Math.PI / 2; w.position.set(x, y, 0); w.castShadow = true; shell.add(w);
+    });
+    put(shell, ball(.09, shade(c0, .7), "smooth", .9, 1, 1, { roughness: .35 }), .1, .1, 0);
+    const tents = [1, -1].map(sd => { const j = jointLeg(g, [sd * .05, .2, .5], [[sd * .03, .12, .06, .018, .014], [sd * .02, .12, .05, .014, .01]], "#8a7c6c"); put(j[1], ball(.028, "#222"), sd * .02, .12, .05); return j; });
+    function update({ t, moving }) {
+      foot.scale.z = 2.3 + (moving ? Math.sin(t * 4) * .15 : 0);
+      tents.forEach((j, i) => { j[0].rotation.x = Math.sin(t * 1.3 + i) * .25; j[1].rotation.z = Math.sin(t * 1.7 + i * 2) * .3; });
+    }
+    return { group: g, parts: { update, wings: [] } };
+  }
+
+  // ── Pieuvre : 8 bras skinnés qui ondulent
+  function octopus(pal) {
+    const g = new T.Group(), [c0, c1] = pal, arms = [];
+    const mantle = put(g, ball(.42, c0, "smooth", .9, 1.2, 1, { roughness: .45 }), 0, .95, -.1);
+    [1, -1].forEach(sd => eye(g, sd * .2, .85, .22, .06, "#c9a13a"));
+    for (let i = 0; i < 8; i++) {
+      const a = i / 8 * Math.PI * 2, P = [], R = [];
+      for (let j = 0; j < 6; j++) { const t = j / 5, r = .18 + t * .8; P.push([Math.cos(a) * r, .6 - t * .52, Math.sin(a) * r]); R.push([.075 * (1 - t * .8), .07 * (1 - t * .8)]); }
+      const arm = skinTube(P, R, (u, sa) => sa < 0 ? c1 : c0, "smooth", { segs: 4, radial: 10, rough: .45 });
+      g.add(arm.mesh); arms.push(arm.bones);
+    }
+    function update({ t }) {
+      arms.forEach((bs, i) => bs.forEach((b, j) => { if (j) { b.rotation.z = Math.sin(t * 2 + i + j * .8) * .12; b.rotation.x = Math.cos(t * 1.6 + i * 1.3 + j * .7) * .1; } }));
+      mantle.scale.y = 1.2 + Math.sin(t * 1.5) * .06;
+    }
+    return { group: g, parts: { update, wings: [] } };
+  }
+
   function hedgehog(pal) {
     const g = new T.Group(), [c0, c1] = pal;
-    put(g, ball(.55, shade(c0, .9), "fur", 1, .72, 1.25), 0, .42, 0);
+    const body = new T.Group(); g.add(body);
+    put(body, ball(.55, shade(c0, .9), "fur", 1, .72, 1.25), 0, .42, 0);
     const inst = new T.InstancedMesh(new T.ConeGeometry(.025, .26, 5), mat(shade(c0, .7), "smooth"), 260), q = new T.Quaternion(), mtx = new T.Matrix4(), v = new T.Vector3();
     for (let i = 0; i < 260; i++) {
       const u = Math.random(), th = Math.random() * Math.PI * 2, ph = Math.acos(1 - u * .95);
@@ -2402,117 +2877,23 @@ function createWorld() {
       q.setFromUnitVectors(Y, new T.Vector3(v.x, v.y, v.z - .35).normalize());
       mtx.compose(new T.Vector3(v.x * .52, .42 + v.y * .38, v.z * .66 - .05), q, new T.Vector3(1, 1, 1)); inst.setMatrixAt(i, mtx);
     }
-    inst.castShadow = true; g.add(inst);
-    const head = new T.Group(); head.position.set(0, .3, .6); g.add(head);
+    inst.castShadow = true; body.add(inst);
+    const head = new T.Group(); head.position.set(0, .3, .6); body.add(head);
     put(head, ball(.2, c1, "fur", 1, .9, 1.1));
     const snout = new T.Mesh(new T.CylinderGeometry(.05, .14, .26, 14), mat(c1, "fur")); snout.rotation.x = Math.PI / 2; snout.position.z = .2; head.add(snout);
     put(head, ball(.045, "#111"), 0, .01, .34); [1, -1].forEach(sd => eye(head, sd * .1, .08, .12, .035));
     const legs = [];
-    [[1, 1], [-1, 1], [1, -1], [-1, -1]].forEach(([sx, sz], i) => { const piv = new T.Group(); piv.position.set(sx * .3, .2, sz * .35); g.add(piv); limb(piv, [0, 0, 0], [0, -.17, .02], .06, .05, c1, "fur"); legs.push({ piv, phase: i % 3 ? Math.PI : 0 }); });
-    return { group: g, parts: { legs, head, wings: [] } };
-  }
-
-  // ── Oiseaux : corps en œuf, plastron, ailes à rémiges, queue en éventail, pattes à doigts
-  function bird(pal, o) {
-    const g = new T.Group(), [c0, c1, c2] = [pal[0], pal[1] || pal[0], pal[2] || pal[0]], s = o.s, tex = "feather";
-    const by = o.leg + s * .34;
-    const body = new T.Group(); body.position.y = by; body.rotation.x = o.upright ? -.5 : o.neck ? -.05 : -.22; g.add(body);
-    put(body, ball(s * .34, c0, tex, .86, .8, 1.25));
-    put(body, ball(s * .3, c1, tex, .82, .76, 1.02), 0, -s * .09, s * .1);
-    const tail = new T.Group(); tail.position.set(0, s * .02, -s * .36); body.add(tail);
-    for (let i = -2; i <= 2; i++) { const f = ball(s * .07, shade(c0, .85), tex, 1, .22, 3.3); f.position.set(i * s * .045, 0, -s * .18); f.rotation.y = i * .13; tail.add(f); }
-    const wings = [];
-    [1, -1].forEach(sd => {
-      const piv = new T.Group(); piv.position.set(sd * s * .25, s * .1, s * .06); body.add(piv);
-      put(piv, ball(s * .2, c0, tex, .28, .72, 1.9), sd * s * .02, 0, -s * .12);
-      for (let k = 0; k < 5; k++) { const f = ball(s * .05, shade(c0, .62), tex, .45, .3, 3.6); f.position.set(sd * s * .035, -s * .03 - k * s * .008, -s * .3 - k * s * .03); f.rotation.y = sd * k * .07; piv.add(f); }
-      wings.push(piv);
-    });
-    let hp;
-    if (o.neck) {
-      const pts = [], rad = [], n = 10;
-      for (let i = 0; i < n; i++) { const t = i / (n - 1); pts.push([0, by + s * .12 + t * o.neck, s * .3 + t * o.neck * .3 + (o.swan ? Math.sin(t * Math.PI) * o.neck * .22 : 0)]); rad.push(s * (.11 - .04 * t)); }
-      chain(g, pts, rad, o.neckC || c0, tex); hp = [0, pts[n - 1][1] + s * .04, pts[n - 1][2] + s * .05];
-    } else hp = [0, by + s * .27 + (o.upright ? s * .12 : 0), s * .32 - (o.upright ? s * .1 : 0)];
-    const head = new T.Group(); head.position.set(...hp); g.add(head);
-    const hk = o.headK || 1;
-    put(head, ball(s * .17 * hk, c2, tex, 1, .96, 1.05));
-    if (o.cheek) [1, -1].forEach(sd => put(head, ball(s * .075, o.cheek, tex, .35, .8, 1.05), sd * s * .13 * hk, -s * .02, s * .03));
-    if (o.collar) chain(g, [[0, hp[1] - s * .17, hp[2] - s * .05]], [s * .12], o.collar, tex);
-    if (o.crown) put(head, ball(s * .07, o.crown, tex, 1, .45, 1.1), 0, s * .15 * hk, -s * .02);
-    if (o.disc) put(head, ball(s * .15 * hk, o.disc, tex, 1, 1, .35), 0, 0, s * .1 * hk);
-    const beak = new T.Mesh(new T.ConeGeometry(s * .05 * (o.beakW || 1), o.beak, 16), mat(o.beakC, "smooth", { roughness: .35 }));
-    beak.rotation.x = Math.PI / 2; beak.position.set(0, -s * .02, s * .15 * hk + o.beak * .45); beak.castShadow = true; head.add(beak);
-    [1, -1].forEach(sd => eye(head, sd * s * .1 * hk, s * .05 * hk, s * .1 * hk, s * .035 * hk, o.iris));
-    const legC = o.legC || "#8a6f4a";
-    [1, -1].forEach(sd => {
-      limb(g, [sd * s * .1, by - s * .15, 0], [sd * s * .1, s * .03, s * .02], s * .035, s * .022, legC);
-      [-.55, 0, .55].forEach(a => limb(g, [sd * s * .1, s * .03, s * .02], [sd * s * .1 + Math.sin(a) * s * .12, .01, s * .02 + Math.cos(a) * s * .12], s * .014, s * .01, legC));
-    });
-    return { group: g, parts: { wings, head, tail, fly: o.fly } };
-  }
-
-  // ── Insectes et araignées
-  function insect(id, pal) {
-    const g = new T.Group(), [c0, c1] = pal, dark = "#1c1a16", wings = [];
-    if (id === 10) {
-      put(g, ball(.32, c0, "smooth", 1, .62, 1.12, { roughness: .22 }), 0, .2, 0);
-      [[.14, .1], [-.14, .1], [.12, -.16], [-.12, -.16], [0, .3], [.2, -.3], [-.2, -.3]].forEach(([x, z]) => put(g, ball(.055, c1, "smooth", 1, .35, 1, { roughness: .3 }), x, .37 - Math.abs(z) * .15, z));
-      put(g, ball(.16, dark, "smooth", 1.1, .7, .8, { roughness: .3 }), 0, .16, .36);
-      [1, -1].forEach(sd => put(g, ball(.05, "#fff", "smooth", 1, .6, 1), sd * .07, .23, .38));
-      for (let i = 0; i < 6; i++) { const sd = i < 3 ? 1 : -1, k = i % 3; limb(g, [sd * .2, .1, .15 - k * .15], [sd * .36, 0, .2 - k * .18], .015, .012, dark); }
-    } else if (id === 12) {
-      chain(g, [[0, .5, .22], [0, .5, .1], [0, .5, -.05], [0, .49, -.2], [0, .48, -.33]], [.07, .06, .05, .045, .035], dark, "fur");
-      [1, -1].forEach(sd => { const piv = new T.Group(); piv.position.set(sd * .04, .52, 0); g.add(piv); const w = wingPlane(1.2, .6, wingTexture("butterfly", c0, c1)); w.scale.x = sd; w.position.x = sd * .6; piv.add(w); wings.push(piv); });
-      [1, -1].forEach(sd => limb(g, [sd * .02, .54, .26], [sd * .12, .75, .5], .008, .006, dark));
-    } else {
-      const bee = id === 11 || id === 23, hopper = id === 13, L = hopper ? 1.4 : 1;
-      put(g, ball(.13, dark, "smooth", 1, 1, 1.1), 0, .45, .36 * L);
-      [1, -1].forEach(sd => put(g, ball(.075, "#3a2a1a", "smooth", .8, 1.1, .9, { roughness: .15 }), sd * .09, .48, .4 * L));
-      put(g, ball(.17, bee ? c1 : c0, bee ? "fur" : "smooth", 1, .95, 1.1), 0, .46, .12 * L);
-      const segs = hopper ? 5 : 4;
-      for (let k = 0; k < segs; k++) put(g, ball(.2 - k * .02, k % 2 ? c1 : c0, bee ? "fur" : "smooth", 1, .9, .7), 0, .42 - k * .01, (-.1 - k * .13) * L);
-      if (id === 23) put(g, ball(.12, "#f4f0e0", "fur", 1, .9, .7), 0, .39, -.1 - segs * .13);
-      if (!hopper) [1, -1].forEach(sd => { const piv = new T.Group(); piv.position.set(sd * .06, .6, .1); g.add(piv); const w = wingPlane(.62, .24, wingTexture("clear")); w.scale.x = sd; w.position.x = sd * .3; w.position.z = -.08; piv.add(w); wings.push(piv); });
-      for (let i = 0; i < 6; i++) {
-        const sd = i < 3 ? 1 : -1, k = i % 3, big = hopper && k === 2;
-        const knee = [sd * (big ? .22 : .2), big ? .72 : .5, (.2 - k * .16) * L];
-        limb(g, [sd * .08, .38, (.18 - k * .12) * L], knee, big ? .045 : .02, .018, big ? c0 : dark);
-        limb(g, knee, [sd * (big ? .3 : .28), .02, (.2 - k * .16 - (big ? .35 : 0)) * L], .018, .012, dark);
-      }
-      [1, -1].forEach(sd => limb(g, [sd * .05, .55, .45 * L], [sd * .2, hopper ? .9 : .7, hopper ? 1.3 : .62], .01, .008, dark));
-      if (id === 24) g.scale.setScalar(.85);
+    [[1, 1], [-1, 1], [1, -1], [-1, -1]].forEach(([sx, sz], i) => { const j = jointLeg(g, [sx * .3, .2, sz * .35], [[0, -.1, .02, .06, .05], [0, -.08, .03, .05, .04]], c1, "fur"); legs.push({ j, phase: i % 3 ? Math.PI : 0 }); });
+    let walk = 0;
+    function update({ t, dt, moving, sleeping }) {
+      walk += dt * (moving ? 14 : 0);
+      legs.forEach(l => { l.j[0].rotation.x = Math.sin(walk + l.phase) * .6 * (moving ? 1 : 0); l.j[1].rotation.x = Math.max(0, -Math.cos(walk + l.phase)) * .8 * (moving ? 1 : 0); });
+      head.rotation.y = Math.sin(t * 1.1) * .4; head.rotation.x = Math.sin(t * 3) * .05;
+      body.scale.set(1, sleeping ? .92 : 1, 1); body.position.y = sleeping ? -.12 : 0;
     }
-    return { group: g, parts: { wings, fly: id !== 10 && id !== 13 } };
-  }
-  function spider(pal) {
-    const g = new T.Group(), [c0, c1] = pal;
-    put(g, ball(.36, c0, "fur", 1, .85, 1.15), 0, .45, -.25);
-    [[0, .78, -.1], [0, .76, -.28], [.12, .74, -.2], [-.12, .74, -.2], [0, .7, -.45]].forEach(p => put(g, ball(.05, c1, "smooth", 1, .5, 1), ...p));
-    put(g, ball(.2, shade(c0, .8), "fur", 1, .8, 1.1), 0, .35, .25);
-    for (let i = 0; i < 8; i++) {
-      const sd = i < 4 ? 1 : -1, k = i % 4, z = .38 - k * .12, knee = [sd * .55, .72, z + (1.5 - k) * .18];
-      limb(g, [sd * .1, .38, z * .6], knee, .035, .03, shade(c0, .6), "fur");
-      limb(g, knee, [sd * .85, .02, z + (1.5 - k) * .35], .03, .015, shade(c0, .6), "fur");
-    }
-    return { group: g, parts: { wings: [] } };
+    return { group: g, parts: { update, wings: [] } };
   }
 
-  // ── Reptiles, amphibiens
-  function lizard(pal) {
-    const g = new T.Group(), [c0, c1] = pal, pts = [], rad = [], col = [], n = 22;
-    for (let i = 0; i < n; i++) { const t = i / (n - 1); pts.push([Math.sin(t * 5) * .06, .2 - t * .08, .75 - t * 2]); rad.push(t < .12 ? .12 + t * .3 : t < .4 ? .16 : .16 * (1 - (t - .4) / .6 * .9)); col.push(i % 3 ? c0 : shade(c0, .78)); }
-    chain(g, pts, rad, col, "scale");
-    put(g, ball(.14, c1, "scale", 1, .5, 2.5), 0, .1, .25);
-    [1, -1].forEach(sd => eye(g, sd * .09, .28, .78, .035, "#b8962e"));
-    const legs = [];
-    [[1, .5], [-1, .5], [1, -.1], [-1, -.1]].forEach(([sd, z], i) => {
-      const piv = new T.Group(); piv.position.set(sd * .12, .2, z); g.add(piv);
-      limb(piv, [0, 0, 0], [sd * .22, -.02, .06], .05, .035, c0, "scale"); limb(piv, [sd * .22, -.02, .06], [sd * .28, -.19, .14], .035, .025, c0, "scale");
-      legs.push({ piv, phase: [0, Math.PI, Math.PI, 0][i], axis: "y" });
-    });
-    return { group: g, parts: { legs, wings: [] } };
-  }
   function turtle(pal) {
     const g = new T.Group(), [c0, c1] = pal;
     const tc = document.createElement("canvas"); tc.width = tc.height = 128; const x2 = tc.getContext("2d");
@@ -2522,93 +2903,30 @@ function createWorld() {
     const shell = new T.Mesh(new T.SphereGeometry(.6, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), new T.MeshStandardMaterial({ map: st, roughness: .5 }));
     shell.scale.set(1, .75, 1.2); shell.position.y = .2; shell.castShadow = true; g.add(shell);
     put(g, ball(.6, shade(c1, 1.3), "scale", 1, .12, 1.2), 0, .2, 0);
-    limb(g, [0, .22, .6], [0, .3, .85], .1, .09, c1, "scale");
-    put(g, ball(.14, c1, "scale", .9, .8, 1.2), 0, .32, .95); [1, -1].forEach(sd => eye(g, sd * .08, .37, 1.02, .03));
+    const neck = new T.Group(); neck.position.set(0, .22, .6); g.add(neck);
+    limb(neck, [0, 0, 0], [0, .08, .25], .1, .09, c1, "scale");
+    put(neck, ball(.14, c1, "scale", .9, .8, 1.2), 0, .1, .35); [1, -1].forEach(sd => eye(neck, sd * .08, .15, .42, .03));
     const legs = [];
-    [[1, .4], [-1, .4], [1, -.45], [-1, -.45]].forEach(([sd, z], i) => { const piv = new T.Group(); piv.position.set(sd * .45, .15, z); g.add(piv); put(piv, ball(.13, c1, "scale", 1, .8, 1.2), 0, -.05, 0); legs.push({ piv, phase: i % 3 ? Math.PI : 0 }); });
-    return { group: g, parts: { legs, wings: [] } };
-  }
-  function frog(pal) {
-    const g = new T.Group(), [c0, c1] = pal, o = { roughness: .35 };
-    put(g, ball(.4, c0, "smooth", 1, .62, 1.15, o), 0, .3, 0);
-    put(g, ball(.34, shade(c1, 1.5), "smooth", .95, .5, 1.05, o), 0, .22, .05);
-    put(g, ball(.3, c0, "smooth", 1.1, .6, .9, o), 0, .36, .32);
-    [1, -1].forEach(sd => {
-      put(g, ball(.11, c0, "smooth", 1, 1, 1, o), sd * .17, .5, .38); eye(g, sd * .19, .53, .44, .07, "#c9a13a");
-      put(g, ball(.14, c0, "smooth", .8, .55, 1.7, o), sd * .36, .2, -.2); put(g, ball(.1, c0, "smooth", .7, .4, 1.8, o), sd * .42, .08, .02);
-      put(g, ball(.08, shade(c0, .9), "smooth", 1.3, .25, 1.5, o), sd * .45, .02, .28);
-      limb(g, [sd * .2, .22, .35], [sd * .26, .02, .48], .04, .03, c0);
-    });
-    [[.1, -.1], [-.12, .1], [.05, .2]].forEach(([x, z]) => put(g, ball(.05, shade(c0, .55), "smooth", 1, .3, 1), x, .52, z));
-    return { group: g, parts: { wings: [] } };
-  }
-
-  // ── Mollusques, poissons, crustacés
-  function snail(pal) {
-    const g = new T.Group(), [c0] = pal;
-    put(g, ball(.2, "#9a8c7c", "smooth", .7, .45, 2.3, { roughness: .3 }), 0, .1, .1);
-    // Coquille : trois tours de spire de plus en plus petits, vus de profil
-    const shell = new T.Group(); shell.position.set(0, .4, -.08); g.add(shell);
-    [[.2, .12, 0, 0], [.12, .08, .05, .06], [.06, .045, .09, .1]].forEach(([R, tube, x, y], i) => {
-      const w = new T.Mesh(new T.TorusGeometry(R, tube, 16, 40), mat(i % 2 ? shade(c0, .82) : c0, "smooth", { roughness: .35 }));
-      w.rotation.y = Math.PI / 2; w.position.set(x, y, 0); w.castShadow = true; shell.add(w);
-    });
-    put(shell, ball(.09, shade(c0, .7), "smooth", .9, 1, 1, { roughness: .35 }), .1, .1, 0);
-    [1, -1].forEach(sd => { limb(g, [sd * .05, .2, .5], [sd * .1, .45, .62], .018, .012, "#8a7c6c"); put(g, ball(.028, "#222"), sd * .1, .47, .63); });
-    return { group: g, parts: { wings: [] } };
-  }
-  function fishTexture(id, c0, c1) {
-    const c = document.createElement("canvas"); c.width = 64; c.height = 256; const g = c.getContext("2d");
-    g.fillStyle = c0; g.fillRect(0, 0, 64, 256);
-    if (id === 17) [70, 130, 200].forEach(y => { g.fillStyle = "#111"; g.fillRect(0, y - 14, 64, 28); g.fillStyle = c1; g.fillRect(0, y - 10, 64, 20); });
-    if (id === 18) for (let i = 0; i < 120; i++) { g.fillStyle = "rgba(245,245,235,.9)"; g.beginPath(); g.arc(Math.random() * 64, Math.random() * 256, 1.5 + Math.random() * 2, 0, 7); g.fill(); }
-    const t = new T.CanvasTexture(c); t.encoding = T.sRGBEncoding; return t;
-  }
-  function fish(id, pal) {
-    const g = new T.Group(), [c0, c1] = pal, k = id === 18 ? 2.4 : 1;
-    const prof = [[0, -.55], [.07, -.48], [.14, -.34], [.2, -.12], [.22, .05], [.19, .25], [.12, .42], [.04, .52], [0, .55]].map(([r, y]) => new T.Vector2(r * k, y * k));
-    const body = new T.Mesh(new T.LatheGeometry(prof, 28), new T.MeshStandardMaterial({ map: fishTexture(id, c0, c1), roughness: .3, metalness: .05 }));
-    body.rotation.x = Math.PI / 2; body.scale.x = .7; body.castShadow = true; g.add(body);
-    const fin = (pts, c) => { const sh = new T.Shape(); pts.forEach(([x, y], i) => i ? sh.lineTo(x * k, y * k) : sh.moveTo(x * k, y * k)); const m = new T.Mesh(new T.ShapeGeometry(sh), mat(c, "smooth", { side: T.DoubleSide, roughness: .4 })); m.castShadow = true; return m; };
-    const tail = new T.Group(); tail.position.z = -.52 * k; g.add(tail);
-    const tf = fin([[0, 0], [.28, .22], [.18, 0], [.28, -.22]], id === 17 ? c0 : shade(c0, .8)); tf.rotation.y = Math.PI / 2; tail.add(tf);
-    const df = fin([[0, 0], [-.18, .2], [-.34, 0]], shade(c0, .85)); df.rotation.y = Math.PI / 2; df.position.set(0, .18 * k, .15 * k); g.add(df);
-    [1, -1].forEach(sd => { const pf = ball(.1 * k, shade(c0, .85), "smooth", .15, .5, 1); pf.position.set(sd * .13 * k, -.06 * k, .15 * k); pf.rotation.z = sd * .6; g.add(pf); eye(g, sd * .12 * k, .06 * k, .38 * k, .035 * k); });
-    return { group: g, parts: { tail, wings: [] } };
-  }
-  function octopus(pal) {
-    const g = new T.Group(), [c0, c1] = pal;
-    put(g, ball(.42, c0, "smooth", .9, 1.2, 1, { roughness: .45 }), 0, .9, -.1);
-    [1, -1].forEach(sd => eye(g, sd * .2, .8, .22, .06, "#c9a13a"));
-    for (let i = 0; i < 8; i++) {
-      const a = i / 8 * Math.PI * 2, pts = [];
-      for (let j = 0; j < 6; j++) { const t = j / 5, R = .2 + t * .75; pts.push(new T.Vector3(Math.cos(a + t * .6) * R, .55 - t * .5 + Math.sin(t * 5 + i) * .05, Math.sin(a + t * .6) * R)); }
-      const tube = new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(pts), 24, .055, 8), mat(i % 2 ? c0 : c1, "smooth", { roughness: .45 }));
-      tube.castShadow = true; g.add(tube);
+    [[1, .4], [-1, .4], [1, -.45], [-1, -.45]].forEach(([sd, z], i) => { const j = jointLeg(g, [sd * .45, .18, z], [[sd * .08, -.06, 0, .12, .1], [0, -.08, .04, .1, .08]], c1, "scale"); legs.push({ j, phase: i % 3 ? Math.PI : 0 }); });
+    let walk = 0;
+    function update({ t, dt, moving, sleeping }) {
+      walk += dt * (moving ? 4 : 0);
+      legs.forEach(l => { l.j[0].rotation.x = Math.sin(walk + l.phase) * .5 * (moving ? 1 : 0); });
+      neck.position.z = sleeping ? .4 : .6; neck.rotation.y = Math.sin(t * .6) * .3;
     }
-    return { group: g, parts: { wings: [] } };
-  }
-  function crab(pal) {
-    const g = new T.Group(), [c0, c1] = pal;
-    put(g, ball(.42, c0, "smooth", 1.25, .45, .95, { roughness: .4 }), 0, .32, 0);
-    [1, -1].forEach(sd => {
-      limb(g, [sd * .12, .45, .3], [sd * .14, .62, .38], .02, .02, c0); put(g, ball(.045, "#111"), sd * .14, .64, .38);
-      limb(g, [sd * .35, .3, .25], [sd * .55, .35, .5], .06, .05, c0); put(g, ball(.14, c1, "smooth", 1, .7, 1.3, { roughness: .35 }), sd * .6, .35, .65);
-      for (let k = 0; k < 3; k++) { const knee = [sd * .75, .4, .1 - k * .2]; limb(g, [sd * .4, .3, .1 - k * .15], knee, .04, .035, c0); limb(g, knee, [sd * .95, .02, .05 - k * .22], .035, .02, c0); }
-    });
-    return { group: g, parts: { wings: [] } };
+    return { group: g, parts: { update, wings: [] } };
   }
 
   // ── Choix du gabarit selon l'espèce, avec les proportions propres à chacune
   const QUAD = {
-    7: { w: .3, len: .7, h: .6, neck: .22, hs: .25, muz: .3, ear: [.1, .24], tail: .95, tailR: .15, bushy: true, tip: true, socks: true, iris: "#b8862a" },
-    9: { w: .36, len: .85, h: .82, neck: .28, hs: .3, muz: .34, ear: [.11, .22], tail: .75, tailR: .13, bushy: true, iris: "#b89a3a" },
-    8: { w: .3, len: .78, h: 1.0, neck: .5, hs: .23, muz: .3, ear: [.12, .28], tail: .12, tailR: .08, antlers: true, earIn: "#e8d8c8" },
-    5: { w: .18, len: .34, h: .3, neck: .06, hs: .16, muz: .1, ear: [.05, .14], tail: .7, tailR: .14, bushy: true, tailUp: true },
+    7: { w: .3, len: .72, h: .62, neck: .2, hs: .24, muz: .3, ear: [.1, .24], tail: .95, tailR: .15, bushy: true, tip: true, socks: true, iris: "#b8862a" },
+    9: { w: .36, len: .88, h: .85, neck: .25, hs: .29, muz: .34, ear: [.11, .22], tail: .75, tailR: .13, bushy: true, iris: "#b89a3a" },
+    8: { w: .3, len: .8, h: 1.0, neck: .5, hs: .22, muz: .28, ear: [.12, .28], tail: .12, tailR: .08, antlers: true, earIn: "#e8d8c8" },
+    5: { w: .18, len: .36, h: .3, neck: .06, hs: .15, muz: .1, ear: [.05, .14], tail: .7, tailR: .14, bushy: true, tailUp: true, muzzleLight: false },
   };
   const BIRD = {
     1: { s: .8, leg: .14, beak: .08, beakC: "#222", cheek: "#F5F5F0", fly: true },
-    2: { s: 1.1, leg: .1, beak: .07, beakC: "#C9B07A", headK: 1.5, disc: "#B89A74", upright: true, fly: true },
+    2: { s: 1.1, leg: .1, beak: .07, beakC: "#C9B07A", headK: 1.45, disc: "#B89A74", fly: true },
     3: { s: 1.2, leg: .12, beak: .2, beakC: "#E3C23A", beakW: 1.6, collar: "#F5F5F0", legC: "#E8862A" },
     4: { s: 1.6, leg: .16, neck: 1.0, swan: true, beak: .22, beakC: "#E26A2C", legC: "#333" },
     25: { s: .75, leg: .08, beak: .05, beakC: "#222", fly: true },
@@ -2617,7 +2935,7 @@ function createWorld() {
   function buildAnimal(sp, pal) {
     const id = sp.id, cat = sp.cat;
     let a;
-    if (cat === "mam") a = id === 6 ? hedgehog(pal) : quad(pal, QUAD[id] || { w: .28, len: .62, h: .55, neck: .2, hs: .23, muz: .24, ear: [.08, .18], tail: .5, tailR: .08 });
+    if (cat === "mam") a = id === 6 ? hedgehog(pal) : quad(pal, QUAD[id] || { w: .28, len: .64, h: .55, neck: .2, hs: .22, muz: .24, ear: [.08, .18], tail: .5, tailR: .08 });
     else if (cat === "ois") a = bird(pal, BIRD[id] || { s: .9, leg: .14, beak: .1, beakC: "#3a3228", fly: true });
     else if (cat === "ins") a = insect(id, pal);
     else if (cat === "ara") a = spider(pal);
@@ -2665,7 +2983,7 @@ function createWorld() {
       add(g, cone(1.6, 2.9, "#F7F7F7", 7), 0, 6.6, 0).rotation.y = d.rot;
       add(g, cone(2.8, 5, d.color, 6), 3, 2.5, 1.2);
     } else if (d.type === "water") {
-      const w = new T.Mesh(new T.CircleGeometry(d.size, 32), new T.MeshPhongMaterial({ color: d.color, transparent: true, opacity: 0.88, shininess: 90 }));
+      const w = new T.Mesh(new T.CircleGeometry(d.size, 32), new T.MeshPhongMaterial({ color: d.color, transparent: true, opacity: 0.55, shininess: 90, depthWrite: false }));
       w.rotation.x = -Math.PI / 2; w.position.y = 0.04; w.receiveShadow = true; g.add(w);
       const shore = new T.Mesh(new T.RingGeometry(d.size, d.size + 0.5, 32), M("#D9C99A")); shore.rotation.x = -Math.PI / 2; shore.position.y = 0.03; g.add(shore);
     } else if (d.type === "flower") {
@@ -2725,12 +3043,12 @@ function createWorld() {
       const built = buildAnimal(sp, pal);
       const kind = AQUATIC.has(sp.id) || sp.cat === "poi" ? "swim" : built.parts.fly ? "fly" : "ground";
       const [x, z] = randomSpot(kind);
-      const size = sp.cat === "ins" ? 1.3 : 1;
-      built.group.scale.setScalar(size);
-      built.group.position.set(x, kind === "swim" ? -0.25 : 0, z);
-      built.group.userData = { kind: "animal", id: sp.id };
-      scene.add(built.group);
-      animals.set(sp.id, { ...built, sp, key, kind, target: randomSpot(kind), speed: 0.6 + seeded(sp.id) * 0.9, phase: seeded(sp.id + 1) * 6 });
+      built.group.scale.setScalar(sp.cat === "ins" ? .55 : sp.cat === "ara" ? .6 : sp.cat === "cru" ? .8 : 1);
+      const root = new T.Group(); root.add(built.group);
+      root.position.set(x, kind === "swim" ? -0.08 : 0, z);
+      root.userData = { kind: "animal", id: sp.id };
+      scene.add(root);
+      animals.set(sp.id, { parts: built.parts, model: built.group, group: root, sp, key, kind, target: randomSpot(kind), speed: 0.6 + seeded(sp.id) * 0.9, phase: seeded(sp.id + 1) * 6, idleUntil: 0 });
     });
     // compagnon
     const ck = state.companion.kind || "egg";
@@ -2824,24 +3142,27 @@ function createWorld() {
       const g = a.group, sp = a.sp;
       const sleeping = cond === "night" && !TRAITS.noct.includes(sp.id) && a.kind !== "swim";
       const shelter = cond === "rain" && !TRAITS.rain.includes(sp.id) && a.kind !== "swim";
-      if (shelter && trees.length) { const tr = trees[sp.id % trees.length]; a.target = [tr.pos[0] + Math.cos(sp.id) * 1.2, tr.pos[1] + Math.sin(sp.id) * 1.2]; }
-      let moving = !sleeping && !(shelter && !trees.length);
+      if (shelter && trees.length) { const tr = trees[sp.id % trees.length]; a.target = [tr.pos[0] + Math.cos(sp.id) * 1.4, tr.pos[1] + Math.sin(sp.id) * 1.4]; }
+      let moving = !sleeping && t > a.idleUntil && !(shelter && !trees.length);
       const dx = a.target[0] - g.position.x, dz = a.target[1] - g.position.z, dist = Math.hypot(dx, dz);
-      if (dist < 0.3) { if (!shelter) a.target = randomSpot(a.kind); moving = false; }
-      if (moving && dist >= 0.3) {
-        const sp2 = a.speed * (cond === "rain" && TRAITS.rain.includes(sp.id) ? 1.6 : 1) * (a.kind === "fly" ? 1.8 : 1);
-        g.position.x += dx / dist * sp2 * dt; g.position.z += dz / dist * sp2 * dt;
-        const want = Math.atan2(dx, dz); g.rotation.y += ((want - g.rotation.y + Math.PI * 3) % (Math.PI * 2) - Math.PI) * Math.min(1, dt * 6);
+      if (dist < 0.3) {
+        if (!shelter && moving) { a.target = randomSpot(a.kind); a.idleUntil = t + 1.5 + Math.random() * 4.5; }
+        moving = false;
       }
+      let turn = 0;
+      if (moving) {
+        const sp2 = a.speed * (cond === "rain" && TRAITS.rain.includes(sp.id) ? 1.6 : 1) * (a.kind === "fly" ? 2 : 1) * (a.parts.sideways ? .7 : 1);
+        g.position.x += dx / dist * sp2 * dt; g.position.z += dz / dist * sp2 * dt;
+        const want = Math.atan2(dx, dz) + (a.parts.sideways ? Math.PI / 2 : 0);
+        turn = ((want - g.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+        g.rotation.y += turn * Math.min(1, dt * 4);
+      }
+      const flying = a.kind === "fly" && moving;
       const jump = jumps.get(sp.id); let jy = 0;
       if (jump) { const k = (t - jump) / 0.6; if (k > 1) jumps.delete(sp.id); else jy = Math.sin(k * Math.PI) * 0.8; }
-      if (a.kind === "fly") { g.position.y = sleeping ? 0 : 1.6 + Math.sin(t * 2 + a.phase) * 0.3 + jy; a.parts.wings.forEach((w, i) => { w.rotation.z = sleeping ? 0 : Math.sin(t * 18 + a.phase) * 0.6 * (i ? -1 : 1); }); }
-      else if (a.kind === "swim") { g.position.y = -0.25 + Math.sin(t * 2 + a.phase) * 0.06 + jy; }
-      else { g.position.y = (moving ? Math.abs(Math.sin(t * 9 + a.phase)) * 0.03 : 0) + jy; a.parts.wings.forEach((w, i) => { w.rotation.z = moving ? 0 : Math.sin(t * 3 + a.phase) * 0.1 * (i ? -1 : 1); }); }
-      (a.parts.legs || []).forEach(l => { const target = moving ? Math.sin(t * 9 * a.speed + a.phase + l.phase) * .5 : 0; if (l.axis === "y") l.piv.rotation.y += (target * .8 - l.piv.rotation.y) * .3; else l.piv.rotation.x += (target - l.piv.rotation.x) * .3; });
-      if (a.parts.tail) a.parts.tail.rotation.y = Math.sin(t * (a.kind === "swim" ? 7 : 2.2) + a.phase) * (a.kind === "swim" ? .35 : .22);
-      if (a.parts.head && !sleeping) a.parts.head.rotation.y = Math.sin(t * .7 + a.phase) * .25;
-      g.scale.y = sleeping ? g.scale.x * 0.8 : g.scale.x;
+      const baseY = a.kind === "swim" ? -0.08 + Math.sin(t * 2 + a.phase) * 0.05 : flying ? 1.5 + Math.sin(t * 2 + a.phase) * 0.25 : 0;
+      g.position.y += (baseY + jy - g.position.y) * Math.min(1, dt * (flying || a.kind !== "fly" ? 6 : 2.5));
+      if (a.parts.update) a.parts.update({ t, dt, moving, speed: a.speed, sleeping, turn: Math.max(-1, Math.min(1, turn)), flying });
     }
     if (companion) {
       const g = companion.group;
@@ -2849,9 +3170,10 @@ function createWorld() {
       else {
         const asleep = cond === "night" && state.companion.kind !== "owl";
         const dx = companion.target[0] - g.position.x, dz = companion.target[1] - g.position.z, dist = Math.hypot(dx, dz);
-        if (dist < 0.3) { const ang = Math.random() * 6.28; companion.target = [Math.cos(ang) * 3, Math.sin(ang) * 3]; }
-        else if (!asleep) { g.position.x += dx / dist * 0.9 * dt; g.position.z += dz / dist * 0.9 * dt; g.rotation.y = Math.atan2(dx, dz); }
-        g.position.y = asleep ? 0 : Math.abs(Math.sin(t * 8)) * 0.05;
+        let mv = false;
+        if (dist < 0.3) { const ang = Math.random() * 6.28; companion.target = [Math.cos(ang) * 3, Math.sin(ang) * 3]; companion.idleUntil = t + 2 + Math.random() * 3; }
+        else if (!asleep && t > (companion.idleUntil || 0)) { g.position.x += dx / dist * 0.9 * dt; g.position.z += dz / dist * 0.9 * dt; g.rotation.y = Math.atan2(dx, dz); mv = true; }
+        if (companion.parts.update) companion.parts.update({ t, dt, moving: mv, speed: .9, sleeping: asleep, turn: 0, flying: false });
       }
     }
     if (rain.visible) { const arr = rain.geometry.attributes.position.array; for (let i = 1; i < arr.length; i += 3) { arr[i] -= 22 * dt; if (arr[i] < 0) arr[i] = 20; } rain.geometry.attributes.position.needsUpdate = true; }
@@ -3353,6 +3675,7 @@ document.addEventListener("click", e => {
   if (t.dataset.hot !== undefined) { state.hot = Number(t.dataset.hot); return render(true); }
   if (t.dataset.mapzoom) { mapZoom(Number(t.dataset.mapzoom)); return; }
   if ("mapall" in t.dataset) { mapSet(mapFull()); return; }
+  if ("nofog" in t.dataset) { state.noFog = !state.noFog; t.classList.toggle("on", state.noFog); t.setAttribute("aria-pressed", state.noFog); scheduleMap(); return; }
   if ("mapreset" in t.dataset) {
     // Autour de moi : centré sur Lyon (position simulée), zoom ×4
     const m = mapData[state.mapView];

@@ -1,14 +1,15 @@
 // Génère carte.json pour la maquette : fonds de carte pré-projetés et positions des lieux.
 // La page n'a ainsi besoin d'aucune bibliothèque de cartographie.
 //
-//   npm i d3-geo@3 topojson-client@3 world-atlas@2
+//   npm i d3-geo@3 d3-contour@4 topojson-client@3 world-atlas@2
 //   # Natural Earth 10m (fleuves, lacs, massifs, villes) depuis github.com/nvkelso/natural-earth-vector/geojson
 //   NE_DIR=chemin/vers/geojson node docs/maquette/build_map.mjs > docs/maquette/carte.json
 //
 // Fond de carte : Natural Earth via world-atlas et natural-earth-vector (domaine public).
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { geoConicConformal, geoNaturalEarth1, geoPath, geoGraticule10 } from "d3-geo";
+import { geoConicConformal, geoNaturalEarth1, geoPath, geoGraticule10, geoIdentity, geoArea } from "d3-geo";
+import { contours } from "d3-contour";
 import { feature, mesh } from "topojson-client";
 
 const require = createRequire(process.cwd() + "/");
@@ -53,6 +54,12 @@ export const PLACES = {
   "mus:amnh": [-73.974, 40.781],
   "mus:trelew": [-65.30, -43.25],
   "mus:macn": [-58.44, -34.605],
+};
+
+// Environnement réel des lieux de démo quand la grille (≈ 4 km par pixel) se trompe
+const PLACE_BIOME = {
+  "Forêt de Fontainebleau": "forest", "Étangs de la Dombes": "countryside", "Lac du Der-Chantecoq": "countryside",
+  "Plage du Sillon, Saint-Malo": "sea", "Camargue, Saintes-Maries-de-la-Mer": "sea", "Monts du Lyonnais": "countryside",
 };
 
 // Hotspots de démonstration : centres de mailles de 0,5°, jamais la position d'une observation.
@@ -109,8 +116,101 @@ function thinned(projection, tol) {
   };
 }
 
+// ── Environnements (biomes) : chaque pixel de terre reçoit un environnement, puis on trace des contours lissés.
+// Données réelles : zones urbaines, glaciers, déserts, toundras et massifs (Natural Earth). Le reste suit des
+// règles climatiques simples (latitude, continentalité) avec un bruit doux pour alterner forêts et campagnes.
+// d3 attend des anneaux extérieurs dans le sens horaire ; GeoJSON (RFC 7946) utilise l'autre sens.
+// Un polygone mal orienté couvrirait toute la sphère sauf lui-même : on le retourne dans ce cas.
+function rewind(f) {
+  if (geoArea(f) <= 2 * Math.PI) return f;
+  const rev = poly => poly.map(ring => ring.slice().reverse());
+  const g = f.geometry;
+  return { ...f, geometry: { ...g, coordinates: g.type === "Polygon" ? rev(g.coordinates) : g.coordinates.map(rev) } };
+}
+const urban = NE("ne_10m_urban_areas").features.map(rewind);
+const glaciers = NE("ne_10m_glaciated_areas").features.map(rewind);
+const byClass = cls => regions.filter(f => f.properties.FEATURECLA === cls).map(rewind);
+export const BIOMES = ["forest", "taiga", "rainforest", "countryside", "savanna", "steppe", "desert", "mountain", "tundra", "ice", "city"];
+
+// Rasterise des polygones déjà projetés (et découpés à l'antiméridien par d3) avec un remplissage pair-impair.
+function rasterize(path, features, nx, ny, step) {
+  const mask = new Uint8Array(nx * ny);
+  for (const f of features) {
+    const rings = []; let cur = null;
+    path.context({ moveTo(x, y) { cur = [[x, y]]; rings.push(cur); }, lineTo(x, y) { cur.push([x, y]); }, closePath() {}, arc() {} })(f);
+    path.context(null);
+    const edges = [];
+    rings.forEach(r => { for (let i = 0; i < r.length; i++) { const a = r[i], b = r[(i + 1) % r.length]; if (a[1] !== b[1]) edges.push(a[1] < b[1] ? [a, b] : [b, a]); } });
+    for (let j = 0; j < ny; j++) {
+      const y = (j + .5) * step, xs = [];
+      for (const [a, b] of edges) if (y >= a[1] && y < b[1]) xs.push(a[0] + (y - a[1]) / (b[1] - a[1]) * (b[0] - a[0]));
+      xs.sort((p, q) => p - q);
+      for (let k = 0; k + 1 < xs.length; k += 2) {
+        const i0 = Math.max(0, Math.ceil(xs[k] / step - .5)), i1 = Math.min(nx - 1, Math.floor(xs[k + 1] / step - .5));
+        for (let i = i0; i <= i1; i++) mask[j * nx + i] = 1;
+      }
+    }
+  }
+  return mask;
+}
+const hash = (x, y) => { const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); };
+function noise(x, y) {
+  const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+  const a = hash(xi, yi), b = hash(xi + 1, yi), c = hash(xi, yi + 1), d = hash(xi + 1, yi + 1);
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+function classify(lon, lat, m) {
+  const alat = Math.abs(lat), n = noise(lon * .9, lat * .9) * .65 + noise(lon * 3.1, lat * 3.1) * .35;
+  if (lat < -60 || m.ice) return "ice";
+  if (m.city) return "city";
+  if (m.mountain) return "mountain";
+  if (m.desert) return "desert";
+  if (m.tundra || alat > 66) return "tundra";
+  if (lat > 55) return n > .3 ? "taiga" : "tundra";
+  if (alat > 35) {
+    const continental = (lon > 45 && lon < 120 && lat < 55) || (lon > -112 && lon < -96 && lat < 50) || (lon > -72 && lon < -60 && lat < -35);
+    if (continental) return n > .72 ? "countryside" : "steppe";
+    return n > .56 ? "forest" : "countryside";
+  }
+  if (alat > 23) {
+    const dry = (lon > -20 && lon < 75) || (lon > 112 && lon < 155 && lat < 0) || (lon > -118 && lon < -98 && lat > 0);
+    if (dry) return n > .55 ? "steppe" : "savanna";
+    return n > .5 ? "forest" : "countryside";
+  }
+  const wet = (lon > -80 && lon < -44 && alat < 12) || (lon > 8 && lon < 30 && alat < 6) || (lon > 95 && lon < 160 && alat < 12);
+  return wet ? "rainforest" : n > .7 ? "forest" : "savanna";
+}
+function biomes(projection, width, height, landFeature, step = 1) {
+  const path = geoPath(projection);
+  const nx = Math.ceil(width / step), ny = Math.ceil(height / step);
+  const land = rasterize(path, [landFeature], nx, ny, step);
+  const masks = {
+    ice: rasterize(path, glaciers, nx, ny, step), city: rasterize(path, urban, nx, ny, step),
+    mountain: rasterize(path, [...byClass("Range/mtn"), ...regions.filter(f => f.properties.NAME_FR === "Massif central").map(rewind)], nx, ny, step),
+    desert: rasterize(path, byClass("Desert"), nx, ny, step),
+    tundra: rasterize(path, byClass("Tundra"), nx, ny, step),
+  };
+  const grid = new Array(nx * ny).fill(null);
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const k = j * nx + i; if (!land[k]) continue;
+    const ll = projection.invert([(i + .5) * step, (j + .5) * step]);
+    if (!ll || !isFinite(ll[0])) continue;
+    grid[k] = classify(ll[0], ll[1], { ice: masks.ice[k], city: masks.city[k], mountain: masks.mountain[k], desert: masks.desert[k], tundra: masks.tundra[k] });
+  }
+  const out = {}, tr = geoPath(thinned(geoIdentity().scale(step), .6)).digits(1);
+  for (const b of BIOMES) {
+    const vals = grid.map(v => v === b ? 1 : 0);
+    if (!vals.some(Boolean)) continue;
+    const [c] = contours().size([nx, ny]).thresholds([.5])(vals);
+    const d = tr(c); if (d) out[b] = d;
+  }
+  const at = ([lon, lat]) => { const [x, y] = projection([lon, lat]); const i = Math.floor(x / step), j = Math.floor(y / step); return grid[j * nx + i] || null; };
+  return { biomes: out, biomeAt: at };
+}
+
 function view(projection, width, height, landTopo, borders, detailOpts) {
   const path = geoPath(detailOpts.tol ? thinned(projection, detailOpts.tol) : projection).digits(1);
+  const bio = biomes(projection, width, height, feature(landTopo, landTopo.objects.land), detailOpts.biomeStep || 1);
   const project = ([lon, lat]) => projection([lon, lat]).map(v => Math.round(v * 10) / 10);
   // Échelle locale : pixels pour 10 km, mesurée à Lyon
   const [x0] = projection([4.85, 45.75]);
@@ -124,6 +224,8 @@ function view(projection, width, height, landTopo, borders, detailOpts) {
     places: Object.fromEntries(Object.entries(PLACES).map(([k, v]) => [k, project(v)])),
     hotspots: HOTSPOTS.map(h => ({ ...h, xy: project(h.cell) })),
     ...details(path, projection, detailOpts),
+    biomes: bio.biomes,
+    placeBiome: Object.fromEntries(Object.entries(PLACES).map(([k, v]) => [k, PLACE_BIOME[k] || bio.biomeAt(v)])),
   };
 }
 
@@ -136,7 +238,7 @@ process.stdout.write(JSON.stringify({
   source: "Natural Earth, via world-atlas 2.0.2 et natural-earth-vector (domaine public)",
   france: view(france.clipExtent([[0, 0], [W, 340]]), W, 340, land50,
     mesh(countries50, countries50.objects.countries, (a, b) => a !== b),
-    { riverMax: 12, lakeMax: 12, rangeMax: 5, cityMin: 40000, tol: 0.12 }),
+    { riverMax: 12, lakeMax: 12, rangeMax: 5, cityMin: 40000, tol: 0.12, biomeStep: 2 }),
   world: view(world, W, 190, land110, null,
     { riverMax: 2, lakeMax: 0, rangeMax: 1, worldCities: true, tol: 0.35 }),
 }));
