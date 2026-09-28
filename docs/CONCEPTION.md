@@ -502,6 +502,10 @@ CREATE TABLE taxon_traits (
 
 La maquette applique déjà les étapes 2 et 3 de façon simplifiée : un gabarit procédural par groupe (corps modelé, pattes articulées qui marchent, ailes et nageoires animées, textures de fourrure, plumes ou écailles), coloré avec les deux couleurs dominantes du centre de la photo importée. En production, ces gabarits sont remplacés par des modèles sculptés et riggés par un artiste 3D, puis texturés à partir de la photo.
 
+**Biomes du sanctuaire.** L'île se découpe en secteurs selon l'habitat des espèces trouvées : forêt, prairie, zone humide, montagne, garrigue, savane, littoral. Un biome apparaît dès qu'on capture une espèce qui y vit (table `taxon_habitats`, déduite de l'UICN et de GBIF). Des rivières séparent les secteurs et rejoignent un lac central ; le littoral ouvre sur une baie où vivent les espèces marines. Chaque biome a son relief (collines et rochers en montagne, sol bas et mares en zone humide, baie sableuse sur le littoral) et sa végétation (fougères et champignons, fleurs, roseaux et nénuphars, arbustes, herbes sèches). Les éléments scannés se placent de préférence dans le biome qui leur correspond, et chaque animal reste dans le sien.
+
+**Gabarits par ordre et famille.** Pour le catalogue complet, le gabarit dépend de l'ordre et de la famille : ongulés à sabots avec cornes (enroulées pour les moutons, arrière pour les chèvres, latérales pour les bovins) ou bois (cervidés), laine pour les moutons, félins, ours, mustélidés, lapins à longues oreilles, rongeurs, primates, éléphants (trompe, oreilles, défenses), chauves-souris (vol), cétacés (nageoire caudale horizontale) et phoques (nage).
+
 **Comportements.** Chaque animal erre, vole ou nage selon ses traits ; il faut un plan d'eau pour que les espèces aquatiques apparaissent. La nuit, seuls les animaux nocturnes restent actifs ; sous la pluie, les autres rejoignent l'abri des arbres scannés.
 
 ---
