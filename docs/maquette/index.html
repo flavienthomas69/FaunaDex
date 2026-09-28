@@ -2368,7 +2368,7 @@ function renderSanct() {
       <div class="chips" style="padding:0">${sanctLayout().sectors.map(s => `<button type="button" class="chip" data-sbiome="${s.b}">${SB[s.b].icon} ${SB[s.b].name} <small>${sanctAnimals().filter(sp => habitatOf(sp) === s.b).length}</small></button>`).join("")}</div>
       <p class="count" style="margin:8px 0 0">Chaque biome apparaît quand vous trouvez une espèce qui y vit. Des rivières les séparent et rejoignent le lac central.</p></div>
     <div class="gbif-note" style="margin-top:12px"><b>Comment ça marche</b>Chaque animal photographié en vrai apparaît ici en 3D, avec les couleurs extraites de votre photo, dans le biome où il vit : forêt, prairie, zone humide, montagne, garrigue, savane ou littoral. Les rochers, arbres et montagnes scannés s'ajoutent de préférence dans le biome qui leur correspond. La météo suit la vôtre : sous la pluie, les amphibiens et les escargots sortent et les autres s'abritent sous les arbres ; la nuit, seuls les animaux nocturnes restent actifs.</div>
-    <div class="sources">Modèles 3D : renard de PixelMannen (CC0), squelette et animations de tomkranis (CC-BY 4.0) ; cheval, perroquet, cigogne et flamant de mirada (projet ro.me, exemples three.js) ; arbres et rochers de Kenney (CC0).</div>
+    <div class="sources">Animaux sculptés et articulés par le moteur de FaunaDex ; cigogne et flamant de mirada (projet ro.me, exemples three.js) ; arbres et rochers de Kenney (CC0).</div>
     <div class="bpad"></div>`;
 }
 
@@ -2382,7 +2382,7 @@ function loadThree() {
   return threeLoading;
 }
 // Modèles 3D réalisés par des artistes (voir docs/maquette/models/LICENCES.md)
-const MODEL_FILES = ["fox", "horse", "parrot", "stork", "flamingo", "tree-big", "tree-small", "palm-short", "formation-rock", "formation-large-rock", "formation-stone"];
+const MODEL_FILES = ["stork", "flamingo", "tree-big", "tree-small", "palm-short", "formation-rock", "formation-large-rock", "formation-stone"];
 let MODELS = null, modelsLoading = null;
 function loadScriptOnce(src, test) {
   if (test()) return Promise.resolve(true);
@@ -2441,7 +2441,7 @@ function createWorld() {
 
   // ── Matériaux et textures générées (fourrure, plumes, écailles, peau lisse)
   const lin = c => new T.Color(c).convertSRGBToLinear();
-  const shade = (c, f) => { const col = new T.Color(c); col.multiplyScalar(f); return "#" + col.getHexString(); };
+  const shade = (c, f) => { const col = new T.Color(c); col.multiplyScalar(f); col.r = Math.min(1, col.r); col.g = Math.min(1, col.g); col.b = Math.min(1, col.b); return "#" + col.getHexString(); };
   function makeTex(kind) {
     const c = document.createElement("canvas"); c.width = c.height = 128;
     const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, 128, 128);
@@ -2682,189 +2682,363 @@ function createWorld() {
     return joints;
   }
 
-  // ── Mammifère quadrupède : colonne, cou, tête, 4 pattes à 3 articulations, queue
-  function quad(pal, o) {
-    const g = new T.Group(), [c0, c1] = [pal[0], pal[1] || pal[0]];
-    const { w, len, h, neck, hs, muz } = o;
-    const headY = h + neck + w * .35, headZ = len * .62 + neck * .45 + hs * .3;
-    const pts = [
-      [0, h + w * .05, -len * .66], [0, h + w * .1, -len * .45], [0, h, -len * .05], [0, h + w * .06, len * .32],
-      [0, h + w * .3 + neck * .3, len * .52 + neck * .15], [0, h + neck * .8 + w * .3, len * .58 + neck * .38],
-      [0, headY, headZ], [0, headY - hs * .12, headZ + hs * .55 + muz * .35], [0, headY - hs * .2, headZ + hs * .62 + muz],
-    ];
-    const fat = o.fat || 1;
-    const radii = [[w * .25, w * .3], [w * .85 * fat, w * .92 * fat], [w * .88 * fat, w * .95 * fat], [w * .95 * fat, w * 1.08 * fat], [w * .6, w * .72],
-      [hs * .58, hs * .66], [hs * .92, hs * .86], [hs * .42, hs * .36], [hs * .1, hs * .09]];
-    const lightMuzzle = o.muzzleLight !== false, dorsal = shade(c0, .76);
-    const body = skinTube(pts, radii, (u, sa) => {
-      if (u > .965) return "#1b1512";                                               // truffe
-      const back = sa > .4 ? mixHex(c0, dorsal, smooth(.4, .95, sa)) : c0;            // ligne dorsale plus sombre
-      const belly = u > .06 && u < .74 ? smooth(-.02, -.6, sa) : 0;                   // ventre et gorge clairs
-      const muzzle = u > .78 && lightMuzzle ? smooth(.35, -.2, sa) : 0;                // museau et joues
-      return mixHex(back, c1, Math.max(belly, muzzle));
-    }, o.tex || "fur", { segs: 6 });
-    g.add(body.mesh);
-    const B = body.bones, P = body.pts, head = B[6];
-    [1, -1].forEach(sd => {
-      const ey = new T.Group(); attach(head, P[6], ey, [sd * hs * .47, headY + hs * .28, headZ + hs * .45]); eye(ey, 0, 0, 0, hs * .13, o.iris);
-      const ear = o.roundEar ? ball(o.ear[0], c0, "fur", 1, 1, .4) : new T.Mesh(new T.ConeGeometry(o.ear[0], o.ear[1], 18), mat(c0, "fur"));
-      if (!o.roundEar) ear.scale.z = .45; ear.rotation.z = -sd * (o.earSpread ?? .25);
-      attach(head, P[6], ear, [sd * hs * .52, headY + hs * .72 + o.ear[1] * .35, headZ - hs * .12]);
-      if (!o.roundEar) {
-        const inner = new T.Mesh(new T.ConeGeometry(o.ear[0] * .6, o.ear[1] * .72, 14), mat(o.earIn || c1, "fur")); inner.scale.z = .3; inner.rotation.z = -sd * (o.earSpread ?? .25);
-        attach(head, P[6], inner, [sd * hs * .52, headY + hs * .68 + o.ear[1] * .32, headZ - hs * .06]);
+  // ── Sculpture : les formes (ellipsoïdes, cônes arrondis) sont fondues en une seule peau par un champ de distance,
+  // puis la peau est déformée par un squelette. Pattes, cou et queue sont donc toujours rattachés au corps.
+  function sdPrim(q, x, y, z) {
+    if (q.kind === "ell") {
+      let px = x - q.c[0], py = y - q.c[1], pz = z - q.c[2];
+      if (q.m) { const e = q.m, X = e[0] * px + e[3] * py + e[6] * pz, Y2 = e[1] * px + e[4] * py + e[7] * pz, Z = e[2] * px + e[5] * py + e[8] * pz; px = X; py = Y2; pz = Z; }
+      const rx = q.r[0], ry = q.r[1], rz = q.r[2];
+      const k0 = Math.hypot(px / rx, py / ry, pz / rz), k1 = Math.hypot(px / (rx * rx), py / (ry * ry), pz / (rz * rz));
+      let d = k1 > 1e-9 ? k0 * (k0 - 1) / k1 : -Math.min(rx, ry, rz);
+      if (q.bump) d -= q.bump[0] * (Math.sin(x * q.bump[1]) * Math.sin(y * q.bump[1] + 1.7) * Math.sin(z * q.bump[1] + 2.9) * .7 + Math.sin(x * q.bump[1] * 2.1 + 3) * Math.sin(z * q.bump[1] * 2.3) * .3);
+      return d;
+    }
+    // Cône arrondi (deux sphères de rayons r1, r2 reliées)
+    const pax = x - q.a[0], pay = y - q.a[1], paz = z - q.a[2];
+    const bax = q.ba[0], bay = q.ba[1], baz = q.ba[2], l2 = q.l2, rr = q.r1 - q.r2, a2 = l2 - rr * rr, il2 = 1 / l2;
+    const yy = pax * bax + pay * bay + paz * baz, zz = yy - l2;
+    const qx = pax * l2 - bax * yy, qy = pay * l2 - bay * yy, qz = paz * l2 - baz * yy;
+    const x2 = qx * qx + qy * qy + qz * qz, y2 = yy * yy * l2, z2 = zz * zz * l2, k = Math.sign(rr) * rr * rr * x2;
+    if (Math.sign(zz) * a2 * z2 > k) return Math.sqrt(x2 + z2) * il2 - q.r2;
+    if (Math.sign(yy) * a2 * y2 < k) return Math.sqrt(x2 + y2) * il2 - q.r1;
+    return (Math.sqrt(x2 * a2 * il2) + yy * rr) * il2 - q.r1;
+  }
+  const smin = (a, b, k) => { if (k <= 0) return Math.min(a, b); const h = Math.max(k - Math.abs(a - b), 0) / k; return Math.min(a, b) - h * h * k * .25; };
+  // Primitives : ell(c, r, bone, opts) et cone(a, b, r1, r2, bone, opts) ; opts = { k: fusion, color: fn(p, n) | "#hex", rot: [rx, ry, rz], bump }
+  const ELL = (c, r, bone, o = {}) => ({ kind: "ell", c, r, bone, ...o });
+  const CONE = (a, b, r1, r2, bone, o = {}) => ({ kind: "cone", a, b, r1, r2, bone, ...o });
+  function sculpt(prims, boneDefs, opt = {}) {
+    let minR = 1e9;
+    prims.forEach(q => {
+      q.k = q.k || 0;
+      if (q.kind === "ell") {
+        if (q.rot) { const m = new T.Matrix4().makeRotationFromEuler(new T.Euler(...q.rot)).invert(); q.m = new T.Matrix3().setFromMatrix4(m).elements; }
+        const R = Math.max(...q.r) + q.k + (q.bump ? q.bump[0] : 0);
+        q.lo = q.c.map(v => v - R); q.hi = q.c.map(v => v + R); minR = Math.min(minR, ...q.r);
+      } else {
+        if (Math.abs(q.r1 - q.r2) >= Math.hypot(q.b[0] - q.a[0], q.b[1] - q.a[1], q.b[2] - q.a[2]) * .98) { const d = q.b.map((v, i) => v - q.a[i]); q.b = q.a.map((v, i) => v + d[i] * 1.02); q.r2 = Math.min(q.r2, q.r1 * .99); q.r1 = Math.min(q.r1, q.r2 + Math.hypot(...d) * .9); }
+        q.ba = q.b.map((v, i) => v - q.a[i]); q.l2 = q.ba[0] ** 2 + q.ba[1] ** 2 + q.ba[2] ** 2;
+        const R = Math.max(q.r1, q.r2) + q.k;
+        q.lo = q.a.map((v, i) => Math.min(v, q.b[i]) - R); q.hi = q.a.map((v, i) => Math.max(v, q.b[i]) + R); minR = Math.min(minR, q.r1, q.r2);
       }
-      if (o.bigEars) { const be = ball(hs * .95, shade(c0, .9), "fur", .18, 1, .85); be.rotation.y = sd * .5; attach(head, P[6], be, [sd * hs * 1.05, headY + hs * .1, headZ - hs * .35]); }
+    });
+    const lo = [0, 1, 2].map(i => Math.min(...prims.map(q => q.lo[i]))), hi = [0, 1, 2].map(i => Math.max(...prims.map(q => q.hi[i])));
+    const ext = hi.map((v, i) => v - lo[i]), maxD = Math.max(...ext);
+    let cell = Math.min(maxD / (opt.res || 64), minR / 1.6);
+    while (ext.reduce((n, e) => n * (e / cell + 3), 1) > 420000) cell *= 1.08;
+    const o0 = lo.map(v => v - cell * 1.5), N = ext.map(e => Math.ceil(e / cell) + 4), [nx, ny, nz] = N;
+    const F = new Float32Array(nx * ny * nz).fill(1e3), id = (i, j, k) => i + nx * (j + ny * k);
+    prims.forEach(q => {
+      const i0 = Math.max(0, Math.floor((q.lo[0] - o0[0]) / cell)), i1 = Math.min(nx - 1, Math.ceil((q.hi[0] - o0[0]) / cell));
+      const j0 = Math.max(0, Math.floor((q.lo[1] - o0[1]) / cell)), j1 = Math.min(ny - 1, Math.ceil((q.hi[1] - o0[1]) / cell));
+      const k0 = Math.max(0, Math.floor((q.lo[2] - o0[2]) / cell)), k1 = Math.min(nz - 1, Math.ceil((q.hi[2] - o0[2]) / cell));
+      for (let k = k0; k <= k1; k++) for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+        const n = id(i, j, k); F[n] = smin(F[n], sdPrim(q, o0[0] + i * cell, o0[1] + j * cell, o0[2] + k * cell), q.k);
+      }
+    });
+    const sdf = (x, y, z) => { let d = 1e3; for (const q of prims) if (x >= q.lo[0] && x <= q.hi[0] && y >= q.lo[1] && y <= q.hi[1] && z >= q.lo[2] && z <= q.hi[2]) d = smin(d, sdPrim(q, x, y, z), q.k); return d; };
+    const grad = (x, y, z, out) => { const e = cell * .35; out.set(sdf(x + e, y, z) - sdf(x - e, y, z), sdf(x, y + e, z) - sdf(x, y - e, z), sdf(x, y, z + e) - sdf(x, y, z - e)).normalize(); return out; };
+    const samp = (x, y, z) => {
+      const fx = Math.min(nx - 1.001, Math.max(0, (x - o0[0]) / cell)), fy = Math.min(ny - 1.001, Math.max(0, (y - o0[1]) / cell)), fz = Math.min(nz - 1.001, Math.max(0, (z - o0[2]) / cell));
+      const i = fx | 0, j = fy | 0, k = fz | 0, u = fx - i, v2 = fy - j, w2 = fz - k, n = id(i, j, k), sy = nx, sz = nx * ny;
+      const a = F[n] + (F[n + 1] - F[n]) * u, b = F[n + sy] + (F[n + sy + 1] - F[n + sy]) * u, c = F[n + sz] + (F[n + sz + 1] - F[n + sz]) * u, d = F[n + sz + sy] + (F[n + sz + sy + 1] - F[n + sz + sy]) * u;
+      const ab = a + (b - a) * v2, cd = c + (d - c) * v2; return ab + (cd - ab) * w2;
+    };
+    const gradG = (x, y, z, out) => { const e = cell * .6; out.set(samp(x + e, y, z) - samp(x - e, y, z), samp(x, y + e, z) - samp(x, y - e, z), samp(x, y, z + e) - samp(x, y, z - e)).normalize(); return out; };
+    // Surface nets : un sommet par cellule traversée par la surface, puis projeté sur la surface exacte
+    const C = new Int32Array((nx - 1) * (ny - 1) * (nz - 1)).fill(-1), cid = (i, j, k) => i + (nx - 1) * (j + (ny - 1) * k);
+    const pos = [], nrm = [], g = new T.Vector3();
+    const CORN = [[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0], [0, 0, 1], [1, 0, 1], [0, 1, 1], [1, 1, 1]];
+    const EDGES = [[0, 1], [2, 3], [4, 5], [6, 7], [0, 2], [1, 3], [4, 6], [5, 7], [0, 4], [1, 5], [2, 6], [3, 7]];
+    const v = new Float32Array(8);
+    for (let k = 0; k < nz - 1; k++) for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) {
+      let inside = 0;
+      for (let c = 0; c < 8; c++) { v[c] = F[id(i + CORN[c][0], j + CORN[c][1], k + CORN[c][2])]; if (v[c] < 0) inside++; }
+      if (inside === 0 || inside === 8) continue;
+      let sx = 0, sy = 0, sz = 0, cnt = 0;
+      for (const [a, b] of EDGES) {
+        if ((v[a] < 0) === (v[b] < 0)) continue;
+        const t = v[a] / (v[a] - v[b]);
+        sx += CORN[a][0] + (CORN[b][0] - CORN[a][0]) * t; sy += CORN[a][1] + (CORN[b][1] - CORN[a][1]) * t; sz += CORN[a][2] + (CORN[b][2] - CORN[a][2]) * t; cnt++;
+      }
+      let x = o0[0] + (i + sx / cnt) * cell, y = o0[1] + (j + sy / cnt) * cell, z = o0[2] + (k + sz / cnt) * cell;
+      { const d = samp(x, y, z); gradG(x, y, z, g); x -= g.x * d; y -= g.y * d; z -= g.z * d; }
+      gradG(x, y, z, g);
+      C[cid(i, j, k)] = pos.length / 3; pos.push(x, y, z); nrm.push(g.x, g.y, g.z);
+    }
+    const idx = [], quad = (a, b, c, d) => { if (a < 0 || b < 0 || c < 0 || d < 0) return; idx.push(a, b, c, a, c, d); };
+    for (let k = 1; k < nz - 1; k++) for (let j = 1; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++)
+      if ((F[id(i, j, k)] < 0) !== (F[id(i + 1, j, k)] < 0)) quad(C[cid(i, j - 1, k - 1)], C[cid(i, j, k - 1)], C[cid(i, j, k)], C[cid(i, j - 1, k)]);
+    for (let k = 1; k < nz - 1; k++) for (let j = 0; j < ny - 1; j++) for (let i = 1; i < nx - 1; i++)
+      if ((F[id(i, j, k)] < 0) !== (F[id(i, j + 1, k)] < 0)) quad(C[cid(i - 1, j, k - 1)], C[cid(i, j, k - 1)], C[cid(i, j, k)], C[cid(i - 1, j, k)]);
+    for (let k = 0; k < nz - 1; k++) for (let j = 1; j < ny - 1; j++) for (let i = 1; i < nx - 1; i++)
+      if ((F[id(i, j, k)] < 0) !== (F[id(i, j, k + 1)] < 0)) quad(C[cid(i - 1, j - 1, k)], C[cid(i, j - 1, k)], C[cid(i, j, k)], C[cid(i - 1, j, k)]);
+    // Orientation des triangles d'après la normale du champ
+    for (let t = 0; t < idx.length; t += 3) {
+      const [a, b, c] = [idx[t], idx[t + 1], idx[t + 2]];
+      const ux = pos[b * 3] - pos[a * 3], uy = pos[b * 3 + 1] - pos[a * 3 + 1], uz = pos[b * 3 + 2] - pos[a * 3 + 2];
+      const wx = pos[c * 3] - pos[a * 3], wy = pos[c * 3 + 1] - pos[a * 3 + 1], wz = pos[c * 3 + 2] - pos[a * 3 + 2];
+      const cx = uy * wz - uz * wy, cy = uz * wx - ux * wz, cz = ux * wy - uy * wx;
+      if (cx * (nrm[a * 3] + nrm[b * 3] + nrm[c * 3]) + cy * (nrm[a * 3 + 1] + nrm[b * 3 + 1] + nrm[c * 3 + 1]) + cz * (nrm[a * 3 + 2] + nrm[b * 3 + 2] + nrm[c * 3 + 2]) < 0) { idx[t + 1] = c; idx[t + 2] = b; }
+    }
+    // Poids de peau (os) et couleurs, mélangés selon la proximité de chaque forme
+    const nv = pos.length / 3, si = new Uint16Array(nv * 4), sw = new Float32Array(nv * 4), col = new Float32Array(nv * 3);
+    const sig = opt.sigma || cell * 2.5, sigC = cell * 1.1, P = new T.Vector3(), Nn = new T.Vector3(), tmp = new T.Color(), acc = new T.Color();
+    const nb = boneDefs.length, bw = new Float32Array(nb), ds = new Float32Array(prims.length);
+    for (let vI = 0; vI < nv; vI++) {
+      P.fromArray(pos, vI * 3); Nn.fromArray(nrm, vI * 3);
+      let dmin = 1e9;
+      prims.forEach((q, qi) => { ds[qi] = sdPrim(q, P.x, P.y, P.z); if (ds[qi] < dmin) dmin = ds[qi]; });
+      bw.fill(0); acc.setRGB(0, 0, 0); let cw = 0;
+      prims.forEach((q, qi) => {
+        const e = ds[qi] - dmin;
+        bw[q.bone] += Math.exp(-e / sig);
+        const wc = Math.exp(-e / (q.sharp ? sigC * .4 : sigC));
+        if (wc > .01) { tmp.set(typeof q.color === "function" ? q.color(P, Nn) : q.color || "#888888").convertSRGBToLinear(); acc.r += tmp.r * wc; acc.g += tmp.g * wc; acc.b += tmp.b * wc; cw += wc; }
+      });
+      col[vI * 3] = acc.r / cw; col[vI * 3 + 1] = acc.g / cw; col[vI * 3 + 2] = acc.b / cw;
+      let tot = 0;
+      for (let s4 = 0; s4 < 4; s4++) { let best = -1; for (let b = 0; b < nb; b++) if (bw[b] > 0 && (best < 0 || bw[b] > bw[best])) best = b; if (best < 0) break; si[vI * 4 + s4] = best; sw[vI * 4 + s4] = bw[best]; tot += bw[best]; bw[best] = 0; }
+      for (let s4 = 0; s4 < 4; s4++) sw[vI * 4 + s4] /= tot;
+    }
+    const geo = new T.BufferGeometry();
+    geo.setIndex(idx);
+    geo.setAttribute("position", new T.Float32BufferAttribute(pos, 3));
+    geo.setAttribute("normal", new T.Float32BufferAttribute(nrm, 3));
+    geo.setAttribute("color", new T.BufferAttribute(col, 3));
+    geo.setAttribute("skinIndex", new T.BufferAttribute(si, 4));
+    geo.setAttribute("skinWeight", new T.BufferAttribute(sw, 4));
+    const rest = boneDefs.map(b => new T.Vector3(...b.pos));
+    const bones = boneDefs.map((b, i) => { const bo = new T.Bone(); bo.position.copy(b.parent >= 0 ? rest[i].clone().sub(rest[b.parent]) : rest[i]); return bo; });
+    const mesh = new T.SkinnedMesh(geo, new T.MeshStandardMaterial({ vertexColors: true, skinning: true, roughness: opt.rough ?? .82, metalness: 0 }));
+    boneDefs.forEach((b, i) => (b.parent >= 0 ? bones[b.parent] : mesh).add(bones[i]));
+    mesh.updateMatrixWorld(true); mesh.bind(new T.Skeleton(bones));
+    mesh.castShadow = true; mesh.receiveShadow = true; mesh.frustumCulled = false;
+    // Point de la surface dans une direction donnée depuis un point intérieur (pour poser yeux, bec, oreilles…)
+    function surface(from, dir) {
+      const d = new T.Vector3(...dir).normalize(), p = new T.Vector3(...from);
+      for (let s = 0; s < 400 && sdf(p.x, p.y, p.z) < 0; s++) p.addScaledVector(d, cell * .2);
+      const n = grad(p.x, p.y, p.z, new T.Vector3());
+      return { p, n };
+    }
+    // Fixe un objet sur un os (coordonnées données dans la pose de repos)
+    function pin(bone, obj, at) { obj.position.set(at.x - rest[bone].x, at.y - rest[bone].y, at.z - rest[bone].z); obj.castShadow = true; bones[bone].add(obj); return obj; }
+    return { mesh, bones, rest, surface, pin, sdf };
+  }
+  // Œil : globe sombre et brillant, iris coloré éventuel, reflet ; enfoncé aux deux tiers dans la peau
+  function sculptEye(S, bone, from, dir, r, iris) {
+    const { p, n } = S.surface(from, dir);
+    const g = new T.Group();
+    const glossy = { roughness: .08, metalness: 0 };
+    g.add(new T.Mesh(new T.SphereGeometry(r, 20, 14), new T.MeshStandardMaterial({ color: lin(iris || "#15100c"), ...glossy })));
+    if (iris) { const pu = new T.Mesh(new T.SphereGeometry(r * .62, 16, 12), new T.MeshStandardMaterial({ color: lin("#080808"), ...glossy })); pu.scale.z = .5; pu.position.z = r * .55; g.add(pu); }
+    const hl = new T.Mesh(new T.SphereGeometry(r * .22, 10, 8), new T.MeshBasicMaterial({ color: "#ffffff" })); hl.position.set(0, r * .45, r * .78); g.add(hl);
+    const at = p.clone().addScaledVector(n, -r * .38);
+    S.pin(bone, g, at);
+    g.quaternion.setFromUnitVectors(new T.Vector3(0, 0, 1), n);
+    return g;
+  }
+
+  // ── Mammifère sculpté
+  function quad(pal, o) {
+    const g = new T.Group(), c0 = pal[0], c1 = pal[1] || pal[0], c2 = pal[2] || shade(c0, .45);
+    const { w, len, h, neck, hs, muz } = o, fat = o.fat || 1;
+    const headY = h + neck * 1.1 + w * .5, headZ = len * .48 + neck * .38 + hs * .4;
+    const dorsal = shade(c0, .8), light = o.muzzleLight !== false;
+    const coat = (p, n, belly = 1) => { let c = n.y > .35 ? mixHex(c0, dorsal, smooth(.35, .95, n.y)) : c0; if (belly && light) c = mixHex(c, c1, smooth(-.15, -.75, n.y) * belly); else if (belly) c = mixHex(c, shade(c0, 1.15), smooth(-.2, -.8, n.y)); return c; };
+    const wool = o.tex === "wool";
+    const bump = wool ? { bump: [w * .07, 9 / w] } : {};
+    const woolC = (p, n) => mixHex(c0, shade(c0, .85), smooth(.2, -.6, n.y));
+    const B = [
+      { pos: [0, h + w * .15, -len * .36], parent: -1 },   // 0 bassin
+      { pos: [0, h + w * .18, 0], parent: 0 },              // 1 dos
+      { pos: [0, h + w * .2, len * .3], parent: 1 },         // 2 poitrail
+      { pos: [0, h + w * .45, len * .44], parent: 2 },       // 3 cou
+      { pos: [0, headY, headZ], parent: 3 },                 // 4 tête
+    ];
+    const P = [
+      ELL([0, h + w * .02, -len * .32], [w * .76 * fat, w * .86 * fat, len * .3], 0, { color: wool ? woolC : coat, ...bump }),
+      ELL([0, h - w * .02, -len * .02], [w * .82 * fat, w * .95 * fat, len * .36], 1, { k: w * .5, color: wool ? woolC : coat, ...bump }),
+      ELL([0, h + w * .06, len * .26], [w * .74 * fat, w * 1.0 * fat, len * .28], 2, { k: w * .5, color: wool ? woolC : coat, ...bump }),
+      CONE([0, h + w * .25, len * .3], [0, headY - hs * .2, headZ - hs * .3], w * .56 * Math.min(fat, 1.15), hs * .42, 3, { k: w * .35, color: (p, n) => o.mane && n.y > .2 && n.z < .2 ? c2 : coat(p, n) }),
+      ELL([0, headY, headZ], [hs * .58, hs * .6, hs * .66], 4, { k: hs * .22, color: (p, n) => o.face ? o.face : coat(p, n, .6) }),
+      CONE([0, headY - hs * .1, headZ + hs * .22], [0, headY - hs * .24 - muz * .22, headZ + hs * .38 + muz], hs * .42, Math.max(hs * .15, muz * .2), 4,
+        { k: hs * .2, color: (p, n) => o.face ? o.face : light ? mixHex(c0, c1, smooth(.4, -.2, n.y)) : shade(c0, .95) }),
+    ];
+    const noseAt = [0, headY - hs * .24 - muz * .22 + hs * .05, headZ + hs * .38 + muz + Math.max(hs * .15, muz * .2) * .6];
+    if (!o.trunk) P.push(ELL(noseAt, [hs * .13, hs * .085, hs * .08], 4, { k: hs * .06, color: "#1d1715", sharp: true }));
+    if (o.trunk) {
+      let prev = [0, headY - hs * .35, headZ + hs * .6];
+      for (let i = 1; i <= 5; i++) { const t = i / 5, nxt = [0, headY - hs * .35 - t * hs * 2.1, headZ + hs * .6 + Math.sin(t * 2.2) * hs * .5]; P.push(CONE(prev, nxt, hs * (.3 - .03 * i), hs * (.27 - .03 * i), 4, { k: hs * .1, color: c0 })); prev = nxt; }
+    }
+    // Pattes : épaule/hanche → coude/grasset → poignet/jarret → pied
+    const legs = [];
+    [[1, true], [-1, true], [1, false], [-1, false]].forEach(([sx, front], li) => {
+      const x = sx * w * .52, zf = front ? len * .28 : -len * .36;
+      const lt = o.legT || 1;
+      const J = front ? [[x, h, zf], [x, h * .5, zf - len * .03], [x, h * .17, zf], [x, w * .05, zf + w * .12]]
+                      : [[x, h, zf], [x, h * .58, zf + len * .1], [x, h * .28, zf - len * .12], [x, w * .05, zf - len * .06]];
+      const b0 = B.length;
+      B.push({ pos: J[0], parent: front ? 2 : 0 }, { pos: J[1], parent: b0 }, { pos: J[2], parent: b0 + 1 });
+      const legC = (p, n) => { if (o.face && wool && p.y < h * .6) return shade(o.face, .85); const lowK = smooth(h * .55, h * .2, p.y); let c = coat(p, n, .4); if (o.socks) c = mixHex(c, c2, lowK); else c = mixHex(c, shade(c0, .75), lowK * .6); if (wool) c = mixHex(c, o.face || "#3a322c", smooth(h * .7, h * .45, p.y)); return c; };
+      const r0 = (front ? w * .38 : w * .46) * Math.min(fat, 1.2) * Math.sqrt(lt);
+      P.push(CONE(J[0], J[1], r0, w * .17 * lt, b0, { k: w * .3, color: legC }));
+      P.push(CONE(J[1], J[2], w * .15 * lt, w * .1 * lt, b0 + 1, { k: w * .1 * lt, color: legC }));
+      P.push(CONE(J[2], [J[3][0], J[3][1] + w * .06, J[3][2] - w * .05], w * .1 * lt, w * .09 * lt, b0 + 2, { k: w * .06, color: legC }));
+      P.push(ELL([J[3][0], J[3][1] + w * .04 * lt, J[3][2]], [w * .12 * lt, w * .09 * lt, w * .15 * lt], b0 + 2, { k: w * .06, color: o.hooves ? "#2a2420" : (p, n) => legC(p, n), sharp: !!o.hooves }));
+      legs.push({ b: b0, front, phase: [0, Math.PI, Math.PI * .5, Math.PI * 1.5][li] });
+    });
+    // Queue articulée
+    const tb = B.length, nT = 5, TP = [];
+    for (let i = 0; i <= nT; i++) {
+      const t = i / nT;
+      TP.push([0, h + w * .35 + (o.tailUp ? t * o.tail * .9 - t * t * o.tail * .3 : -t * o.tail * .55 + t * t * o.tail * .2), -len * .6 - t * o.tail * (o.tailUp ? .45 : .85)]);
+    }
+    for (let i = 0; i < nT; i++) B.push({ pos: TP[i], parent: i ? tb + i - 1 : 0 });
+    for (let i = 0; i < nT; i++) {
+      const t0 = i / nT, t1 = (i + 1) / nT, rad = t => Math.max(o.tailR * (o.bushy ? .45 + Math.sin(t * Math.PI * .85) * .75 : 1 - t * .75), .012);
+      P.push(CONE(TP[i], TP[i + 1], rad(t0), rad(t1), tb + i, { k: i ? o.tailR * .3 : w * .25, color: (p, n) => o.tip && i === nT - 1 && t1 > .9 ? c1 : coat(p, n, .5) }));
+    }
+    const S = sculpt(P, B, { res: 70 });
+    g.add(S.mesh);
+    const head = 4, hc = [0, headY + hs * .1, headZ + hs * .1];
+    [1, -1].forEach(sd => {
+      sculptEye(S, head, hc, [sd * .78, .3, .55], hs * .12, o.iris);
+      // Oreilles
+      const base = S.surface([0, headY, headZ - hs * .1], [sd * .5, 1, -.15]).p;
+      let ear;
+      if (o.roundEar) { ear = new T.Mesh(new T.SphereGeometry(o.ear[0] * 1.1, 20, 14), mat(shade(c0, .9))); ear.scale.set(1, 1, .45); ear.position.y = o.ear[0] * .3; }
+      else {
+        ear = new T.Group();
+        const eo = new T.Mesh(new T.ConeGeometry(o.ear[0], o.ear[1], 20), mat(o.earBack || shade(c0, .95))); eo.scale.z = .42; eo.position.y = o.ear[1] * .45; ear.add(eo);
+        const ei = new T.Mesh(new T.ConeGeometry(o.ear[0] * .66, o.ear[1] * .75, 16), mat(o.earIn || mixHex(c1, "#d9b2a0", .3))); ei.scale.z = .25; ei.position.set(0, o.ear[1] * .4, o.ear[0] * .2); ear.add(ei);
+        ear.rotation.z = -sd * (o.earSpread ?? .3); ear.rotation.x = -.15;
+      }
+      S.pin(head, ear, base.clone().addScaledVector(new T.Vector3(0, 1, 0), -hs * .08));
+      if (o.bigEars) { const be = new T.Mesh(new T.SphereGeometry(hs * 1.05, 24, 16), mat(shade(c0, .92))); be.scale.set(.14, 1, .85); be.rotation.y = sd * .45; S.pin(head, be, new T.Vector3(sd * hs * .85, headY + hs * .05, headZ - hs * .45)); }
       if (o.horns) {
         const hp = [];
         for (let i = 0; i <= 18; i++) {
           const t = i / 18;
-          if (o.horns === "curl") { const a = t * Math.PI * 1.7, R = hs * (.62 - t * .3); hp.push(new T.Vector3(sd * (hs * .1 + t * hs * .35), Math.sin(a) * R, -Math.cos(a) * R + hs * .1)); }
+          if (o.horns === "curl") { const a = t * Math.PI * 1.7, R = hs * (.55 - t * .25); hp.push(new T.Vector3(sd * (t * hs * .3), Math.sin(a) * R, -Math.cos(a) * R + R)); }
           else if (o.horns === "back") hp.push(new T.Vector3(sd * t * hs * .25, t * hs * 1.1, -t * t * hs * 1.1));
           else if (o.horns === "side") hp.push(new T.Vector3(sd * t * hs * 1.1, t * t * hs * .7, t * hs * .1));
           else hp.push(new T.Vector3(sd * t * hs * .2, t * hs * 1.5, -t * hs * .6));
         }
-        const hm = new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(hp), 40, hs * (o.horns === "curl" ? .13 : .08), 10), mat(o.horns === "curl" ? "#C9B994" : "#3A342C", "scale", { roughness: .5 }));
-        attach(head, P[6], hm, [sd * hs * .3, headY + hs * .62, headZ - hs * .15]);
+        const hm = new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(hp), 40, hs * (o.horns === "curl" ? .14 : .08), 12), mat(o.horns === "curl" ? "#C9B994" : "#3A342C", "smooth", { roughness: .5 }));
+        S.pin(head, hm, S.surface([0, headY, headZ], [sd * .35, 1, .1]).p.addScaledVector(new T.Vector3(0, 1, 0), -hs * .05));
       }
-      if (o.tusks) { const tk = new T.Mesh(new T.ConeGeometry(hs * .09, hs * 1.3, 10), mat("#F2EBDC", "smooth", { roughness: .3 })); tk.rotation.x = Math.PI * .72; attach(head, P[6], tk, [sd * hs * .3, headY - hs * .55, headZ + hs * .55]); }
+      if (o.tusks) { const tk = new T.Mesh(new T.ConeGeometry(hs * .09, hs * 1.2, 12), mat("#F2EBDC", "smooth", { roughness: .3 })); tk.rotation.x = Math.PI * .75; S.pin(head, tk, new T.Vector3(sd * hs * .3, headY - hs * .55, headZ + hs * .6)); }
       if (o.antlers) {
-        const an = new T.Group(); attach(head, P[6], an, [sd * hs * .3, headY + hs * .75, headZ - hs * .15]);
-        limb(an, [0, 0, 0], [sd * hs * .35, hs * 1.1, -hs * .25], .03, .02, "#6B4A2E"); limb(an, [sd * hs * .14, hs * .5, -hs * .1], [sd * hs * .02, hs * .95, hs * .25], .02, .014, "#6B4A2E");
+        const an = new T.Group(); S.pin(head, an, S.surface([0, headY, headZ], [sd * .35, 1, -.05]).p);
+        limb(an, [0, 0, 0], [sd * hs * .45, hs * 1.3, -hs * .3], .035, .022, "#6B4A2E"); limb(an, [sd * hs * .18, hs * .55, -hs * .12], [sd * hs * .05, hs * 1.05, hs * .3], .024, .015, "#6B4A2E");
+        limb(an, [sd * hs * .3, hs * .9, -hs * .2], [sd * hs * .75, hs * 1.4, -hs * .05], .02, .013, "#6B4A2E");
       }
     });
-    if (o.trunk) {
-      const tp = [0, 1, 2, 3, 4, 5, 6].map(i => { const t = i / 6; return new T.Vector3(0, -t * hs * 2.1, t * hs * .5 + Math.sin(t * Math.PI) * hs * .25 + (t > .8 ? (t - .8) * hs * 2 : 0)); });
-      const tr = new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(tp), 30, hs * .2, 12), mat(c0, "fur"));
-      attach(head, P[6], tr, [0, headY - hs * .15, headZ + hs * .75]);
-    }
-    // Pattes : épaule/hanche → coude/grasset → poignet/jarret → pied
-    const legs = [];
-    [[1, true], [-1, true], [1, false], [-1, false]].forEach(([sx, front], i) => {
-      const x = sx * w * .55, z = front ? len * .3 : -len * .42;
-      const LP = front
-        ? [[x, h, z], [x, h * .56, z - .03], [x, h * .24, z + .01], [x, .07, z + .02], [x, .035, z + w * .35]]
-        : [[x, h + w * .08, z], [x, h * .62, z + h * .15], [x, h * .3, z - h * .1], [x, .07, z - h * .05], [x, .035, z + w * .3]];
-      const LR = front
-        ? [[w * .36, w * .42], [w * .2, w * .22], [w * .12, w * .13], [w * .13, w * .12], [w * .1, w * .06]]
-        : [[w * .48, w * .56], [w * .27, w * .32], [w * .13, w * .14], [w * .13, w * .12], [w * .1, w * .06]];
-      const leg = skinTube(LP, LR, u => o.hooves && u > .83 ? "#2A2420" : (o.socks && u > .42) ? shade(c0, .3) : u > .8 ? shade(c0, .7) : mixHex(c0, shade(c0, .82), u), o.tex === "wool" ? "fur" : (o.tex || "fur"), { segs: 4, radial: 14 });
-      g.add(leg.mesh);
-      legs.push({ bones: leg.bones, front, phase: [0, Math.PI, Math.PI, 0][i] });
-    });
-    // Queue articulée
-    const tb = [0, h + w * .2, -len * .62], TP = [], TR = [], n = 7;
-    for (let i = 0; i < n; i++) {
-      const t = i / (n - 1);
-      TP.push([0, tb[1] + (o.tailUp ? t * o.tail * 1.05 - t * t * o.tail * .25 : -t * o.tail * .5 + t * t * o.tail * .2), tb[2] - t * o.tail * (o.tailUp ? .5 : .95)]);
-      const r = o.tailR * (o.bushy ? .5 + Math.sin(t * Math.PI * .85) * .8 : 1 - t * .8);
-      TR.push([Math.max(r, .012), Math.max(r, .012)]);
-    }
-    TR[n - 1] = [.01, .01];
-    const tail = skinTube(TP, TR, u => o.tip && u > .82 ? c1 : c0, "fur", { segs: 4, radial: 14 });
-    g.add(tail.mesh);
+    const bones = S.bones;
     let walk = 0, grazeUntil = 0, look = 0;
     function update({ t, dt, moving, speed, sleeping, turn }) {
       walk += dt * (moving ? 7 * speed + 2 : 0);
       const k = moving ? 1 : 0;
       legs.forEach(l => {
         const ph = walk + l.phase, lift = Math.max(0, -Math.cos(ph)) * k;
-        const hip = sleeping ? (l.front ? -1.2 : 1.1) : Math.sin(ph) * .45 * k;
-        l.bones[0].rotation.x = lerpTo(l.bones[0].rotation.x, hip, .2);
-        l.bones[1].rotation.x = lerpTo(l.bones[1].rotation.x, sleeping ? (l.front ? 2.2 : -2) : l.front ? lift * .9 : lift * .5, .2);
-        l.bones[2].rotation.x = lerpTo(l.bones[2].rotation.x, sleeping ? 0 : l.front ? lift * .6 : -lift * .9, .2);
+        const b0 = bones[l.b], b1 = bones[l.b + 1], b2 = bones[l.b + 2];
+        b0.rotation.x = lerpTo(b0.rotation.x, sleeping ? (l.front ? -1.25 : 1.2) : Math.sin(ph) * .4 * k, .2);
+        b1.rotation.x = lerpTo(b1.rotation.x, sleeping ? (l.front ? 2.3 : -2.2) : l.front ? lift * .8 : -lift * .4, .2);
+        b2.rotation.x = lerpTo(b2.rotation.x, sleeping ? (l.front ? -1 : 1.3) : l.front ? lift * .5 : lift * .9, .2);
       });
-      B[2].rotation.y = lerpTo(B[2].rotation.y, turn * .25, .1);
-      B[3].rotation.y = lerpTo(B[3].rotation.y, turn * .25, .1);
-      B[3].scale.setScalar(1 + Math.sin(t * (sleeping ? 1.4 : 2.4)) * .018);
-      // Brouter : seulement à l'arrêt, avec un angle limité pour que le museau s'arrête au sol ; la tête se relève vite dès qu'il repart
+      bones[1].rotation.y = lerpTo(bones[1].rotation.y, turn * .15, .1);
+      bones[2].rotation.y = lerpTo(bones[2].rotation.y, turn * .15, .1);
       if (o.grazer && !moving && !sleeping && t > grazeUntil + 6 && Math.random() < .004) grazeUntil = t + 3;
       const grazing = o.grazer && !moving && t < grazeUntil, kk = moving ? .3 : .06;
-      B[4].rotation.x = lerpTo(B[4].rotation.x, sleeping ? .3 : grazing ? (o.graze || .45) : 0, kk);
-      B[5].rotation.x = lerpTo(B[5].rotation.x, grazing ? (o.graze || .45) * .55 : 0, kk);
-      look = lerpTo(look, sleeping ? 0 : Math.sin(t * .45) * .5, .05);
-      head.rotation.y = look;
-      tail.bones.forEach((b, i) => { b.rotation.y = sleeping ? .35 : Math.sin(t * (moving ? 7 : 2.5) - i * .7) * (.05 + .03 * i); b.rotation.x = sleeping ? .2 : 0; });
-      g.position.y = sleeping ? -h * .42 : 0;
+      bones[3].rotation.x = lerpTo(bones[3].rotation.x, sleeping ? .35 : grazing ? (o.graze || .45) : 0, kk);
+      bones[4].rotation.x = lerpTo(bones[4].rotation.x, grazing ? .3 : 0, kk);
+      look = lerpTo(look, sleeping ? 0 : Math.sin(t * .45) * .45, .05);
+      bones[4].rotation.y = look;
+      for (let i = 0; i < nT; i++) { const b = bones[tb + i]; b.rotation.y = sleeping ? .3 : Math.sin(t * (moving ? 7 : 2.5) - i * .7) * (.05 + .03 * i); }
+      g.position.y = lerpTo(g.position.y, sleeping ? -h * .62 : 0, .1);
     }
     return { group: g, parts: { update, wings: [] } };
   }
 
-  // ── Oiseau : corps skinné, cou articulé, ailes à épaule/coude/poignet qui se replient, pattes à tarse
+  // ── Oiseau sculpté : corps, cou et tête d'une seule pièce ; ailes repliées le long du corps, qui s'ouvrent en vol
   function bird(pal, o) {
-    const g = new T.Group(), [c0, c1, c2] = [pal[0], pal[1] || pal[0], pal[2] || pal[0]], s = o.s;
-    const by = o.leg + s * .34;
-    const neckH = o.neck || 0;
-    const pts = [[0, by + s * .04, -s * .42], [0, by, -s * .22], [0, by + s * .02, 0], [0, by + s * .04, s * .18]];
-    const radii = [[s * .05, s * .04], [s * .24, s * .24], [s * .31, s * .3], [s * .27, s * .28]];
-    const nN = neckH ? 5 : 1;
-    for (let i = 1; i <= nN; i++) {
-      const t = i / nN;
-      pts.push([0, by + s * .12 + t * (neckH || s * .14), s * .26 + t * (neckH * .3 + s * .06) + (o.swan ? Math.sin(t * Math.PI) * neckH * .22 : 0)]);
-      radii.push([s * (.16 - .05 * t), s * (.17 - .05 * t)]);
-    }
-    const hk = o.headK || 1, hIdx = pts.length;
-    const hp = pts[pts.length - 1];
-    pts.push([0, hp[1] + s * .06, hp[2] + s * .05], [0, hp[1] + s * .05, hp[2] + s * .18 * hk]);
-    radii.push([s * .17 * hk, s * .16 * hk], [s * .07 * hk, s * .07 * hk]);
-    const nb = pts.length;
-    const body = skinTube(pts, radii, (u, sa, ca) => {
-      const iHead = (hIdx - .5) / (nb - 1), iNeck = 3.4 / (nb - 1);
-      if (u >= iHead) { if (o.throat && sa < -.25) return o.throat; return o.cheek && sa < .3 && sa > -.6 ? o.cheek : (o.headC || c2); }
-      if (u > iNeck && o.neckC) return o.neckC;
-      if (o.collar && u > iNeck - .05 && u < iNeck + .08) return o.collar;
-      if (o.throat && u > iNeck - .04 && sa < -.1) return o.throat;
-      if (o.tie && sa < -.35 && Math.abs(ca) < .3 && u > .18) return "#1C1C1C";
-      return mixHex(c0, c1, smooth(.1, -.45, sa));
-    }, "feather", { segs: 5 });
-    g.add(body.mesh);
-    const B = body.bones, P = body.pts, head = B[hIdx];
-    const beak = new T.Mesh(new T.ConeGeometry(s * .05 * (o.beakW || 1), o.beak, 16), mat(o.beakC, "smooth", { roughness: .35 }));
-    beak.rotation.x = Math.PI / 2; attach(head, P[hIdx], beak, [0, P[hIdx].y - s * .02, P[hIdx].z + s * .14 * hk + o.beak * .45]);
-    [1, -1].forEach(sd => { const ey = new T.Group(); attach(head, P[hIdx], ey, [sd * s * .1 * hk, P[hIdx].y + s * .04 * hk, P[hIdx].z + s * .08 * hk]); eye(ey, 0, 0, 0, s * .035 * hk, o.iris); });
-    if (o.crown) attach(head, P[hIdx], ball(s * .07, o.crown, "feather", 1, .45, 1.1), [0, P[hIdx].y + s * .15 * hk, P[hIdx].z - s * .02]);
-    if (o.disc) attach(head, P[hIdx], ball(s * .15 * hk, o.disc, "feather", 1, 1, .35), [0, P[hIdx].y, P[hIdx].z + s * .09 * hk]);
-    // Queue en éventail sur l'os arrière
-    for (let i = -2; i <= 2; i++) { const f = ball(s * .07, shade(c0, .85), "feather", 1, .2, 3.2); f.rotation.y = i * .13; attach(B[0], P[0], f, [i * s * .045, P[0].y, P[0].z - s * .16]); }
-    if (o.forked) [1, -1].forEach(sd => { const st = new T.Mesh(new T.ConeGeometry(s * .035, s * .8, 8), mat(c0, "feather")); st.rotation.x = -Math.PI / 2; st.rotation.y = sd * .16; attach(B[0], P[0], st, [sd * s * .06, P[0].y, P[0].z - s * .5]); });
-    if (o.bustle) for (let i = -2; i <= 2; i++) { const f = ball(s * .09, shade(c0, .7), "feather", .6, .35, 2.4); f.rotation.x = .6; f.rotation.y = i * .2; attach(B[0], P[0], f, [i * s * .05, P[0].y - s * .08, P[0].z - s * .1]); }
-    // Ailes : épaule → coude → poignet → pointe ; la section est aplatie (corde de l'aile)
+    const g = new T.Group(), c0 = pal[0], c1 = pal[1] || pal[0], c2 = pal[2] || pal[0], s = o.s, hk = o.headK || 1;
+    const by = o.leg + s * .3, neckH = o.neck || 0;
+    const top = (p, n) => mixHex(c0, c1, smooth(.05, -.55, n.y));
+    const B = [{ pos: [0, by, 0], parent: -1 }, { pos: [0, by + s * .02, -s * .28], parent: 0 }];
+    const P = [
+      ELL([0, by - s * .01, s * .05], [s * .26, s * .27, s * .32], 0, { color: (p, n) => o.tie && Math.abs(p.x) < s * .05 && n.y < -.1 && n.z > -.3 ? "#1C1C1C" : top(p, n) }),
+      ELL([0, by + s * .03, -s * .15], [s * .2, s * .2, s * .3], 0, { k: s * .15, color: top }),
+      ELL([0, by + s * .06, -s * .44], [s * .13, s * .03, s * .24], 1, { k: s * .1, rot: [-.25, 0, 0], color: (p, n) => shade(c0, .8) }),
+    ];
+    if (o.bustle) P.push(ELL([0, by - s * .02, -s * .36], [s * .2, s * .12, s * .22], 1, { k: s * .1, rot: [.5, 0, 0], color: shade(c0, .55) }));
+    // Cou (plusieurs os si long) puis tête
+    const nN = neckH ? 4 : 1, NP = [[0, by + s * .12, s * .2]];
+    for (let i = 1; i <= nN; i++) { const t = i / nN; NP.push([0, by + s * .12 + t * (neckH || s * .1), s * .2 + t * (neckH * .25 + s * .06) + (o.swan ? Math.sin(t * Math.PI) * neckH * .25 : 0)]); }
+    NP.forEach((p, i) => B.push({ pos: p, parent: i ? B.length - 1 : 0 }));
+    const n0 = 2, hr = s * .15 * hk * (neckH ? .7 : 1), last = NP[NP.length - 1], hpos = [0, last[1] + hr * .45, last[2] + hr * .2];
+    B.push({ pos: hpos, parent: B.length - 1 }); const head = B.length - 1;
+    const nr = neckH ? .55 : 1;
+    for (let i = 0; i < nN; i++) P.push(CONE(NP[i], NP[i + 1], s * (.16 - .05 * i / nN) * (i ? nr : .8), s * (.13 - .04 * (i + 1) / nN) * nr, n0 + i, { k: s * .12, color: (p, n) => o.neckC || (o.collar && i === 0 && p.y < by + s * .2 ? o.collar : o.throat && n.z > .3 && n.y < .3 ? o.throat : top(p, n)) }));
+    const headCol = (p, n) => {
+      if (o.disc) { const f = smooth(.35, .7, n.z); return mixHex(o.headC || c0, o.disc, f); }
+      if (o.crown && n.y > .75) return o.crown;
+      if (o.cheek && Math.abs(n.x) > .55 && n.y < .45 && n.y > -.5) return o.cheek;
+      if (o.throat && n.y < -.3) return o.throat;
+      return o.headC || c2;
+    };
+    P.push(ELL(hpos, [hr, hr * (o.disc ? 1.02 : .95), hr * (o.disc ? .9 : 1.08)], head, { k: s * .1, color: headCol }));
+    const S = sculpt(P, B, { res: 64, rough: .75 });
+    g.add(S.mesh);
+    // Bec, yeux
+    const bs = S.surface(hpos, o.disc ? [0, -.35, 1] : [0, -.1, 1]);
+    const beak = new T.Mesh(new T.ConeGeometry(s * .05 * (o.beakW || 1), o.beak, 20), mat(o.beakC, "smooth", { roughness: .35 }));
+    beak.geometry.translate(0, o.beak * .5, 0); beak.rotation.x = o.disc ? Math.PI * .72 : Math.PI / 2 + .08; if (o.beakW > 1.2) beak.scale.z = .45;
+    S.pin(head, beak, bs.p.addScaledVector(bs.n, -s * .02));
+    [1, -1].forEach(sd => sculptEye(S, head, hpos, o.disc ? [sd * .42, .12, .9] : [sd * .85, .22, .42], s * (o.disc ? .055 : .032) * hk, o.disc ? "#E8B830" : o.iris));
+    if (o.forked) [1, -1].forEach(sd => { const st = new T.Mesh(new T.ConeGeometry(s * .03, s * .7, 10), mat(shade(c0, .8))); st.rotation.x = -Math.PI / 2 + .2; st.rotation.y = sd * .18; S.pin(1, st, new T.Vector3(sd * s * .05, by + s * .08, -s * .78)); });
+    // Ailes : pivot à l'épaule ; repliées vers l'arrière, dépliées sur le côté en vol
     const wings = [];
     [1, -1].forEach(sd => {
-      const WP = [[sd * s * .2, by + s * .12, s * .06], [sd * s * .5, by + s * .14, 0], [sd * s * .78, by + s * .13, -s * .04], [sd * s * 1.05, by + s * .1, -s * .12]];
-      const WR = [[s * .2, s * .05], [s * .22, s * .035], [s * .18, s * .025], [s * .05, s * .01]];
-      const wing = skinTube(WP, WR, (u, sa) => o.speculum && u > .3 && u < .52 && sa > 0 ? o.speculum : u > .55 ? shade(c0, .6) : sa < 0 ? shade(c1, .95) : (u > .2 && u < .28 ? shade(c0, 1.25) : c0), o.bat ? "fur" : "feather", { segs: 5, radial: 16 });
-      g.add(wing.mesh);
-      for (let k = 0; k < 4; k++) { const f = ball(s * .05, shade(c0, .55), "feather", .9, .15, 3.4); f.rotation.y = sd * (.2 + k * .18); attach(wing.bones[2], wing.pts[2], f, [WP[2][0] + sd * s * .12, WP[2][1], WP[2][2] - s * .14 - k * s * .02]); }
-      wings.push({ bones: wing.bones, sd });
+      const outer = new T.Group(), inner = new T.Group(); outer.add(inner);
+      const L = s * (o.bat ? .7 : .62), geo = new T.SphereGeometry(1, 28, 14), pa = geo.attributes.position, cols = [];
+      for (let i = 0; i < pa.count; i++) {
+        const z = pa.getZ(i), t = (1 - z) / 2;             // 0 à l'épaule, 1 à la pointe
+        pa.setXYZ(i, pa.getX(i) * s * .17 * (1 - t * .45), pa.getY(i) * s * .035, -(t) * L);
+        const c = new T.Color(o.speculum && t > .35 && t < .55 && pa.getY(i) > 0 ? o.speculum : t > .62 ? shade(c0, .55) : pa.getY(i) < 0 ? shade(c1, .95) : shade(c0, .95)).convertSRGBToLinear(); cols.push(c.r, c.g, c.b);
+      }
+      geo.setAttribute("color", new T.Float32BufferAttribute(cols, 3)); geo.computeVertexNormals();
+      const wm = new T.Mesh(geo, new T.MeshStandardMaterial({ vertexColors: true, roughness: .75 })); wm.castShadow = true; wm.rotation.x = .12;
+      inner.add(wm);
+      S.pin(0, outer, new T.Vector3(sd * s * .2, by + s * .1, s * .14));
+      wings.push({ outer, inner, sd });
     });
-    // Pattes : tarse articulé + doigts
-    const legC = o.legC || "#8a6f4a", legs = [];
+    // Pattes : partent de l'intérieur du corps ; tarse et doigts
+    const legC = o.legC || "#8a6f4a", legs = [], LH = by - s * .12;
     [1, -1].forEach((sd, i) => {
-      const j = jointLeg(g, [sd * s * .1, by - s * .18, s * .02], [[0, -(by - s * .18 - .05) * .55, -s * .05, s * .045, s * .03], [0, -(by - s * .18 - .05) * .45, s * .06, s * .03, s * .022]], legC);
-      [-.55, 0, .55].forEach(a => limb(j[1], [0, -(by - s * .18 - .05) * .45, s * .06], [Math.sin(a) * s * .12, -(by - s * .18 - .05) * .45 - .02, s * .06 + Math.cos(a) * s * .12], s * .014, s * .01, legC));
+      const j = jointLeg(g, [sd * s * .09, LH, s * .02], [[0, -LH * .5, -s * .04, s * .05, s * .028], [0, -LH * .5 + .015, s * .04, s * .026, s * .022]], legC);
+      [-.5, 0, .5, Math.PI].forEach(a => limb(j[1], [0, -LH * .5 + .015, s * .04], [Math.sin(a) * s * .11, -LH * .5, s * .04 + Math.cos(a) * s * (a > 3 ? .07 : .12)], s * .016, s * .011, legC));
       legs.push({ j, phase: i * Math.PI });
     });
+    const bones = S.bones, nb0 = n0;
     let walk = 0, flap = 0;
     function update({ t, dt, moving, sleeping, flying }) {
       walk += dt * (moving && !flying ? 9 : 0);
-      flap += dt * (flying ? 16 : 0);
-      wings.forEach(({ bones: wb, sd }) => {
-        const folded = !flying;
-        wb[0].rotation.y = lerpTo(wb[0].rotation.y, folded ? sd * 1.25 : sd * .15, .15);
-        wb[1].rotation.y = lerpTo(wb[1].rotation.y, folded ? -sd * 2.3 : 0, .15);
-        wb[2].rotation.y = lerpTo(wb[2].rotation.y, folded ? sd * 2.1 : 0, .15);
-        wb[0].rotation.z = flying ? sd * Math.sin(flap) * .75 : lerpTo(wb[0].rotation.z, 0, .15);
-        wb[2].rotation.z = flying ? sd * Math.sin(flap - .8) * .4 : lerpTo(wb[2].rotation.z, 0, .15);
+      flap += dt * (flying ? 14 : 0);
+      wings.forEach(({ outer, inner, sd }) => {
+        inner.rotation.y = lerpTo(inner.rotation.y, flying ? -sd * Math.PI * .5 : 0, .15);
+        outer.rotation.z = flying ? sd * Math.sin(flap) * .7 : lerpTo(outer.rotation.z, 0, .15);
       });
       legs.forEach(l => {
-        l.j[0].rotation.x = flying ? lerpTo(l.j[0].rotation.x, -1.2, .1) : Math.sin(walk + l.phase) * .5 * (moving ? 1 : 0);
-        l.j[1].rotation.x = flying ? lerpTo(l.j[1].rotation.x, 1.8, .1) : Math.max(0, -Math.cos(walk + l.phase)) * .8 * (moving ? 1 : 0);
+        l.j[0].rotation.x = flying ? lerpTo(l.j[0].rotation.x, -1.1, .1) : Math.sin(walk + l.phase) * .5 * (moving ? 1 : 0);
+        l.j[1].rotation.x = flying ? lerpTo(l.j[1].rotation.x, 1.6, .1) : Math.max(0, -Math.cos(walk + l.phase)) * .8 * (moving ? 1 : 0);
       });
-      B[1].scale.setScalar(1 + Math.sin(t * 3) * .02);
       const peck = !moving && !flying && Math.sin(t * .9 + s) > .92;
-      B[hIdx - 1].rotation.x = lerpTo(B[hIdx - 1].rotation.x, sleeping ? .5 : peck ? .8 : 0, .12);
-      head.rotation.y = sleeping ? 2.3 : Math.sin(t * 1.3) * .6 * (moving ? .3 : 1);
+      bones[nb0].rotation.x = lerpTo(bones[nb0].rotation.x, sleeping ? .4 : peck ? .7 : 0, .12);
+      bones[head].rotation.y = sleeping ? 2.3 : Math.sin(t * 1.3) * .6 * (moving ? .3 : 1);
+      bones[1].rotation.x = Math.sin(t * 2) * .05;
       g.position.y = moving && !flying ? Math.abs(Math.sin(walk)) * .03 : 0;
     }
     return { group: g, parts: { update, fly: o.fly, wings: [] } };
@@ -3151,11 +3325,12 @@ function createWorld() {
     const base = { w: .28, len: .64, h: .55, neck: .2, hs: .22, muz: .24, ear: [.08, .18], tail: .5, tailR: .08 };
     if (o === "Artiodactyla") return { ...base, w: .3, len: .78, h: .85, neck: .38, hs: .21, muz: .26, ear: [.08, .2], earSpread: .9, tail: .18, tailR: .06, grazer: true, graze: .5, hooves: true,
       horns: f === "Bovidae" ? (gen === "Ovis" ? "curl" : /Capra|Rupicapra|Oreamnos/.test(gen) ? "back" : /Bos|Bison|Bubalus|Syncerus/.test(gen) ? "side" : "straight") : null,
-      antlers: f === "Cervidae", tex: gen === "Ovis" ? "wool" : "fur", fat: gen === "Ovis" ? 1.3 : 1, muzzleLight: gen !== "Ovis" };
+      antlers: f === "Cervidae", tex: gen === "Ovis" ? "wool" : "fur", fat: gen === "Ovis" ? 1.3 : 1, muzzleLight: gen !== "Ovis", face: gen === "Ovis" ? "#EDE6D8" : null,
+      legT: /Bos|Bison|Bubalus|Syncerus/.test(gen) ? 1.5 : gen === "Ovis" ? 1.2 : 1 };
     if (o === "Perissodactyla") return { ...base, w: .42, len: 1, h: 1.1, neck: .5, hs: .26, muz: .36, ear: [.08, .2], tail: .6, tailR: .06, grazer: true, graze: .55, hooves: true };
-    if (o === "Proboscidea") return { ...base, w: .7, len: 1.2, h: 1.35, neck: .12, hs: .45, muz: .1, ear: [.05, .05], roundEar: true, tail: .5, tailR: .04, trunk: true, bigEars: true, tusks: true, muzzleLight: false };
+    if (o === "Proboscidea") return { ...base, w: .7, len: 1.2, h: 1.35, neck: .12, hs: .45, muz: .1, ear: [.05, .05], roundEar: true, tail: .5, tailR: .04, trunk: true, bigEars: true, tusks: true, muzzleLight: false, legT: 1.9 };
     if (f === "Felidae") return { ...base, w: .26, len: .62, h: .5, neck: .16, hs: .22, muz: .12, ear: [.08, .14], tail: .75, tailR: .06, iris: "#c9a13a" };
-    if (f === "Ursidae") return { ...base, w: .45, len: .8, h: .62, neck: .2, hs: .3, muz: .22, ear: [.08, .08], roundEar: true, tail: .12, tailR: .08, muzzleLight: false, fat: 1.15 };
+    if (f === "Ursidae") return { ...base, legT: 1.7, w: .45, len: .8, h: .72, neck: .2, hs: .3, muz: .22, ear: [.08, .08], roundEar: true, tail: .12, tailR: .08, muzzleLight: false, fat: 1.15 };
     if (f === "Canidae") return { ...QUAD[7], socks: false, tip: false };
     if (f === "Mustelidae") return { ...base, w: .16, len: .6, h: .22, neck: .12, hs: .14, muz: .1, ear: [.05, .05], roundEar: true, tail: .4, tailR: .06 };
     if (o === "Lagomorpha") return { ...base, w: .2, len: .34, h: .28, neck: .06, hs: .15, muz: .08, ear: [.05, .4], earSpread: .08, tail: .08, tailR: .08, muzzleLight: false };
@@ -3212,7 +3387,7 @@ function createWorld() {
     if (src.smoothed) return; src.smoothed = true;
     src.scene.traverse(o => { if (o.isMesh) { smoothNormals(o.geometry, crease); o.material.flatShading = false; o.material.needsUpdate = true; } });
   }
-  const MODEL_DEF = { fox: { len: 1.5 }, horse: { len: 2.3 }, parrot: { len: .9 }, stork: { len: 1.8 }, flamingo: { len: 1.9 } };
+  const MODEL_DEF = { stork: { len: 1.8 }, flamingo: { len: 1.9 } };
   function modelInstance(name, pal, scale = 1) {
     const src = MODELS[name], def = MODEL_DEF[name] || { len: 1 };
     smoothModel(src);
@@ -3232,19 +3407,6 @@ function createWorld() {
     const g = new T.Group(); g.add(root);
     return { g, mixer: new T.AnimationMixer(root), clips: src.animations };
   }
-  // Renard articulé : attente (« Survey »), marche, course, avec fondus entre les animations
-  function foxModel(pal, scale) {
-    const m = modelInstance("fox", pal, scale), acts = {};
-    m.clips.forEach(c => { acts[c.name] = m.mixer.clipAction(c); });
-    let cur = null;
-    const play = n => { const a = acts[n]; if (!a || cur === a) return; a.reset().setEffectiveWeight(1).fadeIn(.3).play(); if (cur) cur.fadeOut(.3); cur = a; };
-    play("Survey");
-    return { group: m.g, parts: { wings: [], update({ dt, moving, speed, sleeping }) {
-      play(moving && !sleeping ? (speed > 1.25 ? "Run" : "Walk") : "Survey");
-      if (cur) cur.timeScale = sleeping ? .2 : moving ? .8 + speed * .3 : 1;
-      m.mixer.update(dt);
-    } } };
-  }
   // Modèles animés par morphing (cheval au galop, oiseaux en vol)
   function morphModel(name, pal, scale, o = {}) {
     const m = modelInstance(name, pal, scale), a = m.mixer.clipAction(m.clips[0]), dur = m.clips[0].duration;
@@ -3256,16 +3418,12 @@ function createWorld() {
       m.mixer.update(dt);
     } } };
   }
-  function modelFor(sp, pal) {
+  // Modèles d'artiste gardés pour les échassiers sans gabarit sculpté (hérons, cigognes, flamants)
+  function modelFor(sp) {
     if (!MODELS) return null;
-    const id = sp.id, fam = sp.family || "", photo = (state.captured[id] || {}).palette || null;
-    if (id === 7 && MODELS.fox) return foxModel(photo, 1);
-    if (id === 9 && MODELS.fox) return foxModel(photo || ["#8D8A84", "#DCD7CE", "#3A3836"], 1.4);
-    if (fam === "Canidae" && MODELS.fox) return foxModel(pal, 1.15);
-    if (fam === "Equidae" && MODELS.horse) return morphModel("horse", photo, 1);
-    if ((id === 26 || /Ardeidae|Ciconiidae|Gruidae/.test(fam)) && MODELS.stork) return morphModel("stork", id === 26 ? (photo || ["#9EA3A6", "#B8BCBF", "#1C1C1C"]) : photo, 1, { fly: true, hover: true });
+    const fam = sp.family || "", photo = (state.captured[sp.id] || {}).palette || null;
+    if (/Ardeidae|Ciconiidae/.test(fam) && MODELS.stork) return morphModel("stork", photo, 1, { fly: true, hover: true });
     if (/Phoenicopteridae/.test(fam) && MODELS.flamingo) return morphModel("flamingo", photo, 1, { fly: true, hover: true });
-    if (sp.cat === "ois" && ![2, 3, 4].includes(id) && MODELS.parrot) return morphModel("parrot", pal, id === 1 || id === 25 ? .55 : .7, { fly: true, hover: true });
     return null;
   }
   function buildAnimal(sp, pal) {
@@ -3419,12 +3577,14 @@ function createWorld() {
     // animaux
     const list = sanctAnimals();
     const want = new Set(list.map(sp => sp.id));
+    let budget = 2, pending = false;
     for (const [id, a] of animals) if (!want.has(id)) { scene.remove(a.group); animals.delete(id); }
     list.forEach(sp => {
       const pal = (state.captured[sp.id] || {}).palette || SPECIES_COLORS[sp.id] || (sp.cat === "mam" && mammalColors(sp)) || CAT_COLORS[sp.cat];
       const key = pal.join();
       const cur = animals.get(sp.id);
       if (cur && cur.key === key) return;
+      if (budget-- <= 0) { pending = true; return; }
       if (cur) scene.remove(cur.group);
       const built = buildAnimal(sp, pal);
       const kind = isAquatic(sp) ? "swim" : built.parts.fly ? "fly" : "ground";
@@ -3436,6 +3596,7 @@ function createWorld() {
       scene.add(root);
       animals.set(sp.id, { parts: built.parts, model: built.group, group: root, sp, key, kind, target: randomSpot(kind, sp), speed: 0.6 + seeded(sp.id) * 0.9, phase: seeded(sp.id + 1) * 6, idleUntil: 0 });
     });
+    if (pending) setTimeout(sync, 30);
     // compagnon
     const ck = state.companion.kind || "egg";
     if (!companion || companion.ck !== ck) {
@@ -3583,7 +3744,7 @@ function createWorld() {
   function focus() { const o = selected(); if (o) { follow = !!(state.sel && state.sel.kind === "animal"); orbit.target.set(o.position.x, Math.max(0, heightAt(o.position.x, o.position.z)) + .5, o.position.z); orbit.r = Math.min(orbit.r, 9); orbit.phi = 1.22; } }
   function focusBiome(b) { const s = layout.sectors.find(x => x.b === b); if (!s) return; const a = (s.a0 + s.a1) / 2; follow = false; orbit.target.set(Math.cos(a) * 10, 0, Math.sin(a) * 10); orbit.r = 18; orbit.phi = 1.05; orbit.theta = a; }
   window.addEventListener("resize", resize);
-  return { renderer, resize, sync, start, zoom, reset, jump, focus, focusBiome, orbit };
+  return { renderer, resize, sync, start, zoom, reset, jump, focus, focusBiome, orbit, dev: { buildAnimal, scene, camera, mammalColors } };
 }
 
 function museumLabel(key) { const m = MUSEUMS[key]; return `${m.name}, ${m.city}`; }

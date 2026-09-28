@@ -508,14 +508,22 @@ La maquette applique déjà les étapes 2 et 3 de façon simplifiée : un gabari
 
 **Comportements.** Chaque animal erre, vole ou nage selon ses traits ; il faut un plan d'eau pour que les espèces aquatiques apparaissent. La nuit, seuls les animaux nocturnes restent actifs ; sous la pluie, les autres rejoignent l'abri des arbres scannés.
 
-**Direction artistique.** Le rendu est lisse et naturel, avec des couleurs nettes et sans textures bruitées. Les modèles d'origine à facettes sont adoucis au chargement : chaque sommet prend la moyenne des normales des faces qui l'entourent, ce qui garde la silhouette et arrondit l'éclairage. Les rochers gardent leurs arêtes au-delà de 60°. Quand un modèle animé réalisé par un artiste existe, on l'utilise :
-- renard articulé avec les animations attente, marche et course, aussi utilisé pour le loup et les autres canidés ;
-- cheval pour les équidés ;
-- oiseau en vol pour les passereaux ;
-- cigogne pour les hérons, cigognes et grues ;
-- flamant.
+**Direction artistique.** Le rendu est lisse et naturel, avec des couleurs nettes et sans textures bruitées.
 
-Ces modèles sont recolorés avec les couleurs de la photo : chaque teinte du modèle est rangée en sombre, clair ou couleur dominante, puis remplacée par la couleur correspondante de la palette extraite. Les autres espèces gardent leur gabarit procédural, avec des formes plus arrondies et le même éclairage lisse. Les arbres et rochers scannés utilisent le Nature Kit de Kenney (CC0), recoloré selon le scan. Les crédits et licences sont dans `maquette/models/LICENCES.md`. En production, la bibliothèque de modèles serait étendue famille par famille (modèles commandés ou sous licence CC0 ou CC-BY).
+**Animaux sculptés.** Les mammifères et la plupart des oiseaux sont sculptés à la volée, et non assemblés en pièces séparées :
+- Le gabarit de l'espèce décrit des volumes simples : ellipsoïdes pour le bassin, le ventre, le poitrail et le crâne ; cônes arrondis pour le cou, le museau, les segments de pattes et la queue.
+- Ces volumes sont fusionnés en douceur dans un champ de distance, puis convertis en une seule peau continue (surface nets). Les pattes, le cou et la queue sont donc toujours rattachés au corps.
+- La peau est liée à un squelette : bassin, dos, poitrail, cou, tête, trois articulations par patte et queue. Chaque sommet est influencé par les os voisins, ce qui permet de marcher, brouter, se coucher et voler sans déchirure.
+- Les couleurs sont peintes par zone selon la palette de la photo : dos plus sombre, ventre et museau clairs, chaussettes, bout de queue, disque facial des chouettes, joues et bavette des mésanges, etc.
+- Les yeux, le bec, les oreilles, les cornes et les bois sont posés sur la surface par lancer de rayon depuis la tête. Ils ne peuvent donc pas être noyés dans le volume.
+- Une génération prend 0,1 à 0,3 s. Le sanctuaire en construit deux par image pour ne pas figer l'écran.
+
+**Autres éléments.**
+- Hérons, cigognes et flamants gardent un modèle animé réalisé par un artiste, recoloré selon la photo.
+- Les arbres et rochers scannés utilisent le Nature Kit de Kenney (CC0), recoloré selon le scan.
+- Les crédits et licences sont dans `maquette/models/LICENCES.md`.
+
+**En production.** Pour aller vers le photoréalisme, il faudrait une bibliothèque de modèles détaillés par famille, commandés ou sous licence CC0 ou CC-BY. On y ajouterait un pelage généré, par coquilles ou par cartes de poils.
 
 ---
 
