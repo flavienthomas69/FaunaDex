@@ -508,14 +508,14 @@ La maquette applique déjà les étapes 2 et 3 de façon simplifiée : un gabari
 
 **Comportements.** Chaque animal erre, vole ou nage selon ses traits ; il faut un plan d'eau pour que les espèces aquatiques apparaissent. La nuit, seuls les animaux nocturnes restent actifs ; sous la pluie, les autres rejoignent l'abri des arbres scannés.
 
-**Direction artistique.** Le rendu est « low-poly » à facettes, avec des aplats de couleur nets et sans textures bruitées. Quand un modèle animé réalisé par un artiste existe, on l'utilise :
+**Direction artistique.** Le rendu est lisse et naturel, avec des couleurs nettes et sans textures bruitées. Les modèles d'origine à facettes sont adoucis au chargement : chaque sommet prend la moyenne des normales des faces qui l'entourent, ce qui garde la silhouette et arrondit l'éclairage. Les rochers gardent leurs arêtes au-delà de 60°. Quand un modèle animé réalisé par un artiste existe, on l'utilise :
 - renard articulé avec les animations attente, marche et course, aussi utilisé pour le loup et les autres canidés ;
 - cheval pour les équidés ;
 - oiseau en vol pour les passereaux ;
 - cigogne pour les hérons, cigognes et grues ;
 - flamant.
 
-Ces modèles sont recolorés avec les couleurs de la photo : chaque teinte du modèle est rangée en sombre, clair ou couleur dominante, puis remplacée par la couleur correspondante de la palette extraite. Les autres espèces gardent leur gabarit procédural, dans le même style à facettes. Les arbres et rochers scannés utilisent le Nature Kit de Kenney (CC0), recoloré selon le scan. Les crédits et licences sont dans `maquette/models/LICENCES.md`. En production, la bibliothèque de modèles serait étendue famille par famille (modèles commandés ou sous licence CC0 ou CC-BY).
+Ces modèles sont recolorés avec les couleurs de la photo : chaque teinte du modèle est rangée en sombre, clair ou couleur dominante, puis remplacée par la couleur correspondante de la palette extraite. Les autres espèces gardent leur gabarit procédural, avec des formes plus arrondies et le même éclairage lisse. Les arbres et rochers scannés utilisent le Nature Kit de Kenney (CC0), recoloré selon le scan. Les crédits et licences sont dans `maquette/models/LICENCES.md`. En production, la bibliothèque de modèles serait étendue famille par famille (modèles commandés ou sous licence CC0 ou CC-BY).
 
 ---
 
