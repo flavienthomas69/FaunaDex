@@ -439,7 +439,8 @@ CREATE TABLE capture_variants (
 
 ### 2.8 Carte, brouillard de guerre et hotspots
 
-- **Navigation** : carte glissable et zoomable (MapLibre sur mobile, tuiles vectorielles), bouton « autour de moi » et vue d'ensemble ; les noms des lieux d'observation apparaissent en zoomant.
+- **Navigation** : carte glissable et zoomable (MapLibre sur mobile, tuiles vectorielles rendues par le GPU), bouton « autour de moi » et vue d'ensemble ; les noms des lieux d'observation apparaissent en zoomant. Le brouillard est une couche à part, dessinée en dégradé autour des cellules explorées, et non un filtre de flou, qui ralentit fortement le zoom.
+- **Fond des zones découvertes** : sous le brouillard, un style cartographique riche (relief et massifs, forêts, fleuves, lacs, villes, noms) n'apparaît que dans les cellules explorées. La maquette l'obtient avec Natural Earth (domaine public) ; l'application utilisera un style de tuiles vectorielles OpenStreetMap avec relief ombré.
 - **Brouillard** : la carte est couverte, sauf dans un rayon de 40 km autour de chaque lieu d'observation du joueur. Stockage : cellules H3 de résolution 5 (≈ 250 km²) dans `user_explored_cells (user_id, h3_cell)`, remplies à chaque capture. Le client ne reçoit que les cellules, jamais les coordonnées des autres joueurs.
 - **Hotspots** : agrégats par maille de 50 km et par famille, recalculés chaque nuit. Règles de protection : au moins 5 observateurs distincts, délai d'une semaine, exclusion de toute espèce UICN vulnérable ou plus et des listes d'espèces sensibles (rapaces nicheurs, chiroptères en gîte…). La position exacte d'une observation n'est jamais exposée.
 
@@ -496,7 +497,7 @@ CREATE TABLE taxon_traits (
 4. **Option haut de gamme** : reconstruction 3D à partir d'une seule image (modèles de type TripoSR ou Stable Fast 3D) pour les éléments fixes du décor comme les rochers, où l'animation n'est pas nécessaire.
 5. Le résultat est stocké en glTF par capture (`captures.model_url`) et régénéré si le joueur fournit une meilleure photo.
 
-La maquette applique déjà les étapes 2 et 3 de façon simplifiée : un gabarit procédural par groupe, coloré avec les deux couleurs dominantes du centre de la photo importée.
+La maquette applique déjà les étapes 2 et 3 de façon simplifiée : un gabarit procédural par groupe (corps modelé, pattes articulées qui marchent, ailes et nageoires animées, textures de fourrure, plumes ou écailles), coloré avec les deux couleurs dominantes du centre de la photo importée. En production, ces gabarits sont remplacés par des modèles sculptés et riggés par un artiste 3D, puis texturés à partir de la photo.
 
 **Comportements.** Chaque animal erre, vole ou nage selon ses traits ; il faut un plan d'eau pour que les espèces aquatiques apparaissent. La nuit, seuls les animaux nocturnes restent actifs ; sous la pluie, les autres rejoignent l'abri des arbres scannés.
 

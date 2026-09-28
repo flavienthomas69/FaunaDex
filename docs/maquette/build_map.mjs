@@ -2,9 +2,11 @@
 // La page n'a ainsi besoin d'aucune bibliothèque de cartographie.
 //
 //   npm i d3-geo@3 topojson-client@3 world-atlas@2
-//   node docs/maquette/build_map.mjs > docs/maquette/carte.json
+//   # Natural Earth 10m (fleuves, lacs, massifs, villes) depuis github.com/nvkelso/natural-earth-vector/geojson
+//   NE_DIR=chemin/vers/geojson node docs/maquette/build_map.mjs > docs/maquette/carte.json
 //
-// Fond de carte : Natural Earth via world-atlas (domaine public).
+// Fond de carte : Natural Earth via world-atlas et natural-earth-vector (domaine public).
+import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { geoConicConformal, geoNaturalEarth1, geoPath, geoGraticule10 } from "d3-geo";
 import { feature, mesh } from "topojson-client";
@@ -64,8 +66,51 @@ export const HOTSPOTS = [
   { cell: [4.25, 43.75], family: "Flamants et limicoles", observers: 36 },
 ];
 
-function view(projection, width, height, landTopo, borders) {
-  const path = geoPath(projection).digits(1);
+const NE = name => JSON.parse(readFileSync(`${process.env.NE_DIR}/${name}.geojson`, "utf8"));
+const rivers = [...NE("ne_10m_rivers_lake_centerlines").features, ...NE("ne_10m_rivers_europe").features];
+const lakes = NE("ne_10m_lakes").features;
+const regions = NE("ne_10m_geography_regions_polys").features;
+const cities = NE("ne_10m_populated_places_simple").features;
+
+// Couches de détail, visibles uniquement dans les zones découvertes
+function details(path, projection, { riverMax, lakeMax, rangeMax, cityMin, worldCities }) {
+  const cls = r => r <= 5 ? 0 : r <= 8 ? 1 : r <= 9 ? 2 : 3;
+  const riverPaths = [[], [], [], []];
+  for (const f of rivers) {
+    const r = f.properties.scalerank; if (r > riverMax) continue;
+    const d = path(f); if (d) riverPaths[cls(r)].push(d);
+  }
+  const lakePath = lakes.filter(f => f.properties.scalerank <= lakeMax).map(f => path(f)).filter(Boolean).join("");
+  const ranges = regions
+    .filter(f => ["Range/mtn", "Plateau"].includes(f.properties.FEATURECLA) && f.properties.SCALERANK <= rangeMax && !/péninsule/i.test(f.properties.NAME_FR))
+    .map(f => ({ d: path(f), name: f.properties.NAME_FR, xy: path.centroid(f).map(v => Math.round(v)) }))
+    .filter(r => r.d && r.d.length > 20);
+  const towns = cities
+    .filter(f => worldCities ? f.properties.worldcity === 1 || f.properties.megacity === 1 : f.properties.pop_max >= cityMin)
+    .map(f => ({ xy: projection([f.properties.longitude, f.properties.latitude]), name: f.properties.name, pop: f.properties.pop_max }))
+    .filter(c => c.xy && c.xy[0] >= 0 && c.xy[1] >= 0 && c.xy[0] <= 350 && c.xy[1] <= 340)
+    .map(c => [Math.round(c.xy[0] * 10) / 10, Math.round(c.xy[1] * 10) / 10, c.name, c.pop])
+    .sort((a, b) => b[3] - a[3]);
+  return { rivers: riverPaths.map(a => a.join("")), lakes: lakePath, ranges, towns };
+}
+
+// Supprime les sommets à moins de `tol` pixels du précédent : allège les tracés sans changer l'aspect.
+function thinned(projection, tol) {
+  return {
+    stream(out) {
+      let last = null;
+      return projection.stream({
+        point(x, y) { if (last && Math.hypot(x - last[0], y - last[1]) < tol) return; last = [x, y]; out.point(x, y); },
+        lineStart() { last = null; out.lineStart(); }, lineEnd() { out.lineEnd(); },
+        polygonStart() { out.polygonStart(); }, polygonEnd() { out.polygonEnd(); },
+        sphere() { out.sphere && out.sphere(); },
+      });
+    },
+  };
+}
+
+function view(projection, width, height, landTopo, borders, detailOpts) {
+  const path = geoPath(detailOpts.tol ? thinned(projection, detailOpts.tol) : projection).digits(1);
   const project = ([lon, lat]) => projection([lon, lat]).map(v => Math.round(v * 10) / 10);
   // Échelle locale : pixels pour 10 km, mesurée à Lyon
   const [x0] = projection([4.85, 45.75]);
@@ -78,6 +123,7 @@ function view(projection, width, height, landTopo, borders) {
     px10km: Math.round((x1 - x0) * 100) / 100,
     places: Object.fromEntries(Object.entries(PLACES).map(([k, v]) => [k, project(v)])),
     hotspots: HOTSPOTS.map(h => ({ ...h, xy: project(h.cell) })),
+    ...details(path, projection, detailOpts),
   };
 }
 
@@ -87,8 +133,10 @@ const france = geoConicConformal().rotate([-3, 0]).parallels([44, 49]).fitExtent
 const world = geoNaturalEarth1().fitExtent([[4, 4], [W - 4, 186]], { type: "Sphere" });
 
 process.stdout.write(JSON.stringify({
-  source: "Natural Earth via world-atlas 2.0.2 (domaine public)",
+  source: "Natural Earth, via world-atlas 2.0.2 et natural-earth-vector (domaine public)",
   france: view(france.clipExtent([[0, 0], [W, 340]]), W, 340, land50,
-    mesh(countries50, countries50.objects.countries, (a, b) => a !== b)),
-  world: view(world, W, 190, land110, null),
+    mesh(countries50, countries50.objects.countries, (a, b) => a !== b),
+    { riverMax: 12, lakeMax: 12, rangeMax: 5, cityMin: 40000, tol: 0.12 }),
+  world: view(world, W, 190, land110, null,
+    { riverMax: 2, lakeMax: 0, rangeMax: 1, worldCities: true, tol: 0.35 }),
 }));

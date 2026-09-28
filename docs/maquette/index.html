@@ -626,8 +626,8 @@
 
   /* Carte navigable */
   .mapwrap { position: relative; }
-  #mapsvg { touch-action: none; cursor: grab; }
-  #mapsvg:active { cursor: grabbing; }
+  #mapcv { display: block; width: 100%; touch-action: none; cursor: grab; }
+  #mapcv:active { cursor: grabbing; }
   .pl { font: 600 7px/1 var(--body); fill: #1B2621; paint-order: stroke; stroke: #FFFDF5; stroke-width: 2px; text-anchor: middle; pointer-events: none; }
   .mapctl { position: absolute; right: 8px; top: 8px; display: grid; gap: 6px; z-index: 3; }
   .mapctl button {
@@ -1927,35 +1927,17 @@ function renderMap() {
   const seen = new Set();
   const labels = explorePoints().filter(l => { const xy = m.places[l]; if (!xy || seen.has(xy.join())) return false; seen.add(xy.join()); return true; });
   const pts = labels.map(l => m.places[l]);
-  const r = Math.max(m.px10km * 4, 6);
   const cell = Math.max(m.px10km * 5, 1);
   const sectors = new Set(pts.map(([x, y]) => `${Math.floor(x / cell)}:${Math.floor(y / cell)}`)).size;
   const hot = state.mapView === "france" ? m.hotspots : [];
   const sel = state.hot !== null && hot[state.hot];
-  const vb = state.mapVB[state.mapView] || [0, 0, m.width, m.height];
   return `${head}
     <div class="seg" style="margin-top:14px">
       <button type="button" class="${state.mapView === "france" ? "on" : ""}" data-mapview="france">France</button>
       <button type="button" class="${state.mapView === "world" ? "on" : ""}" data-mapview="world">Monde</button>
     </div>
     <div class="mapwrap">
-      <svg id="mapsvg" viewBox="${vb.join(" ")}" role="img" aria-label="Carte des zones explorées. Glissez pour vous déplacer, pincez ou utilisez les boutons pour zoomer.">
-        <defs>
-          <filter id="soft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="${Math.max(r / 2.5, 2)}"/></filter>
-          <mask id="fogmask" maskUnits="userSpaceOnUse" x="-50" y="-50" width="${m.width + 100}" height="${m.height + 100}"><rect x="-50" y="-50" width="${m.width + 100}" height="${m.height + 100}" fill="#fff"/><g filter="url(#soft)">${pts.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#000"/>`).join("")}</g></mask>
-          <pattern id="fogtex" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="#1B2621"/><circle cx="1.5" cy="1.5" r=".7" fill="#2A3830"/></pattern>
-        </defs>
-        <rect x="-50" y="-50" width="${m.width + 100}" height="${m.height + 100}" fill="#A9C8D6"/>
-        <path d="${m.graticule}" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width=".5" vector-effect="non-scaling-stroke"/>
-        <path d="${m.land}" fill="#E4DFC9" stroke="#B8B197" stroke-width=".8" vector-effect="non-scaling-stroke"/>
-        ${m.borders ? `<path d="${m.borders}" fill="none" stroke="#B8B197" stroke-width=".8" stroke-dasharray="2 2" vector-effect="non-scaling-stroke"/>` : ""}
-        <rect x="-50" y="-50" width="${m.width + 100}" height="${m.height + 100}" fill="#1E2A24" fill-opacity=".52" mask="url(#fogmask)"/>
-        ${hot.map((h, i) => `<g class="hot ${state.hot === i ? "sel" : ""}" data-hot="${i}" tabindex="0" role="button" aria-label="${esc(h.family)}">
-          <circle cx="${h.xy[0]}" cy="${h.xy[1]}" r="${m.px10km * 2.6}" vector-effect="non-scaling-stroke"/>
-          <text class="ht" x="${h.xy[0]}" y="${h.xy[1]}" text-anchor="middle" dominant-baseline="central">${h.observers}</text></g>`).join("")}
-        ${pts.map(([x, y]) => `<circle class="mk" cx="${x}" cy="${y}" r="2.2" fill="#F2A541" stroke="#fff" stroke-width="1" vector-effect="non-scaling-stroke"/>`).join("")}
-        ${labels.map((l, i) => `<text class="pl" x="${pts[i][0]}" y="${pts[i][1]}" dy="-5">${esc(placeName(l))}</text>`).join("")}
-      </svg>
+      <canvas id="mapcv" role="img" aria-label="Carte des zones explorées. Glissez pour vous déplacer, pincez ou utilisez les boutons pour zoomer."></canvas>
       <div class="mapctl">
         <button type="button" data-mapzoom="1.6" aria-label="Zoomer">+</button>
         <button type="button" data-mapzoom="0.625" aria-label="Dézoomer">−</button>
@@ -1976,58 +1958,162 @@ function renderMap() {
     <div class="sources">Fond de carte : ${esc(mapData.source)}.</div>`;
 }
 
-// Navigation : glisser, pincer, molette, boutons. On modifie le viewBox sans reconstruire la carte.
-let mapDragged = false;
-function mapApply(svg, vb) {
+// Carte en canvas : on redessine à chaque image (chemins Path2D mis en cache), sans filtre SVG.
+const MAPCACHE = {};
+function mapPaths(view) {
+  if (MAPCACHE[view]) return MAPCACHE[view];
+  const m = mapData[view], P = d => d ? new Path2D(d) : null;
+  return (MAPCACHE[view] = {
+    land: P(m.land), borders: P(m.borders), grat: P(m.graticule), lakes: P(m.lakes),
+    rivers: m.rivers.map(P), ranges: m.ranges.map(r => ({ p: P(r.d), name: r.name, xy: r.xy })),
+  });
+}
+let mapPatterns = null;
+function makePatterns(ctx) {
+  const grain = document.createElement("canvas"); grain.width = grain.height = 96;
+  const g = grain.getContext("2d");
+  for (let i = 0; i < 1400; i++) {
+    const v = Math.random();
+    g.fillStyle = v < .5 ? `rgba(70,110,50,${.05 + Math.random() * .12})` : v < .8 ? `rgba(150,130,80,${.05 + Math.random() * .1})` : `rgba(255,255,240,${.08 + Math.random() * .12})`;
+    g.fillRect(Math.random() * 96, Math.random() * 96, 1 + Math.random() * 2, 1 + Math.random() * 2);
+  }
+  // petites forêts : touffes plus sombres
+  for (let i = 0; i < 26; i++) { g.fillStyle = "rgba(60,100,45,.22)"; g.beginPath(); g.arc(Math.random() * 96, Math.random() * 96, 2 + Math.random() * 4, 0, 7); g.fill(); }
+  const peaks = document.createElement("canvas"); peaks.width = peaks.height = 22;
+  const q = peaks.getContext("2d");
+  q.strokeStyle = "rgba(110,80,50,.55)"; q.lineWidth = 1.1;
+  [[5, 9], [15, 19]].forEach(([x, y]) => { q.beginPath(); q.moveTo(x - 4, y); q.lineTo(x, y - 5); q.lineTo(x + 4, y); q.stroke(); q.fillStyle = "rgba(255,255,255,.6)"; q.beginPath(); q.moveTo(x - 1.4, y - 3.2); q.lineTo(x, y - 5); q.lineTo(x + 1.4, y - 3.2); q.fill(); });
+  mapPatterns = { grain: ctx.createPattern(grain, "repeat"), peaks: ctx.createPattern(peaks, "repeat") };
+}
+let mapFog = null, mapQueued = false;
+function scheduleMap() { if (!mapQueued) { mapQueued = true; requestAnimationFrame(() => { mapQueued = false; drawMap(); }); } }
+function mapFull() { const m = mapData[state.mapView]; return [0, 0, m.width, m.height]; }
+function mapClamp(vb) {
   const m = mapData[state.mapView];
-  const w = Math.min(m.width, Math.max(m.width / 12, vb[2]));
-  const h = w * m.height / m.width;
+  const w = Math.min(m.width, Math.max(m.width / 14, vb[2])), h = w * m.height / m.width;
   const x = Math.min(m.width - w, Math.max(0, vb[0] + (vb[2] - w) / 2));
   const y = Math.min(m.height - h, Math.max(0, vb[1] + (vb[3] - h) / 2));
-  const nv = [x, y, w, h];
-  state.mapVB[state.mapView] = nv;
-  svg.setAttribute("viewBox", nv.join(" "));
-  const z = m.width / w;
-  svg.querySelectorAll(".mk").forEach(c => c.setAttribute("r", 2.2 / Math.sqrt(z) * 1.3));
-  svg.querySelectorAll(".pl").forEach(t => { t.style.fontSize = (7 / z) + "px"; t.style.display = z >= 2 ? "" : "none"; t.setAttribute("dy", -4 / z); });
-  svg.querySelectorAll(".ht").forEach(t => { t.style.fontSize = (8 / Math.sqrt(z)) + "px"; });
+  return [x, y, w, h];
 }
-function mapZoom(svg, factor, cx, cy) {
-  const vb = state.mapVB[state.mapView] || [0, 0, mapData[state.mapView].width, mapData[state.mapView].height];
+function mapSet(vb) { state.mapVB[state.mapView] = mapClamp(vb); scheduleMap(); }
+function mapZoom(factor, cx, cy) {
+  const vb = state.mapVB[state.mapView] || mapFull();
   const px = cx ?? vb[0] + vb[2] / 2, py = cy ?? vb[1] + vb[3] / 2;
-  const w = vb[2] / factor, h = vb[3] / factor;
-  mapApply(svg, [px - (px - vb[0]) / factor, py - (py - vb[1]) / factor, w, h].map((v, i) => i < 2 ? v : v));
+  mapSet([px - (px - vb[0]) / factor, py - (py - vb[1]) / factor, vb[2] / factor, vb[3] / factor]);
+}
+function mapState() {
+  const m = mapData[state.mapView];
+  const seen = new Set();
+  const labels = explorePoints().filter(l => { const xy = m.places[l]; if (!xy || seen.has(xy.join())) return false; seen.add(xy.join()); return true; });
+  return { m, labels, pts: labels.map(l => m.places[l]), r: Math.max(m.px10km * 4, 6) };
+}
+function drawMap() {
+  const cv = document.getElementById("mapcv");
+  if (!cv || !mapData || mapData.error) return;
+  const { m, labels, pts, r } = mapState();
+  const P = mapPaths(state.mapView);
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = cv.clientWidth, ch = cw * m.height / m.width;
+  if (cv.width !== Math.round(cw * dpr) || cv.height !== Math.round(ch * dpr)) { cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr); cv.style.height = ch + "px"; }
+  const ctx = cv.getContext("2d");
+  if (!mapPatterns) makePatterns(ctx);
+  const vb = state.mapVB[state.mapView] || mapFull();
+  const s = cw / vb[2], z = m.width / vb[2], k = dpr * s;
+  const toMap = () => ctx.setTransform(k, 0, 0, k, -vb[0] * k, -vb[1] * k);
+  const toScreen = (x, y) => [(x - vb[0]) * s, (y - vb[1]) * s];
+  // Fond découvert : mer, relief, forêts, fleuves, lacs
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = "#8FBCD1"; ctx.fillRect(0, 0, cv.width, cv.height);
+  toMap();
+  ctx.lineWidth = 0.6 / s; ctx.strokeStyle = "rgba(255,255,255,.3)"; ctx.stroke(P.grat);
+  ctx.fillStyle = "#D5E2B6"; ctx.fill(P.land);
+  const inv = new DOMMatrix([1 / k, 0, 0, 1 / k, 0, 0]);
+  mapPatterns.grain.setTransform(inv.translate(vb[0] * k, vb[1] * k)); ctx.fillStyle = mapPatterns.grain; ctx.fill(P.land);
+  P.ranges.forEach(rg => { ctx.fillStyle = "rgba(176,142,98,.38)"; ctx.fill(rg.p); });
+  mapPatterns.peaks.setTransform(inv.translate(vb[0] * k, vb[1] * k)); ctx.fillStyle = mapPatterns.peaks;
+  P.ranges.forEach(rg => ctx.fill(rg.p));
+  if (P.lakes) { ctx.fillStyle = "#6FA8C8"; ctx.fill(P.lakes); }
+  ctx.lineCap = ctx.lineJoin = "round"; ctx.strokeStyle = "#5C9DC4";
+  [2.2, 1.5, 1, 0.7].forEach((w, i) => { if (!P.rivers[i] || (i === 3 && z < 2.2) || (i === 2 && z < 1.5)) return; ctx.lineWidth = w / s; ctx.stroke(P.rivers[i]); });
+  ctx.lineWidth = 0.9 / s; ctx.strokeStyle = "#8E9A72"; ctx.stroke(P.land);
+  if (P.borders) { ctx.setLineDash([3 / s, 2 / s]); ctx.strokeStyle = "#9A8F6A"; ctx.stroke(P.borders); ctx.setLineDash([]); }
+  // Brouillard : couche opaque trouée en dégradé autour des lieux d'observation
+  if (!mapFog) mapFog = document.createElement("canvas");
+  if (mapFog.width !== cv.width || mapFog.height !== cv.height) { mapFog.width = cv.width; mapFog.height = cv.height; }
+  const f = mapFog.getContext("2d");
+  f.globalCompositeOperation = "source-over"; f.clearRect(0, 0, mapFog.width, mapFog.height);
+  f.fillStyle = "rgba(26,37,31,.86)"; f.fillRect(0, 0, mapFog.width, mapFog.height);
+  f.globalCompositeOperation = "destination-out";
+  pts.forEach(([x, y]) => {
+    const [sx, sy] = toScreen(x, y), R = r * s * dpr;
+    const gr = f.createRadialGradient(sx * dpr, sy * dpr, R * .45, sx * dpr, sy * dpr, R);
+    gr.addColorStop(0, "rgba(0,0,0,1)"); gr.addColorStop(1, "rgba(0,0,0,0)");
+    f.fillStyle = gr; f.beginPath(); f.arc(sx * dpr, sy * dpr, R, 0, 7); f.fill();
+  });
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(mapFog, 0, 0);
+  // Étiquettes et symboles, en coordonnées écran
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const discovered = (x, y) => pts.some(([px, py]) => Math.hypot(px - x, py - y) < r * .85);
+  const label = (text, x, y, size, color, weight = 600) => {
+    ctx.font = `${weight} ${size}px Figtree, system-ui, sans-serif`; ctx.textAlign = "center";
+    ctx.lineWidth = 3; ctx.strokeStyle = "rgba(255,253,245,.9)"; ctx.strokeText(text, x, y); ctx.fillStyle = color; ctx.fillText(text, x, y);
+  };
+  if (z >= 1.3) P.ranges.forEach(rg => { if (discovered(rg.xy[0], rg.xy[1]) || z >= 3) { const [x, y] = toScreen(...rg.xy); if (discovered(rg.xy[0], rg.xy[1])) label(rg.name.toUpperCase(), x, y, 9, "#6E5232", 700); } });
+  const minPop = z >= 4 ? 4e4 : z >= 2.5 ? 2e5 : z >= 1.5 ? 1e6 : 5e6;
+  m.towns.forEach(([x, y, name, pop]) => {
+    if (pop < minPop || !discovered(x, y)) return;
+    const [sx, sy] = toScreen(x, y);
+    ctx.fillStyle = "#3A3A32"; ctx.beginPath(); ctx.arc(sx, sy, pop > 1e6 ? 2.6 : 1.8, 0, 7); ctx.fill();
+    label(name, sx, sy - 5, pop > 1e6 ? 11 : 10, "#2D3A32");
+  });
+  const hot = state.mapView === "france" ? m.hotspots : [];
+  hot.forEach((h, i) => {
+    const [sx, sy] = toScreen(...h.xy), R = m.px10km * 2.6 * s;
+    ctx.beginPath(); ctx.arc(sx, sy, R, 0, 7);
+    ctx.fillStyle = state.hot === i ? "rgba(242,165,65,.55)" : "rgba(242,165,65,.28)"; ctx.fill();
+    ctx.setLineDash(state.hot === i ? [] : [4, 3]); ctx.lineWidth = 1.4; ctx.strokeStyle = "#F2A541"; ctx.stroke(); ctx.setLineDash([]);
+    ctx.font = "700 11px JetBrains Mono, monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = "#5A3A00"; ctx.fillText(h.observers, sx, sy); ctx.textBaseline = "alphabetic";
+  });
+  pts.forEach(([x, y], i) => {
+    const [sx, sy] = toScreen(x, y);
+    ctx.beginPath(); ctx.arc(sx, sy, 4, 0, 7); ctx.fillStyle = "#F2A541"; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = "#fff"; ctx.stroke();
+    if (z >= 2) label(placeName(labels[i]), sx, sy + 15, 10, "#8A4B00", 700);
+  });
 }
 function attachMapNav() {
-  const svg = document.getElementById("mapsvg");
-  if (!svg || !mapData || mapData.error) return;
-  mapApply(svg, state.mapVB[state.mapView] || [0, 0, mapData[state.mapView].width, mapData[state.mapView].height]);
+  const cv = document.getElementById("mapcv");
+  if (!cv || !mapData || mapData.error) return;
+  drawMap();
   const pts = new Map(); let last = null, moved = 0;
-  const toUser = (e) => {
-    const rc = svg.getBoundingClientRect(), vb = state.mapVB[state.mapView];
+  const toMapXY = e => {
+    const rc = cv.getBoundingClientRect(), vb = state.mapVB[state.mapView] || mapFull();
     return [vb[0] + (e.clientX - rc.left) / rc.width * vb[2], vb[1] + (e.clientY - rc.top) / rc.height * vb[3]];
   };
-  svg.addEventListener("pointerdown", e => { pts.set(e.pointerId, [e.clientX, e.clientY]); svg.setPointerCapture(e.pointerId); moved = 0; last = null; mapDragged = false; });
-  svg.addEventListener("pointermove", e => {
+  cv.addEventListener("pointerdown", e => { pts.set(e.pointerId, [e.clientX, e.clientY]); cv.setPointerCapture(e.pointerId); moved = 0; last = null; });
+  cv.addEventListener("pointermove", e => {
     if (!pts.has(e.pointerId)) return;
     const prev = pts.get(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]);
-    const rc = svg.getBoundingClientRect(), vb = state.mapVB[state.mapView];
-    if (pts.size === 1) {
-      const dx = (e.clientX - prev[0]) / rc.width * vb[2], dy = (e.clientY - prev[1]) / rc.height * vb[3];
-      moved += Math.abs(e.clientX - prev[0]) + Math.abs(e.clientY - prev[1]);
-      if (moved > 6) mapDragged = true;
-      mapApply(svg, [vb[0] - dx, vb[1] - dy, vb[2], vb[3]]);
-    } else if (pts.size === 2) {
-      const [a, b] = [...pts.values()];
-      const dist = Math.hypot(a[0] - b[0], a[1] - b[1]);
-      if (last) { const mid = toUser({ clientX: (a[0] + b[0]) / 2, clientY: (a[1] + b[1]) / 2 }); mapZoom(svg, dist / last, mid[0], mid[1]); }
-      last = dist; mapDragged = true;
+    const rc = cv.getBoundingClientRect(), vb = state.mapVB[state.mapView] || mapFull();
+    moved += Math.abs(e.clientX - prev[0]) + Math.abs(e.clientY - prev[1]);
+    if (pts.size === 1) mapSet([vb[0] - (e.clientX - prev[0]) / rc.width * vb[2], vb[1] - (e.clientY - prev[1]) / rc.height * vb[3], vb[2], vb[3]]);
+    else if (pts.size === 2) {
+      const [a, b] = [...pts.values()], dist = Math.hypot(a[0] - b[0], a[1] - b[1]);
+      if (last) { const [x, y] = toMapXY({ clientX: (a[0] + b[0]) / 2, clientY: (a[1] + b[1]) / 2 }); mapZoom(dist / last, x, y); }
+      last = dist;
     }
   });
-  const up = e => { pts.delete(e.pointerId); last = null; };
-  svg.addEventListener("pointerup", up); svg.addEventListener("pointercancel", up);
-  svg.addEventListener("wheel", e => { e.preventDefault(); const [x, y] = toUser(e); mapZoom(svg, e.deltaY < 0 ? 1.25 : 0.8, x, y); }, { passive: false });
+  const up = e => {
+    const tap = pts.size === 1 && moved < 6;
+    pts.delete(e.pointerId); last = null;
+    if (!tap || e.type !== "pointerup" || state.mapView !== "france") return;
+    const [x, y] = toMapXY(e), m = mapData.france;
+    const i = m.hotspots.findIndex(h => Math.hypot(h.xy[0] - x, h.xy[1] - y) < m.px10km * 2.6);
+    if (i >= 0) { state.hot = i; render(true); }
+  };
+  cv.addEventListener("pointerup", up); cv.addEventListener("pointercancel", up);
+  cv.addEventListener("wheel", e => { e.preventDefault(); const [x, y] = toMapXY(e); mapZoom(e.deltaY < 0 ? 1.25 : 0.8, x, y); }, { passive: false });
 }
+window.addEventListener("resize", () => { if (state.view === "map") scheduleMap(); });
 
 /* Quêtes et événements */
 function questRow(q) {
@@ -2127,7 +2213,7 @@ function renderSanct() {
         <button type="button" data-w3zoom="1.25" aria-label="Éloigner">−</button>
         <button type="button" data-w3reset aria-label="Recentrer">⌖</button>
       </div>
-      ${state.decor.length ? "" : `<div class="emptyworld"><b>Votre sanctuaire est vide</b>Scannez des rochers, des arbres, une montagne ou une mare dans la vraie vie pour construire son décor.</div>`}
+      ${state.decor.length ? "" : `<div class="emptyworld"><b>Décor vide</b>Scannez rochers, arbres, montagnes ou mares pour le construire.</div>`}
       <p class="maphint">Glissez pour tourner · deux doigts ou clic droit pour vous déplacer · pincez pour zoomer</p>
     </div>
     <div class="scanbar">
@@ -2175,119 +2261,376 @@ function createWorld() {
   const renderer = new T.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.1;
   renderer.domElement.className = "w3dcanvas";
   const scene = new T.Scene();
   const camera = new T.PerspectiveCamera(48, 1, 0.1, 300);
   const orbit = { theta: 0.8, phi: 1.02, r: 30, target: new T.Vector3(0, 0, 0) };
-  const hemi = new T.HemisphereLight(0xffffff, 0x556644, 0.85); scene.add(hemi);
+  const hemi = new T.HemisphereLight(0xdfefff, 0x5a6a3a, 0.85); scene.add(hemi);
   const sun = new T.DirectionalLight(0xffffff, 0.85);
   sun.position.set(12, 24, 8); sun.castShadow = true;
   Object.assign(sun.shadow.camera, { left: -24, right: 24, top: 24, bottom: -24 });
   sun.shadow.mapSize.set(1024, 1024); scene.add(sun);
 
-  const M = c => new T.MeshLambertMaterial({ color: c, flatShading: true });
+  // ── Matériaux et textures générées (fourrure, plumes, écailles, peau lisse)
+  const lin = c => new T.Color(c).convertSRGBToLinear();
+  const shade = (c, f) => { const col = new T.Color(c); col.multiplyScalar(f); return "#" + col.getHexString(); };
+  function makeTex(kind) {
+    const c = document.createElement("canvas"); c.width = c.height = 128;
+    const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, 128, 128);
+    if (kind === "fur") for (let i = 0; i < 2600; i++) { const x = Math.random() * 128, y = Math.random() * 128; g.strokeStyle = `rgba(0,0,0,${.05 + Math.random() * .12})`; g.lineWidth = .8; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.random() * 2 - 1, y + 3 + Math.random() * 6); g.stroke(); }
+    if (kind === "feather") for (let y = 0; y < 136; y += 6) for (let x = (y / 6 % 2) * 5; x < 136; x += 10) { g.strokeStyle = "rgba(0,0,0,.14)"; g.lineWidth = 1; g.beginPath(); g.arc(x, y, 5, .15, Math.PI - .15); g.stroke(); }
+    if (kind === "scale") for (let y = 0; y < 136; y += 5) for (let x = (y / 5 % 2) * 2.5; x < 136; x += 5) { g.strokeStyle = "rgba(0,0,0,.22)"; g.beginPath(); g.arc(x, y, 2.6, 0, Math.PI); g.stroke(); }
+    if (kind === "smooth") for (let i = 0; i < 600; i++) { g.fillStyle = `rgba(0,0,0,${Math.random() * .07})`; g.beginPath(); g.arc(Math.random() * 128, Math.random() * 128, 1 + Math.random() * 2, 0, 7); g.fill(); }
+    if (kind === "grass") for (let i = 0; i < 5000; i++) { g.fillStyle = `rgba(${Math.random() < .5 ? "0,40,0" : "255,255,200"},${Math.random() * .13})`; g.fillRect(Math.random() * 128, Math.random() * 128, 1, 2 + Math.random() * 3); }
+    const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; t.encoding = T.sRGBEncoding;
+    t.repeat.set(kind === "grass" ? 14 : 2, kind === "grass" ? 14 : 2); return t;
+  }
+  const TEX = { fur: makeTex("fur"), feather: makeTex("feather"), scale: makeTex("scale"), smooth: makeTex("smooth"), grass: makeTex("grass") };
+  const mat = (c, tex = "smooth", o = {}) => new T.MeshStandardMaterial({ color: lin(c), roughness: .8, metalness: 0,
+    map: TEX[tex], bumpMap: TEX[tex], bumpScale: tex === "fur" ? .014 : tex === "scale" ? .01 : .004, ...o });
+  const M = c => mat(c, "smooth");
   const add = (g, mesh, x = 0, y = 0, z = 0) => { mesh.position.set(x, y, z); mesh.castShadow = true; g.add(mesh); return mesh; };
-  const sph = (r, c, sx = 1, sy = 1, sz = 1) => { const m = new T.Mesh(new T.SphereGeometry(r, 10, 8), M(c)); m.scale.set(sx, sy, sz); return m; };
-  const cyl = (rt, rb, h, c, seg = 7) => new T.Mesh(new T.CylinderGeometry(rt, rb, h, seg), M(c));
-  const cone = (r, h, c, seg = 7) => new T.Mesh(new T.ConeGeometry(r, h, seg), M(c));
-  const eyes = (g, y, z, dx, r = 0.05) => { add(g, sph(r, "#111"), dx, y, z); add(g, sph(r, "#111"), -dx, y, z); };
-
-  // Île du sanctuaire
-  const island = new T.Group(); scene.add(island);
-  const ground = new T.Mesh(new T.CylinderGeometry(20, 17, 3, 48, 1), M("#6FA35A"));
-  ground.position.y = -1.5; ground.receiveShadow = true; island.add(ground);
-  const soil = new T.Mesh(new T.CylinderGeometry(17, 12, 4, 48, 1), M("#6B4E34")); soil.position.y = -5; island.add(soil);
-
-  // Modèles d'animaux par plan d'organisation, colorés avec la palette (photo ou espèce)
-  function buildAnimal(sp, pal) {
-    const g = new T.Group(); const [c0, c1, c2] = [pal[0], pal[1] || pal[0], pal[2] || pal[0]];
-    const parts = { wings: [] };
-    const id = sp.id, cat = sp.cat;
-    if (cat === "mam") {
-      const leg = id === 8 ? 0.8 : id === 6 ? 0.18 : 0.5;
-      if (id === 6) { add(g, new T.Mesh(new T.IcosahedronGeometry(0.55, 1), M(c0)), 0, 0.45, 0).scale.set(1, 0.75, 1.2); add(g, sph(0.2, c1), 0, 0.35, 0.6); add(g, sph(0.05, "#111"), 0, 0.36, 0.8); }
-      else {
-        add(g, sph(0.5, c0, 0.8, 0.75, 1.35), 0, leg + 0.3, 0);
-        add(g, sph(0.3, c1, 0.7, 0.6, 1.1), 0, leg + 0.15, 0.15);
-        add(g, sph(0.33, c0), 0, leg + 0.62, 0.72);
-        add(g, cone(0.14, 0.32, c1), 0, leg + 0.55, 1.05).rotation.x = Math.PI / 2;
-        eyes(g, leg + 0.72, 0.98, 0.13);
-        [0.17, -0.17].forEach(x => add(g, cone(0.1, 0.25, c0, 4), x, leg + 0.95, 0.66));
-        [[0.24, 0.42], [-0.24, 0.42], [0.24, -0.42], [-0.24, -0.42]].forEach(([x, z]) => add(g, cyl(0.07, 0.06, leg + 0.1, c0, 5), x, (leg + 0.1) / 2, z));
-        const tail = add(g, cone(id === 5 ? 0.25 : 0.14, id === 5 ? 0.9 : 0.75, c0), 0, leg + (id === 5 ? 0.7 : 0.35), -0.85);
-        tail.rotation.x = id === 5 ? -0.3 : -Math.PI / 2 - 0.45;
-        if (id === 7 || id === 9) add(g, sph(0.1, c1), 0, leg + 0.1, -1.18);
-        if (id === 8) [0.12, -0.12].forEach(x => add(g, cyl(0.02, 0.03, 0.4, "#6B4A2E", 4), x, leg + 1.1, 0.68));
-      }
-    } else if (cat === "ois") {
-      const tall = id === 4 || id === 26;
-      const legH = id === 26 ? 0.9 : 0.2;
-      add(g, sph(0.35, c0, 0.8, 0.8, 1.25), 0, legH + 0.35, 0);
-      add(g, sph(0.28, c1, 0.75, 0.7, 1), 0, legH + 0.27, 0.08);
-      const neck = tall ? 0.7 : 0;
-      if (tall) add(g, cyl(0.07, 0.09, 0.8, c0, 5), 0, legH + 0.75, 0.3).rotation.x = 0.35;
-      add(g, sph(0.2, c2), 0, legH + 0.65 + neck, 0.32 + neck * 0.35);
-      add(g, cone(0.06, 0.2, id === 26 ? "#6B6B5A" : "#E8A33D", 5), 0, legH + 0.62 + neck, 0.55 + neck * 0.35).rotation.x = Math.PI / 2;
-      eyes(g, legH + 0.7 + neck, 0.44 + neck * 0.35, 0.1, 0.035);
-      if (id === 26) add(g, sph(0.07, "#C8322A"), 0, legH + 0.84 + neck, 0.32 + neck * 0.35);
-      [0.28, -0.28].forEach((x, i) => { const piv = new T.Group(); piv.position.set(x * 0.9, legH + 0.45, 0); g.add(piv); const w = add(piv, sph(0.3, c0, 0.25, 0.5, 1.1), x * 0.4, 0, -0.05); w.rotation.z = i ? -0.3 : 0.3; parts.wings.push(piv); });
-      add(g, sph(0.2, c0, 0.6, 0.15, 1), 0, legH + 0.35, -0.5).rotation.x = -0.3;
-      [0.1, -0.1].forEach(x => add(g, cyl(0.02, 0.02, legH + 0.1, "#9A7A4A", 4), x, (legH + 0.1) / 2, 0));
-      parts.fly = id !== 4 && id !== 26 && id !== 3;
-    } else if (cat === "ins" || cat === "ara") {
-      if (id === 10) { add(g, sph(0.35, c0, 1, 0.6, 1.1), 0, 0.22, 0); add(g, sph(0.15, c1), 0, 0.18, 0.38); [[0.15, 0.1], [-0.15, 0.1], [0.13, -0.15], [-0.13, -0.15], [0, 0.3], [0.2, -0.3], [-0.2, -0.3]].forEach(([x, z]) => add(g, sph(0.06, c1), x, 0.4, z)); }
-      else if (cat === "ara") {
-        add(g, sph(0.35, c0, 1, 0.85, 1.15), 0, 0.4, -0.2); add(g, sph(0.2, c0), 0, 0.3, 0.3);
-        [[0, 0.62, -0.1], [0, 0.6, -0.3], [0.1, 0.58, -0.2], [-0.1, 0.58, -0.2]].forEach(([x, y, z]) => add(g, sph(0.05, c1), x, y, z));
-        for (let i = 0; i < 8; i++) { const side = i < 4 ? 1 : -1, k = i % 4; const l = add(g, cyl(0.025, 0.02, 0.8, c0, 4), side * 0.4, 0.3, 0.45 - k * 0.2); l.rotation.z = side * 1.1; l.rotation.y = (k - 1.5) * 0.3 * side; }
-      } else {
-        const big = id === 12 ? 1 : 0;
-        const body = id === 13 ? [c0, c0, c1] : [c0, c1, c0];
-        add(g, sph(0.12, body[2]), 0, 0.35, 0.35); add(g, sph(0.15, body[1]), 0, 0.35, 0.12);
-        [0, 1, 2].forEach(k => add(g, sph(0.17 - k * 0.02, k % 2 ? c1 : c0, 1, 1, 0.9), 0, 0.33, -0.12 - k * 0.2));
-        eyes(g, 0.42, 0.44, 0.07, 0.035);
-        for (let i = 0; i < 6; i++) { const side = i < 3 ? 1 : -1; const l = add(g, cyl(0.015, 0.015, id === 13 && i % 3 === 2 ? 0.7 : 0.4, "#2A2A22", 4), side * 0.15, 0.2, 0.2 - (i % 3) * 0.18); l.rotation.z = side * 0.9; }
-        [1, -1].forEach(side => { const piv = new T.Group(); piv.position.set(side * 0.08, 0.48, 0.05); g.add(piv);
-          const wm = big ? M(c0) : new T.MeshLambertMaterial({ color: "#ffffff", transparent: true, opacity: .55 });
-          const w = new T.Mesh(new T.PlaneGeometry(big ? 0.9 : 0.5, big ? 0.7 : 0.22), wm); w.material.side = T.DoubleSide;
-          w.rotation.x = -Math.PI / 2; w.position.x = side * (big ? 0.45 : 0.25); piv.add(w);
-          if (big) { const spot = new T.Mesh(new T.CircleGeometry(0.1, 8), M(c1)); spot.rotation.x = -Math.PI / 2; spot.position.set(side * 0.55, 0.01, -0.15); piv.add(spot); }
-          parts.wings.push(piv); });
-        parts.fly = id !== 13;
-      }
-    } else if (cat === "rep") {
-      if (id === 15) { add(g, sph(0.55, c0, 1, 0.55, 1.2), 0, 0.35, 0); add(g, sph(0.18, c1), 0, 0.3, 0.72); [[0.35, 0.4], [-0.35, 0.4], [0.35, -0.4], [-0.35, -0.4]].forEach(([x, z]) => add(g, sph(0.12, c1), x, 0.12, z)); eyes(g, 0.36, 0.86, 0.08, 0.03); }
-      else { add(g, sph(0.25, c0, 0.8, 0.5, 2.2), 0, 0.2, 0); add(g, sph(0.16, c0, 0.9, 0.6, 1.4), 0, 0.22, 0.62); eyes(g, 0.3, 0.75, 0.09, 0.03);
-        add(g, cone(0.12, 1.2, c1), 0, 0.15, -1.1).rotation.x = -Math.PI / 2;
-        [[0.25, 0.35], [-0.25, 0.35], [0.25, -0.3], [-0.25, -0.3]].forEach(([x, z]) => { const l = add(g, cyl(0.04, 0.04, 0.3, c0, 4), x, 0.1, z); l.rotation.z = x > 0 ? 1 : -1; }); }
-    } else if (cat === "amp") {
-      add(g, sph(0.4, c0, 1, 0.7, 1.1), 0, 0.3, 0); add(g, sph(0.3, c1, 0.9, 0.5, 0.9), 0, 0.2, 0.1);
-      [0.18, -0.18].forEach(x => { add(g, sph(0.11, c0), x, 0.55, 0.28); add(g, sph(0.06, "#111"), x, 0.58, 0.36); });
-      [0.35, -0.35].forEach(x => add(g, sph(0.15, c0, 1, 0.5, 1.6), x, 0.12, -0.2));
-    } else if (cat === "mol") {
-      if (id === 21) { add(g, sph(0.45, c0, 1, 1.2, 1), 0, 0.9, 0); eyes(g, 0.85, 0.4, 0.15, 0.05);
-        for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; const t = add(g, cone(0.08, 0.9, c1, 5), Math.cos(a) * 0.3, 0.35, Math.sin(a) * 0.3); t.rotation.x = Math.PI; t.rotation.z = Math.cos(a) * 0.4; } }
-      else { add(g, sph(0.2, c1, 0.8, 0.5, 2.2), 0, 0.12, 0.1); const shell = add(g, sph(0.35, c0), 0, 0.42, -0.1);
-        const spiral = new T.Mesh(new T.TorusGeometry(0.2, 0.05, 6, 16), M(c1)); spiral.rotation.y = Math.PI / 2; add(g, spiral, 0.2, 0.42, -0.1);
-        [0.06, -0.06].forEach(x => add(g, cyl(0.015, 0.015, 0.3, c1, 4), x, 0.3, 0.52).rotation.x = 0.5); shell.scale.set(0.8, 1, 1); }
-    } else if (cat === "poi") {
-      const k = id === 18 ? 2.2 : 1;
-      add(g, sph(0.35 * k, c0, 0.5, 0.8, 1.5), 0, 0, 0);
-      add(g, cone(0.25 * k, 0.4 * k, c0, 4), 0, 0, -0.6 * k).rotation.x = Math.PI / 2;
-      eyes(g, 0.1 * k, 0.4 * k, 0.12 * k, 0.04 * k);
-      if (id === 17) [0.25, -0.1, -0.4].forEach(z => { const ring = new T.Mesh(new T.TorusGeometry(0.2, 0.04, 4, 12), M(c1)); ring.scale.set(0.9, 1.4, 1); add(g, ring, 0, 0, z); });
-      if (id === 18) for (let i = 0; i < 14; i++) add(g, sph(0.05, c1), (seeded(i) - .5) * 0.3, 0.15 + seeded(i + 3) * 0.3, (seeded(i + 7) - .5) * 1.6);
-    } else if (cat === "cru") {
-      add(g, sph(0.4, c0, 1.2, 0.45, 0.9), 0, 0.25, 0); eyes(g, 0.4, 0.35, 0.1, 0.04);
-      [0.45, -0.45].forEach(x => add(g, sph(0.13, c1, 1, 0.8, 1.3), x, 0.3, 0.4));
-      for (let i = 0; i < 6; i++) { const side = i < 3 ? 1 : -1; const l = add(g, cyl(0.03, 0.03, 0.5, c0, 4), side * 0.5, 0.15, 0.1 - (i % 3) * 0.2); l.rotation.z = side * 1.2; }
+  const ball = (r, c, tex = "smooth", sx = 1, sy = 1, sz = 1, o) => { const m = new T.Mesh(new T.SphereGeometry(r, 24, 18), mat(c, tex, o)); m.scale.set(sx, sy, sz); m.castShadow = true; return m; };
+  const sph = (r, c, sx, sy, sz) => ball(r, c, "smooth", sx, sy, sz);
+  const cyl = (rt, rb, h, c, seg = 12) => new T.Mesh(new T.CylinderGeometry(rt, rb, h, seg), M(c));
+  const cone = (r, h, c, seg = 12) => new T.Mesh(new T.ConeGeometry(r, h, seg), M(c));
+  const put = (g, m, x = 0, y = 0, z = 0) => add(g, m, x, y, z);
+  const Y = new T.Vector3(0, 1, 0);
+  function limb(g, a, b, r0, r1, c, tex = "smooth") {
+    const A = new T.Vector3(...a), B = new T.Vector3(...b), len = A.distanceTo(B);
+    const m = new T.Mesh(new T.CylinderGeometry(r1, r0, len, 12, 1), mat(c, tex));
+    m.position.copy(A).add(B).multiplyScalar(.5); m.quaternion.setFromUnitVectors(Y, B.clone().sub(A).normalize()); m.castShadow = true; g.add(m);
+    const j = ball(r1, c, tex); j.position.copy(B); g.add(j); return m;
+  }
+  const chain = (g, pts, radii, colors, tex) => pts.forEach((p, i) => put(g, ball(radii[i], Array.isArray(colors) ? colors[i] : colors, tex), ...p));
+  function eye(g, x, y, z, r, iris = "#1a1410") {
+    const glossy = { roughness: .12, bumpMap: null, map: null };
+    put(g, ball(r, iris, "smooth", 1, 1, 1, glossy), x, y, z);
+    if (iris !== "#1a1410") put(g, ball(r * .55, "#0b0b0b", "smooth", 1, 1, .4, glossy), x + Math.sign(x) * r * .35, y, z + r * .55);
+    put(g, ball(r * .28, "#ffffff", "smooth", 1, 1, 1, { ...glossy, roughness: .05, emissive: lin("#888") }), x + Math.sign(x) * r * .25, y + r * .4, z + r * .75);
+  }
+  function wingTexture(kind, c0, c1) {
+    const c = document.createElement("canvas"); c.width = 256; c.height = 128; const g = c.getContext("2d");
+    if (kind === "butterfly") {
+      g.fillStyle = c0; g.strokeStyle = "#141414"; g.lineWidth = 7;
+      g.beginPath(); g.moveTo(8, 60); g.bezierCurveTo(80, -10, 230, 0, 250, 30); g.bezierCurveTo(200, 70, 120, 70, 8, 64); g.fill(); g.stroke();
+      g.beginPath(); g.moveTo(8, 66); g.bezierCurveTo(90, 70, 170, 80, 160, 110); g.lineTo(175, 126); g.lineTo(140, 112); g.bezierCurveTo(90, 125, 30, 100, 8, 70); g.fill(); g.stroke();
+      g.lineWidth = 2.5; for (let i = 0; i < 6; i++) { g.beginPath(); g.moveTo(10, 62); g.lineTo(60 + i * 32, 12 + i * 6); g.stroke(); }
+      g.fillStyle = "#141414"; g.fillRect(150, 18, 70, 12);
+      [[120, 96], [100, 100], [80, 99]].forEach(([x, y]) => { g.fillStyle = "#3C63B8"; g.beginPath(); g.arc(x, y, 5, 0, 7); g.fill(); });
+      g.fillStyle = "#D2352A"; g.beginPath(); g.arc(142, 104, 6, 0, 7); g.fill();
     } else {
-      add(g, sph(0.4, c0), 0, 0.4, 0);
+      g.fillStyle = "rgba(230,240,255,.45)"; g.strokeStyle = "rgba(60,60,60,.6)"; g.lineWidth = 2;
+      g.beginPath(); g.ellipse(128, 64, 120, 42, 0, 0, 7); g.fill(); g.stroke();
+      g.lineWidth = 1; for (let i = 0; i < 7; i++) { g.beginPath(); g.moveTo(10, 64); g.quadraticCurveTo(128, 20 + i * 14, 245, 64); g.stroke(); }
     }
+    const t = new T.CanvasTexture(c); t.encoding = T.sRGBEncoding; return t;
+  }
+  function wingPlane(w, h, tex) {
+    const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshStandardMaterial({ map: tex, transparent: true, alphaTest: .05, side: T.DoubleSide, roughness: .6 }));
+    m.rotation.x = -Math.PI / 2; m.castShadow = true; return m;
+  }
+
+  // Île du sanctuaire : herbe texturée, touffes, sous-sol
+  const island = new T.Group(); scene.add(island);
+  const ground = new T.Mesh(new T.CylinderGeometry(20, 17, 3, 64, 1), mat("#6FA35A", "grass", { roughness: .95, bumpScale: .02 }));
+  ground.position.y = -1.5; ground.receiveShadow = true; island.add(ground);
+  const soil = new T.Mesh(new T.CylinderGeometry(17, 12, 4, 48, 1), mat("#6B4E34", "fur")); soil.position.y = -5; island.add(soil);
+  const tuftMat = mat("#5E9A45", "smooth");
+  const tufts = new T.InstancedMesh(new T.ConeGeometry(.025, .18, 4), tuftMat, 2600), tm = new T.Matrix4(), tq = new T.Quaternion(), te = new T.Euler();
+  for (let i = 0; i < 2600; i++) {
+    const a = Math.random() * 6.28, rr = Math.sqrt(Math.random()) * 19.3; te.set((Math.random() - .5) * .5, 0, (Math.random() - .5) * .5); tq.setFromEuler(te);
+    const sc = .6 + Math.random() * .9; tm.compose(new T.Vector3(Math.cos(a) * rr, .15 * sc, Math.sin(a) * rr), tq, new T.Vector3(sc, sc, sc)); tufts.setMatrixAt(i, tm);
+  }
+  island.add(tufts);
+
+  // ── Mammifères : torse modelé, pattes articulées, tête détaillée, queue
+  function quad(pal, o) {
+    const g = new T.Group(), [c0, c1] = [pal[0], pal[1] || pal[0]], dark = shade(c0, .45), tex = "fur";
+    const { w, len, h } = o;
+    put(g, ball(w, c0, tex, 1, .92, len / w), 0, h, 0);
+    put(g, ball(w * 1.02, c0, tex, 1, 1.02, 1), 0, h + w * .06, len * .55);
+    put(g, ball(w * 1.06, c0, tex, 1, .98, 1.08), 0, h + w * .03, -len * .55);
+    put(g, ball(w * .78, c1, tex, .92, .55, len / w * .8), 0, h - w * .38, .04);
+    put(g, ball(w * .5, c1, tex, 1, 1.05, .6), 0, h + w * .02, len * .9);
+    const neckTop = [0, h + o.neck + w * .45, len * .98 + o.neck * .4];
+    limb(g, [0, h + w * .3, len * .7], neckTop, w * .66, o.hs * .7, c0, tex);
+    const head = new T.Group(); head.position.set(...neckTop); g.add(head);
+    put(head, ball(o.hs, c0, tex, .92, .86, 1), 0, o.hs * .15, o.hs * .15);
+    const muz = new T.Mesh(new T.CylinderGeometry(o.hs * .2, o.hs * .5, o.muz, 16), mat(c0, tex)); muz.rotation.x = Math.PI / 2; muz.position.set(0, 0, o.hs * .75 + o.muz * .45); muz.castShadow = true; head.add(muz);
+    put(head, ball(o.hs * .42, c1, tex, 1, .55, 1.5), 0, -o.hs * .22, o.hs * .7 + o.muz * .3);
+    put(head, ball(o.hs * .15, "#1b1512", "smooth", 1.15, .8, .9, { roughness: .25 }), 0, o.hs * .04, o.hs * .75 + o.muz * .92);
+    [1, -1].forEach(sd => {
+      eye(head, sd * o.hs * .44, o.hs * .38, o.hs * .7, o.hs * .12, o.iris);
+      const ear = new T.Mesh(new T.ConeGeometry(o.ear[0], o.ear[1], 18), mat(c0, tex)); ear.scale.z = .45;
+      ear.position.set(sd * o.hs * .48, o.hs * .95 + o.ear[1] * .3, o.hs * .02); ear.rotation.z = -sd * .28; ear.castShadow = true; head.add(ear);
+      const inner = new T.Mesh(new T.ConeGeometry(o.ear[0] * .6, o.ear[1] * .75, 14), mat(o.earIn || c1, tex)); inner.scale.z = .3;
+      inner.position.set(sd * o.hs * .48, o.hs * .9 + o.ear[1] * .26, o.hs * .06); inner.rotation.z = -sd * .28; head.add(inner);
+    });
+    if (o.antlers) [1, -1].forEach(sd => { limb(head, [sd * o.hs * .3, o.hs * .9, 0], [sd * o.hs * .55, o.hs * 1.9, -o.hs * .2], .03, .02, "#6B4A2E"); limb(head, [sd * o.hs * .42, o.hs * 1.35, -o.hs * .1], [sd * o.hs * .3, o.hs * 1.75, o.hs * .25], .02, .015, "#6B4A2E"); });
+    const legs = [], pawR = w * .17, L = h - w * .1 - pawR * .6;
+    [[1, 1], [-1, 1], [1, -1], [-1, -1]].forEach(([sx, sz], i) => {
+      const piv = new T.Group(); piv.position.set(sx * w * .58, h - w * .1, sz > 0 ? len * .55 : -len * .52); g.add(piv);
+      const knee = [0, -L * .52, sz > 0 ? .02 : -.07];
+      limb(piv, [0, 0, 0], knee, w * .36, w * .19, c0, tex);
+      limb(piv, knee, [0, -L, .02], w * .18, w * .13, o.socks ? dark : c0, tex);
+      put(piv, ball(pawR, o.socks ? dark : shade(c0, .8), tex, 1, .55, 1.4), 0, -L - pawR * .15, pawR * .5);
+      legs.push({ piv, phase: [0, Math.PI, Math.PI, 0][i] });
+    });
+    const tail = new T.Group(); tail.position.set(0, h + w * .25, -len * .95 - w * .25); g.add(tail);
+    const n = 9, pts = [], rad = [], col = [];
+    for (let i = 0; i < n; i++) {
+      const t = i / (n - 1);
+      pts.push([0, o.tailUp ? t * o.tail * 1.1 - t * t * o.tail * .2 : -t * o.tail * .55 + t * t * o.tail * .25, -t * o.tail * (o.tailUp ? .45 : 1)]);
+      rad.push(o.tailR * (o.bushy ? .55 + Math.sin(t * Math.PI * .85) * .75 : 1 - t * .75));
+      col.push(o.tip && i >= n - 2 ? c1 : c0);
+    }
+    chain(tail, pts, rad, col, tex);
+    return { group: g, parts: { legs, tail, head, wings: [] } };
+  }
+  function hedgehog(pal) {
+    const g = new T.Group(), [c0, c1] = pal;
+    put(g, ball(.55, shade(c0, .9), "fur", 1, .72, 1.25), 0, .42, 0);
+    const inst = new T.InstancedMesh(new T.ConeGeometry(.025, .26, 5), mat(shade(c0, .7), "smooth"), 260), q = new T.Quaternion(), mtx = new T.Matrix4(), v = new T.Vector3();
+    for (let i = 0; i < 260; i++) {
+      const u = Math.random(), th = Math.random() * Math.PI * 2, ph = Math.acos(1 - u * .95);
+      v.set(Math.sin(ph) * Math.cos(th), Math.cos(ph), Math.min(.75, Math.sin(ph) * Math.sin(th))).normalize();
+      q.setFromUnitVectors(Y, new T.Vector3(v.x, v.y, v.z - .35).normalize());
+      mtx.compose(new T.Vector3(v.x * .52, .42 + v.y * .38, v.z * .66 - .05), q, new T.Vector3(1, 1, 1)); inst.setMatrixAt(i, mtx);
+    }
+    inst.castShadow = true; g.add(inst);
+    const head = new T.Group(); head.position.set(0, .3, .6); g.add(head);
+    put(head, ball(.2, c1, "fur", 1, .9, 1.1));
+    const snout = new T.Mesh(new T.CylinderGeometry(.05, .14, .26, 14), mat(c1, "fur")); snout.rotation.x = Math.PI / 2; snout.position.z = .2; head.add(snout);
+    put(head, ball(.045, "#111"), 0, .01, .34); [1, -1].forEach(sd => eye(head, sd * .1, .08, .12, .035));
+    const legs = [];
+    [[1, 1], [-1, 1], [1, -1], [-1, -1]].forEach(([sx, sz], i) => { const piv = new T.Group(); piv.position.set(sx * .3, .2, sz * .35); g.add(piv); limb(piv, [0, 0, 0], [0, -.17, .02], .06, .05, c1, "fur"); legs.push({ piv, phase: i % 3 ? Math.PI : 0 }); });
+    return { group: g, parts: { legs, head, wings: [] } };
+  }
+
+  // ── Oiseaux : corps en œuf, plastron, ailes à rémiges, queue en éventail, pattes à doigts
+  function bird(pal, o) {
+    const g = new T.Group(), [c0, c1, c2] = [pal[0], pal[1] || pal[0], pal[2] || pal[0]], s = o.s, tex = "feather";
+    const by = o.leg + s * .34;
+    const body = new T.Group(); body.position.y = by; body.rotation.x = o.upright ? -.5 : o.neck ? -.05 : -.22; g.add(body);
+    put(body, ball(s * .34, c0, tex, .86, .8, 1.25));
+    put(body, ball(s * .3, c1, tex, .82, .76, 1.02), 0, -s * .09, s * .1);
+    const tail = new T.Group(); tail.position.set(0, s * .02, -s * .36); body.add(tail);
+    for (let i = -2; i <= 2; i++) { const f = ball(s * .07, shade(c0, .85), tex, 1, .22, 3.3); f.position.set(i * s * .045, 0, -s * .18); f.rotation.y = i * .13; tail.add(f); }
+    const wings = [];
+    [1, -1].forEach(sd => {
+      const piv = new T.Group(); piv.position.set(sd * s * .25, s * .1, s * .06); body.add(piv);
+      put(piv, ball(s * .2, c0, tex, .28, .72, 1.9), sd * s * .02, 0, -s * .12);
+      for (let k = 0; k < 5; k++) { const f = ball(s * .05, shade(c0, .62), tex, .45, .3, 3.6); f.position.set(sd * s * .035, -s * .03 - k * s * .008, -s * .3 - k * s * .03); f.rotation.y = sd * k * .07; piv.add(f); }
+      wings.push(piv);
+    });
+    let hp;
+    if (o.neck) {
+      const pts = [], rad = [], n = 10;
+      for (let i = 0; i < n; i++) { const t = i / (n - 1); pts.push([0, by + s * .12 + t * o.neck, s * .3 + t * o.neck * .3 + (o.swan ? Math.sin(t * Math.PI) * o.neck * .22 : 0)]); rad.push(s * (.11 - .04 * t)); }
+      chain(g, pts, rad, o.neckC || c0, tex); hp = [0, pts[n - 1][1] + s * .04, pts[n - 1][2] + s * .05];
+    } else hp = [0, by + s * .27 + (o.upright ? s * .12 : 0), s * .32 - (o.upright ? s * .1 : 0)];
+    const head = new T.Group(); head.position.set(...hp); g.add(head);
+    const hk = o.headK || 1;
+    put(head, ball(s * .17 * hk, c2, tex, 1, .96, 1.05));
+    if (o.cheek) [1, -1].forEach(sd => put(head, ball(s * .075, o.cheek, tex, .35, .8, 1.05), sd * s * .13 * hk, -s * .02, s * .03));
+    if (o.collar) chain(g, [[0, hp[1] - s * .17, hp[2] - s * .05]], [s * .12], o.collar, tex);
+    if (o.crown) put(head, ball(s * .07, o.crown, tex, 1, .45, 1.1), 0, s * .15 * hk, -s * .02);
+    if (o.disc) put(head, ball(s * .15 * hk, o.disc, tex, 1, 1, .35), 0, 0, s * .1 * hk);
+    const beak = new T.Mesh(new T.ConeGeometry(s * .05 * (o.beakW || 1), o.beak, 16), mat(o.beakC, "smooth", { roughness: .35 }));
+    beak.rotation.x = Math.PI / 2; beak.position.set(0, -s * .02, s * .15 * hk + o.beak * .45); beak.castShadow = true; head.add(beak);
+    [1, -1].forEach(sd => eye(head, sd * s * .1 * hk, s * .05 * hk, s * .1 * hk, s * .035 * hk, o.iris));
+    const legC = o.legC || "#8a6f4a";
+    [1, -1].forEach(sd => {
+      limb(g, [sd * s * .1, by - s * .15, 0], [sd * s * .1, s * .03, s * .02], s * .035, s * .022, legC);
+      [-.55, 0, .55].forEach(a => limb(g, [sd * s * .1, s * .03, s * .02], [sd * s * .1 + Math.sin(a) * s * .12, .01, s * .02 + Math.cos(a) * s * .12], s * .014, s * .01, legC));
+    });
+    return { group: g, parts: { wings, head, tail, fly: o.fly } };
+  }
+
+  // ── Insectes et araignées
+  function insect(id, pal) {
+    const g = new T.Group(), [c0, c1] = pal, dark = "#1c1a16", wings = [];
+    if (id === 10) {
+      put(g, ball(.32, c0, "smooth", 1, .62, 1.12, { roughness: .22 }), 0, .2, 0);
+      [[.14, .1], [-.14, .1], [.12, -.16], [-.12, -.16], [0, .3], [.2, -.3], [-.2, -.3]].forEach(([x, z]) => put(g, ball(.055, c1, "smooth", 1, .35, 1, { roughness: .3 }), x, .37 - Math.abs(z) * .15, z));
+      put(g, ball(.16, dark, "smooth", 1.1, .7, .8, { roughness: .3 }), 0, .16, .36);
+      [1, -1].forEach(sd => put(g, ball(.05, "#fff", "smooth", 1, .6, 1), sd * .07, .23, .38));
+      for (let i = 0; i < 6; i++) { const sd = i < 3 ? 1 : -1, k = i % 3; limb(g, [sd * .2, .1, .15 - k * .15], [sd * .36, 0, .2 - k * .18], .015, .012, dark); }
+    } else if (id === 12) {
+      chain(g, [[0, .5, .22], [0, .5, .1], [0, .5, -.05], [0, .49, -.2], [0, .48, -.33]], [.07, .06, .05, .045, .035], dark, "fur");
+      [1, -1].forEach(sd => { const piv = new T.Group(); piv.position.set(sd * .04, .52, 0); g.add(piv); const w = wingPlane(1.2, .6, wingTexture("butterfly", c0, c1)); w.scale.x = sd; w.position.x = sd * .6; piv.add(w); wings.push(piv); });
+      [1, -1].forEach(sd => limb(g, [sd * .02, .54, .26], [sd * .12, .75, .5], .008, .006, dark));
+    } else {
+      const bee = id === 11 || id === 23, hopper = id === 13, L = hopper ? 1.4 : 1;
+      put(g, ball(.13, dark, "smooth", 1, 1, 1.1), 0, .45, .36 * L);
+      [1, -1].forEach(sd => put(g, ball(.075, "#3a2a1a", "smooth", .8, 1.1, .9, { roughness: .15 }), sd * .09, .48, .4 * L));
+      put(g, ball(.17, bee ? c1 : c0, bee ? "fur" : "smooth", 1, .95, 1.1), 0, .46, .12 * L);
+      const segs = hopper ? 5 : 4;
+      for (let k = 0; k < segs; k++) put(g, ball(.2 - k * .02, k % 2 ? c1 : c0, bee ? "fur" : "smooth", 1, .9, .7), 0, .42 - k * .01, (-.1 - k * .13) * L);
+      if (id === 23) put(g, ball(.12, "#f4f0e0", "fur", 1, .9, .7), 0, .39, -.1 - segs * .13);
+      if (!hopper) [1, -1].forEach(sd => { const piv = new T.Group(); piv.position.set(sd * .06, .6, .1); g.add(piv); const w = wingPlane(.62, .24, wingTexture("clear")); w.scale.x = sd; w.position.x = sd * .3; w.position.z = -.08; piv.add(w); wings.push(piv); });
+      for (let i = 0; i < 6; i++) {
+        const sd = i < 3 ? 1 : -1, k = i % 3, big = hopper && k === 2;
+        const knee = [sd * (big ? .22 : .2), big ? .72 : .5, (.2 - k * .16) * L];
+        limb(g, [sd * .08, .38, (.18 - k * .12) * L], knee, big ? .045 : .02, .018, big ? c0 : dark);
+        limb(g, knee, [sd * (big ? .3 : .28), .02, (.2 - k * .16 - (big ? .35 : 0)) * L], .018, .012, dark);
+      }
+      [1, -1].forEach(sd => limb(g, [sd * .05, .55, .45 * L], [sd * .2, hopper ? .9 : .7, hopper ? 1.3 : .62], .01, .008, dark));
+      if (id === 24) g.scale.setScalar(.85);
+    }
+    return { group: g, parts: { wings, fly: id !== 10 && id !== 13 } };
+  }
+  function spider(pal) {
+    const g = new T.Group(), [c0, c1] = pal;
+    put(g, ball(.36, c0, "fur", 1, .85, 1.15), 0, .45, -.25);
+    [[0, .78, -.1], [0, .76, -.28], [.12, .74, -.2], [-.12, .74, -.2], [0, .7, -.45]].forEach(p => put(g, ball(.05, c1, "smooth", 1, .5, 1), ...p));
+    put(g, ball(.2, shade(c0, .8), "fur", 1, .8, 1.1), 0, .35, .25);
+    for (let i = 0; i < 8; i++) {
+      const sd = i < 4 ? 1 : -1, k = i % 4, z = .38 - k * .12, knee = [sd * .55, .72, z + (1.5 - k) * .18];
+      limb(g, [sd * .1, .38, z * .6], knee, .035, .03, shade(c0, .6), "fur");
+      limb(g, knee, [sd * .85, .02, z + (1.5 - k) * .35], .03, .015, shade(c0, .6), "fur");
+    }
+    return { group: g, parts: { wings: [] } };
+  }
+
+  // ── Reptiles, amphibiens
+  function lizard(pal) {
+    const g = new T.Group(), [c0, c1] = pal, pts = [], rad = [], col = [], n = 22;
+    for (let i = 0; i < n; i++) { const t = i / (n - 1); pts.push([Math.sin(t * 5) * .06, .2 - t * .08, .75 - t * 2]); rad.push(t < .12 ? .12 + t * .3 : t < .4 ? .16 : .16 * (1 - (t - .4) / .6 * .9)); col.push(i % 3 ? c0 : shade(c0, .78)); }
+    chain(g, pts, rad, col, "scale");
+    put(g, ball(.14, c1, "scale", 1, .5, 2.5), 0, .1, .25);
+    [1, -1].forEach(sd => eye(g, sd * .09, .28, .78, .035, "#b8962e"));
+    const legs = [];
+    [[1, .5], [-1, .5], [1, -.1], [-1, -.1]].forEach(([sd, z], i) => {
+      const piv = new T.Group(); piv.position.set(sd * .12, .2, z); g.add(piv);
+      limb(piv, [0, 0, 0], [sd * .22, -.02, .06], .05, .035, c0, "scale"); limb(piv, [sd * .22, -.02, .06], [sd * .28, -.19, .14], .035, .025, c0, "scale");
+      legs.push({ piv, phase: [0, Math.PI, Math.PI, 0][i], axis: "y" });
+    });
+    return { group: g, parts: { legs, wings: [] } };
+  }
+  function turtle(pal) {
+    const g = new T.Group(), [c0, c1] = pal;
+    const tc = document.createElement("canvas"); tc.width = tc.height = 128; const x2 = tc.getContext("2d");
+    x2.fillStyle = c0; x2.fillRect(0, 0, 128, 128); x2.strokeStyle = "rgba(30,20,5,.7)"; x2.lineWidth = 3;
+    for (let yy = 0; yy < 5; yy++) for (let xx = 0; xx < 6; xx++) { const cx = xx * 24 + (yy % 2) * 12, cy = yy * 28; x2.beginPath(); for (let a = 0; a < 6; a++) x2.lineTo(cx + Math.cos(a * Math.PI / 3) * 13, cy + Math.sin(a * Math.PI / 3) * 13); x2.closePath(); x2.stroke(); x2.fillStyle = "rgba(230,190,90,.35)"; x2.fill(); }
+    const st = new T.CanvasTexture(tc); st.encoding = T.sRGBEncoding;
+    const shell = new T.Mesh(new T.SphereGeometry(.6, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), new T.MeshStandardMaterial({ map: st, roughness: .5 }));
+    shell.scale.set(1, .75, 1.2); shell.position.y = .2; shell.castShadow = true; g.add(shell);
+    put(g, ball(.6, shade(c1, 1.3), "scale", 1, .12, 1.2), 0, .2, 0);
+    limb(g, [0, .22, .6], [0, .3, .85], .1, .09, c1, "scale");
+    put(g, ball(.14, c1, "scale", .9, .8, 1.2), 0, .32, .95); [1, -1].forEach(sd => eye(g, sd * .08, .37, 1.02, .03));
+    const legs = [];
+    [[1, .4], [-1, .4], [1, -.45], [-1, -.45]].forEach(([sd, z], i) => { const piv = new T.Group(); piv.position.set(sd * .45, .15, z); g.add(piv); put(piv, ball(.13, c1, "scale", 1, .8, 1.2), 0, -.05, 0); legs.push({ piv, phase: i % 3 ? Math.PI : 0 }); });
+    return { group: g, parts: { legs, wings: [] } };
+  }
+  function frog(pal) {
+    const g = new T.Group(), [c0, c1] = pal, o = { roughness: .35 };
+    put(g, ball(.4, c0, "smooth", 1, .62, 1.15, o), 0, .3, 0);
+    put(g, ball(.34, shade(c1, 1.5), "smooth", .95, .5, 1.05, o), 0, .22, .05);
+    put(g, ball(.3, c0, "smooth", 1.1, .6, .9, o), 0, .36, .32);
+    [1, -1].forEach(sd => {
+      put(g, ball(.11, c0, "smooth", 1, 1, 1, o), sd * .17, .5, .38); eye(g, sd * .19, .53, .44, .07, "#c9a13a");
+      put(g, ball(.14, c0, "smooth", .8, .55, 1.7, o), sd * .36, .2, -.2); put(g, ball(.1, c0, "smooth", .7, .4, 1.8, o), sd * .42, .08, .02);
+      put(g, ball(.08, shade(c0, .9), "smooth", 1.3, .25, 1.5, o), sd * .45, .02, .28);
+      limb(g, [sd * .2, .22, .35], [sd * .26, .02, .48], .04, .03, c0);
+    });
+    [[.1, -.1], [-.12, .1], [.05, .2]].forEach(([x, z]) => put(g, ball(.05, shade(c0, .55), "smooth", 1, .3, 1), x, .52, z));
+    return { group: g, parts: { wings: [] } };
+  }
+
+  // ── Mollusques, poissons, crustacés
+  function snail(pal) {
+    const g = new T.Group(), [c0] = pal;
+    put(g, ball(.2, "#9a8c7c", "smooth", .7, .45, 2.3, { roughness: .3 }), 0, .1, .1);
+    // Coquille : trois tours de spire de plus en plus petits, vus de profil
+    const shell = new T.Group(); shell.position.set(0, .4, -.08); g.add(shell);
+    [[.2, .12, 0, 0], [.12, .08, .05, .06], [.06, .045, .09, .1]].forEach(([R, tube, x, y], i) => {
+      const w = new T.Mesh(new T.TorusGeometry(R, tube, 16, 40), mat(i % 2 ? shade(c0, .82) : c0, "smooth", { roughness: .35 }));
+      w.rotation.y = Math.PI / 2; w.position.set(x, y, 0); w.castShadow = true; shell.add(w);
+    });
+    put(shell, ball(.09, shade(c0, .7), "smooth", .9, 1, 1, { roughness: .35 }), .1, .1, 0);
+    [1, -1].forEach(sd => { limb(g, [sd * .05, .2, .5], [sd * .1, .45, .62], .018, .012, "#8a7c6c"); put(g, ball(.028, "#222"), sd * .1, .47, .63); });
+    return { group: g, parts: { wings: [] } };
+  }
+  function fishTexture(id, c0, c1) {
+    const c = document.createElement("canvas"); c.width = 64; c.height = 256; const g = c.getContext("2d");
+    g.fillStyle = c0; g.fillRect(0, 0, 64, 256);
+    if (id === 17) [70, 130, 200].forEach(y => { g.fillStyle = "#111"; g.fillRect(0, y - 14, 64, 28); g.fillStyle = c1; g.fillRect(0, y - 10, 64, 20); });
+    if (id === 18) for (let i = 0; i < 120; i++) { g.fillStyle = "rgba(245,245,235,.9)"; g.beginPath(); g.arc(Math.random() * 64, Math.random() * 256, 1.5 + Math.random() * 2, 0, 7); g.fill(); }
+    const t = new T.CanvasTexture(c); t.encoding = T.sRGBEncoding; return t;
+  }
+  function fish(id, pal) {
+    const g = new T.Group(), [c0, c1] = pal, k = id === 18 ? 2.4 : 1;
+    const prof = [[0, -.55], [.07, -.48], [.14, -.34], [.2, -.12], [.22, .05], [.19, .25], [.12, .42], [.04, .52], [0, .55]].map(([r, y]) => new T.Vector2(r * k, y * k));
+    const body = new T.Mesh(new T.LatheGeometry(prof, 28), new T.MeshStandardMaterial({ map: fishTexture(id, c0, c1), roughness: .3, metalness: .05 }));
+    body.rotation.x = Math.PI / 2; body.scale.x = .7; body.castShadow = true; g.add(body);
+    const fin = (pts, c) => { const sh = new T.Shape(); pts.forEach(([x, y], i) => i ? sh.lineTo(x * k, y * k) : sh.moveTo(x * k, y * k)); const m = new T.Mesh(new T.ShapeGeometry(sh), mat(c, "smooth", { side: T.DoubleSide, roughness: .4 })); m.castShadow = true; return m; };
+    const tail = new T.Group(); tail.position.z = -.52 * k; g.add(tail);
+    const tf = fin([[0, 0], [.28, .22], [.18, 0], [.28, -.22]], id === 17 ? c0 : shade(c0, .8)); tf.rotation.y = Math.PI / 2; tail.add(tf);
+    const df = fin([[0, 0], [-.18, .2], [-.34, 0]], shade(c0, .85)); df.rotation.y = Math.PI / 2; df.position.set(0, .18 * k, .15 * k); g.add(df);
+    [1, -1].forEach(sd => { const pf = ball(.1 * k, shade(c0, .85), "smooth", .15, .5, 1); pf.position.set(sd * .13 * k, -.06 * k, .15 * k); pf.rotation.z = sd * .6; g.add(pf); eye(g, sd * .12 * k, .06 * k, .38 * k, .035 * k); });
+    return { group: g, parts: { tail, wings: [] } };
+  }
+  function octopus(pal) {
+    const g = new T.Group(), [c0, c1] = pal;
+    put(g, ball(.42, c0, "smooth", .9, 1.2, 1, { roughness: .45 }), 0, .9, -.1);
+    [1, -1].forEach(sd => eye(g, sd * .2, .8, .22, .06, "#c9a13a"));
+    for (let i = 0; i < 8; i++) {
+      const a = i / 8 * Math.PI * 2, pts = [];
+      for (let j = 0; j < 6; j++) { const t = j / 5, R = .2 + t * .75; pts.push(new T.Vector3(Math.cos(a + t * .6) * R, .55 - t * .5 + Math.sin(t * 5 + i) * .05, Math.sin(a + t * .6) * R)); }
+      const tube = new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(pts), 24, .055, 8), mat(i % 2 ? c0 : c1, "smooth", { roughness: .45 }));
+      tube.castShadow = true; g.add(tube);
+    }
+    return { group: g, parts: { wings: [] } };
+  }
+  function crab(pal) {
+    const g = new T.Group(), [c0, c1] = pal;
+    put(g, ball(.42, c0, "smooth", 1.25, .45, .95, { roughness: .4 }), 0, .32, 0);
+    [1, -1].forEach(sd => {
+      limb(g, [sd * .12, .45, .3], [sd * .14, .62, .38], .02, .02, c0); put(g, ball(.045, "#111"), sd * .14, .64, .38);
+      limb(g, [sd * .35, .3, .25], [sd * .55, .35, .5], .06, .05, c0); put(g, ball(.14, c1, "smooth", 1, .7, 1.3, { roughness: .35 }), sd * .6, .35, .65);
+      for (let k = 0; k < 3; k++) { const knee = [sd * .75, .4, .1 - k * .2]; limb(g, [sd * .4, .3, .1 - k * .15], knee, .04, .035, c0); limb(g, knee, [sd * .95, .02, .05 - k * .22], .035, .02, c0); }
+    });
+    return { group: g, parts: { wings: [] } };
+  }
+
+  // ── Choix du gabarit selon l'espèce, avec les proportions propres à chacune
+  const QUAD = {
+    7: { w: .3, len: .7, h: .6, neck: .22, hs: .25, muz: .3, ear: [.1, .24], tail: .95, tailR: .15, bushy: true, tip: true, socks: true, iris: "#b8862a" },
+    9: { w: .36, len: .85, h: .82, neck: .28, hs: .3, muz: .34, ear: [.11, .22], tail: .75, tailR: .13, bushy: true, iris: "#b89a3a" },
+    8: { w: .3, len: .78, h: 1.0, neck: .5, hs: .23, muz: .3, ear: [.12, .28], tail: .12, tailR: .08, antlers: true, earIn: "#e8d8c8" },
+    5: { w: .18, len: .34, h: .3, neck: .06, hs: .16, muz: .1, ear: [.05, .14], tail: .7, tailR: .14, bushy: true, tailUp: true },
+  };
+  const BIRD = {
+    1: { s: .8, leg: .14, beak: .08, beakC: "#222", cheek: "#F5F5F0", fly: true },
+    2: { s: 1.1, leg: .1, beak: .07, beakC: "#C9B07A", headK: 1.5, disc: "#B89A74", upright: true, fly: true },
+    3: { s: 1.2, leg: .12, beak: .2, beakC: "#E3C23A", beakW: 1.6, collar: "#F5F5F0", legC: "#E8862A" },
+    4: { s: 1.6, leg: .16, neck: 1.0, swan: true, beak: .22, beakC: "#E26A2C", legC: "#333" },
+    25: { s: .75, leg: .08, beak: .05, beakC: "#222", fly: true },
+    26: { s: 1.4, leg: 1.1, neck: .9, beak: .26, beakC: "#6B6B5A", crown: "#C8322A", neckC: "#1C1C1C", legC: "#333" },
+  };
+  function buildAnimal(sp, pal) {
+    const id = sp.id, cat = sp.cat;
+    let a;
+    if (cat === "mam") a = id === 6 ? hedgehog(pal) : quad(pal, QUAD[id] || { w: .28, len: .62, h: .55, neck: .2, hs: .23, muz: .24, ear: [.08, .18], tail: .5, tailR: .08 });
+    else if (cat === "ois") a = bird(pal, BIRD[id] || { s: .9, leg: .14, beak: .1, beakC: "#3a3228", fly: true });
+    else if (cat === "ins") a = insect(id, pal);
+    else if (cat === "ara") a = spider(pal);
+    else if (cat === "rep") a = id === 15 ? turtle(pal) : lizard(pal);
+    else if (cat === "amp") a = frog(pal);
+    else if (cat === "mol") a = id === 21 ? octopus(pal) : snail(pal);
+    else if (cat === "poi") a = fish(id, pal);
+    else if (cat === "cru") a = crab(pal);
+    else a = { group: new T.Group(), parts: { wings: [] } };
     // Zone de contact invisible, plus large que le modèle, pour pouvoir le toucher au doigt
-    const hit = new T.Mesh(new T.SphereGeometry(cat === "poi" && id === 18 ? 2 : 1, 8, 6), new T.MeshBasicMaterial({ visible: false }));
-    hit.position.y = 0.5; g.add(hit);
-    return { group: g, parts };
+    const hit = new T.Mesh(new T.SphereGeometry(id === 18 ? 2 : 1, 8, 6), new T.MeshBasicMaterial({ visible: false }));
+    hit.position.y = .5; a.group.add(hit);
+    return a;
   }
 
   function buildCompanion() {
@@ -2306,7 +2649,12 @@ function createWorld() {
 
   function buildDecor(d) {
     const g = new T.Group(); const k = d.size;
-    if (d.type === "rock") { const m = add(g, new T.Mesh(new T.IcosahedronGeometry(0.8, 0), M(d.color)), 0, 0.4 * k, 0); m.scale.set(1.3 * k, 0.8 * k, 1.1 * k); m.rotation.y = d.rot; }
+    if (d.type === "rock") {
+      const geo = new T.IcosahedronGeometry(0.8, 2), pos = geo.attributes.position;
+      for (let i = 0; i < pos.count; i++) { const f = 1 + (seeded(i + d.rot * 10) - .5) * .28; pos.setXYZ(i, pos.getX(i) * f, pos.getY(i) * f, pos.getZ(i) * f); }
+      geo.computeVertexNormals();
+      const m = add(g, new T.Mesh(geo, mat(d.color, "smooth", { roughness: .95, bumpScale: .03 })), 0, 0.35 * k, 0); m.scale.set(1.3 * k, 0.8 * k, 1.1 * k); m.rotation.y = d.rot; m.receiveShadow = true;
+    }
     else if (d.type === "tree") {
       const conifer = /Pin|Sapin/.test(d.variant), birch = /Bouleau/.test(d.variant);
       add(g, cyl(0.15 * k, 0.22 * k, 1.8 * k, birch ? "#EDEDE6" : conifer && /Pin/.test(d.variant) ? "#A0522D" : "#6B4A2E", 6), 0, 0.9 * k, 0);
@@ -2354,7 +2702,7 @@ function createWorld() {
     const cond = CONDS[state.cond].id;
     const sky = cond === "night" ? "#0E1630" : cond === "rain" ? "#8E9AA6" : SKY[state.biome];
     scene.background = new T.Color(sky); scene.fog = new T.Fog(sky, 45, 90);
-    if (lastBiome !== state.biome) { ground.material.color.set(GROUND[state.biome]); lastBiome = state.biome; }
+    if (lastBiome !== state.biome) { ground.material.color.copy(lin(GROUND[state.biome])); tuftMat.color.copy(lin(shade(GROUND[state.biome], .8))); lastBiome = state.biome; }
     hemi.intensity = cond === "night" ? 0.28 : cond === "rain" ? 0.6 : 0.85;
     sun.intensity = cond === "night" ? 0.2 : cond === "rain" ? 0.35 : 0.85;
     sun.color.set(cond === "night" ? "#8FA3FF" : "#ffffff");
@@ -2377,7 +2725,7 @@ function createWorld() {
       const built = buildAnimal(sp, pal);
       const kind = AQUATIC.has(sp.id) || sp.cat === "poi" ? "swim" : built.parts.fly ? "fly" : "ground";
       const [x, z] = randomSpot(kind);
-      const size = sp.cat === "ins" || sp.cat === "ara" ? 1.1 : sp.id === 18 ? 1 : 1;
+      const size = sp.cat === "ins" ? 1.3 : 1;
       built.group.scale.setScalar(size);
       built.group.position.set(x, kind === "swim" ? -0.25 : 0, z);
       built.group.userData = { kind: "animal", id: sp.id };
@@ -2436,7 +2784,9 @@ function createWorld() {
     if (mode === "pan") pan(dx, dy);
     else { orbit.theta += dx * 0.008; orbit.phi = Math.min(1.45, Math.max(0.3, orbit.phi - dy * 0.006)); }
   });
+  let follow = false;
   function pan(dx, dy) {
+    follow = false;
     const k = orbit.r * 0.0022;
     // droite caméra = (sin θ, −cos θ), avant = (−cos θ, −sin θ)
     orbit.target.x += (-Math.sin(orbit.theta) * dx - Math.cos(orbit.theta) * dy) * k;
@@ -2454,7 +2804,7 @@ function createWorld() {
     const hit = ray.intersectObjects(objs, true)[0];
     let o = hit && hit.object; while (o && !o.userData.kind) o = o.parent;
     if (!o) { state.sel = null; }
-    else if (o.userData.kind === "animal") state.sel = { kind: "animal", id: o.userData.id };
+    else if (o.userData.kind === "animal") { state.sel = { kind: "animal", id: o.userData.id }; follow = true; setTimeout(focus, 0); }
     else if (o.userData.kind === "decor") state.sel = { kind: "decor", uid: o.userData.uid };
     else state.sel = { kind: "companion" };
     state.toast = null; sync(); updateSanctPanel();
@@ -2487,7 +2837,10 @@ function createWorld() {
       if (jump) { const k = (t - jump) / 0.6; if (k > 1) jumps.delete(sp.id); else jy = Math.sin(k * Math.PI) * 0.8; }
       if (a.kind === "fly") { g.position.y = sleeping ? 0 : 1.6 + Math.sin(t * 2 + a.phase) * 0.3 + jy; a.parts.wings.forEach((w, i) => { w.rotation.z = sleeping ? 0 : Math.sin(t * 18 + a.phase) * 0.6 * (i ? -1 : 1); }); }
       else if (a.kind === "swim") { g.position.y = -0.25 + Math.sin(t * 2 + a.phase) * 0.06 + jy; }
-      else { g.position.y = (moving ? Math.abs(Math.sin(t * 9 + a.phase)) * 0.06 : 0) + jy; a.parts.wings.forEach((w, i) => { w.rotation.z = moving ? 0 : Math.sin(t * 3 + a.phase) * 0.1 * (i ? -1 : 1); }); }
+      else { g.position.y = (moving ? Math.abs(Math.sin(t * 9 + a.phase)) * 0.03 : 0) + jy; a.parts.wings.forEach((w, i) => { w.rotation.z = moving ? 0 : Math.sin(t * 3 + a.phase) * 0.1 * (i ? -1 : 1); }); }
+      (a.parts.legs || []).forEach(l => { const target = moving ? Math.sin(t * 9 * a.speed + a.phase + l.phase) * .5 : 0; if (l.axis === "y") l.piv.rotation.y += (target * .8 - l.piv.rotation.y) * .3; else l.piv.rotation.x += (target - l.piv.rotation.x) * .3; });
+      if (a.parts.tail) a.parts.tail.rotation.y = Math.sin(t * (a.kind === "swim" ? 7 : 2.2) + a.phase) * (a.kind === "swim" ? .35 : .22);
+      if (a.parts.head && !sleeping) a.parts.head.rotation.y = Math.sin(t * .7 + a.phase) * .25;
       g.scale.y = sleeping ? g.scale.x * 0.8 : g.scale.x;
     }
     if (companion) {
@@ -2502,13 +2855,16 @@ function createWorld() {
       }
     }
     if (rain.visible) { const arr = rain.geometry.attributes.position.array; for (let i = 1; i < arr.length; i += 3) { arr[i] -= 22 * dt; if (arr[i] < 0) arr[i] = 20; } rain.geometry.attributes.position.needsUpdate = true; }
+    if (follow && state.sel && state.sel.kind === "animal") {
+      const o = animals.get(state.sel.id); if (o) { orbit.target.x += (o.group.position.x - orbit.target.x) * .08; orbit.target.z += (o.group.position.z - orbit.target.z) * .08; orbit.target.y += (o.group.position.y + .4 - orbit.target.y) * .08; }
+    }
     placeCamera(); renderer.render(scene, camera);
   }
   function start() { if (!raf) { lastT = performance.now(); raf = requestAnimationFrame(tick); } }
   function zoom(f) { orbit.r = Math.min(55, Math.max(7, orbit.r * f)); }
-  function reset() { orbit.theta = 0.8; orbit.phi = 1.02; orbit.r = 30; orbit.target.set(0, 0, 0); }
+  function reset() { follow = false; orbit.theta = 0.8; orbit.phi = 1.02; orbit.r = 30; orbit.target.set(0, 0, 0); }
   function jump(id) { jumps.set(id, performance.now() / 1000); }
-  function focus(sel) { const o = selected(); if (o) { orbit.target.set(o.position.x, 0, o.position.z); orbit.r = Math.min(orbit.r, 16); } }
+  function focus() { const o = selected(); if (o) { follow = !!(state.sel && state.sel.kind === "animal"); orbit.target.set(o.position.x, .5, o.position.z); orbit.r = Math.min(orbit.r, 9); orbit.phi = 1.22; } }
   window.addEventListener("resize", resize);
   return { renderer, resize, sync, start, zoom, reset, jump, focus };
 }
@@ -2971,7 +3327,7 @@ function showBadges(list, i) {
 }
 
 document.addEventListener("click", e => {
-  const t = e.target.closest("button, [data-fiche], [data-hot]");
+  const t = e.target.closest("button, [data-fiche]");
   if (!t) return;
   if (t.id === "reset") { resetState(); $layer.innerHTML = ""; render(); return; }
   if (t.id === "shoot") return shoot();
@@ -2994,14 +3350,14 @@ document.addEventListener("click", e => {
     return showBadges(state.pending, Number(t.dataset.next));
   }
   if (t.dataset.mapview) { state.mapView = t.dataset.mapview; state.hot = null; return render(true); }
-  if (t.dataset.hot !== undefined) { if (mapDragged && t.tagName !== "BUTTON") { mapDragged = false; return; } state.hot = Number(t.dataset.hot); return render(true); }
-  if (t.dataset.mapzoom) { const svg = document.getElementById("mapsvg"); if (svg) mapZoom(svg, Number(t.dataset.mapzoom)); return; }
-  if ("mapall" in t.dataset) { const svg = document.getElementById("mapsvg"); if (svg) mapApply(svg, [0, 0, mapData[state.mapView].width, mapData[state.mapView].height]); return; }
+  if (t.dataset.hot !== undefined) { state.hot = Number(t.dataset.hot); return render(true); }
+  if (t.dataset.mapzoom) { mapZoom(Number(t.dataset.mapzoom)); return; }
+  if ("mapall" in t.dataset) { mapSet(mapFull()); return; }
   if ("mapreset" in t.dataset) {
     // Autour de moi : centré sur Lyon (position simulée), zoom ×4
-    const svg = document.getElementById("mapsvg"), m = mapData[state.mapView];
+    const m = mapData[state.mapView];
     const [cx, cy] = m.places["Monts du Lyonnais"]; const w = m.width / 4, h = m.height / 4;
-    if (svg) mapApply(svg, [cx - w / 2, cy - h / 2, w, h]); return;
+    mapSet([cx - w / 2, cy - h / 2, w, h]); return;
   }
   if (t.dataset.w3zoom) { W3 && W3.zoom(Number(t.dataset.w3zoom)); return; }
   if ("w3reset" in t.dataset) { W3 && W3.reset(); return; }
