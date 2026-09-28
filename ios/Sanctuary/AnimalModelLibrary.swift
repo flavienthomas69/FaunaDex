@@ -19,11 +19,17 @@ enum AnimalAssetCatalog {
         "Strix aluco": AnimalAsset(file: "owl_lowpoly.usdz", height: 0.6),
         "Vulpes vulpes": AnimalAsset(file: "fox_lowpoly.usdz", height: 0.55),
         "Chamaeleo calyptratus": AnimalAsset(file: "chameleon_lowpoly.usdz", height: 0.3),
+        "Cervus elaphus": AnimalAsset(file: "stag.usdz", height: 1.4),
+        "Capreolus capreolus": AnimalAsset(file: "roe.usdz", height: 0.75),
     ]
     static let byFamily: [String: AnimalAsset] = [
         "Strigidae": AnimalAsset(file: "owl_lowpoly.usdz", height: 0.55),
         "Canidae": AnimalAsset(file: "fox_lowpoly.usdz", height: 0.6),
         "Chamaeleonidae": AnimalAsset(file: "chameleon_lowpoly.usdz", height: 0.3),
+        // Modèles animés déjà testés dans la maquette (docs/maquette/models, à convertir en .usdz avec Reality Converter)
+        "Cervidae": AnimalAsset(file: "hind.usdz", height: 1.1),
+        "Ursidae": AnimalAsset(file: "bear.usdz", height: 1.0),
+        "Equidae": AnimalAsset(file: "horse.usdz", height: 1.5),
     ]
 
     static func asset(scientificName: String, family: String?) -> AnimalAsset? {
@@ -85,13 +91,22 @@ final class AnimalModelLibrary {
         return wrapper
     }
 
-    /// Les animations contenues dans le fichier (marche, repos…) sont jouées en boucle.
-    static func playAllAnimations(in root: SCNNode) {
+    /// Joue en boucle une seule animation par nœud : celle dont le nom contient `preferred` (« idle » par défaut),
+    /// sinon la première. Les autres (marche, galop…) sont mises en pause : les jouer toutes à la fois mélangerait les poses.
+    /// Attention : un .usdz ne garde souvent qu'une seule animation ; exporter un fichier par clip si besoin.
+    static func playAllAnimations(in root: SCNNode, preferred: String = "idle") {
         root.enumerateHierarchy { node, _ in
-            for key in node.animationKeys {
+            let keys = node.animationKeys
+            guard !keys.isEmpty else { return }
+            let chosen = keys.first { $0.lowercased().contains(preferred) } ?? keys[0]
+            for key in keys {
                 guard let player = node.animationPlayer(forKey: key) else { continue }
-                player.animation.repeatCount = .greatestFiniteMagnitude
-                player.play()
+                if key == chosen {
+                    player.animation.repeatCount = .greatestFiniteMagnitude
+                    player.play()
+                } else {
+                    player.stop()
+                }
             }
         }
     }

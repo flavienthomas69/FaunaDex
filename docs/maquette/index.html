@@ -2369,7 +2369,7 @@ function renderSanct() {
       <div class="chips" style="padding:0">${sanctLayout().sectors.map(s => `<button type="button" class="chip" data-sbiome="${s.b}">${SB[s.b].icon} ${SB[s.b].name} <small>${sanctAnimals().filter(sp => habitatOf(sp) === s.b).length}</small></button>`).join("")}</div>
       <p class="count" style="margin:8px 0 0">Chaque biome apparaît quand vous trouvez une espèce qui y vit. Des rivières les séparent et rejoignent le lac central.</p></div>
     <div class="gbif-note" style="margin-top:12px"><b>Comment ça marche</b>Chaque animal photographié en vrai apparaît ici en 3D, avec les couleurs extraites de votre photo, dans le biome où il vit : forêt, prairie, zone humide, montagne, garrigue, savane ou littoral. Les rochers, arbres et montagnes scannés s'ajoutent de préférence dans le biome qui leur correspond. La météo suit la vôtre : sous la pluie, les amphibiens et les escargots sortent et les autres s'abritent sous les arbres ; la nuit, seuls les animaux nocturnes restent actifs.</div>
-    <div class="sources">Animaux sculptés et articulés par le moteur de FaunaDex ; cigogne et flamant de mirada (projet ro.me, exemples three.js) ; arbres et rochers de Kenney (CC0).</div>
+    <div class="sources">Cerf, biche, chevreuil et ours : Ultimate Animated Animal Pack de Quaternius (CC0), recolorés par le projet postojomierz ; renard : PixelMannen (CC0) et tomkranis (CC-BY 4.0) ; cheval, cigogne et flamant : mirada (ro.me, exemples three.js) ; arbres et rochers : Kenney (CC0) ; autres animaux sculptés par FaunaDex.</div>
     <div class="bpad"></div>`;
 }
 
@@ -2383,7 +2383,7 @@ function loadThree() {
   return threeLoading;
 }
 // Modèles 3D réalisés par des artistes (voir docs/maquette/models/LICENCES.md)
-const MODEL_FILES = ["stork", "flamingo", "tree-big", "tree-small", "palm-short", "formation-rock", "formation-large-rock", "formation-stone"];
+const MODEL_FILES = ["fox", "horse", "stag", "hind", "roe", "bear", "stork", "flamingo", "tree-big", "tree-small", "palm-short", "formation-rock", "formation-large-rock", "formation-stone"];
 let MODELS = null, modelsLoading = null;
 function loadScriptOnce(src, test) {
   if (test()) return Promise.resolve(true);
@@ -3454,7 +3454,21 @@ function createWorld() {
     for (let i = 0; i < a.count; i++) { col.setRGB(a.getX(i), a.getY(i), a.getZ(i)).convertLinearToSRGB(); const o = map(col).convertSRGBToLinear(); a.setXYZ(i, o.r, o.g, o.b); }
     a.needsUpdate = true;
   }
-  const MODEL_DEF = { stork: { len: 1.8 }, flamingo: { len: 1.9 } };
+  // Boîte englobante réelle : pour un maillage à squelette, on applique les os à chaque sommet
+  // (la géométrie brute est dans la pose de liaison, parfois à une tout autre échelle)
+  function modelBox(root) {
+    root.updateMatrixWorld(true);
+    const box = new T.Box3(), v = new T.Vector3();
+    root.traverse(o => {
+      if (!o.isMesh) return;
+      if (!o.isSkinnedMesh) { box.expandByObject(o); return; }
+      o.skeleton.update();
+      const n = o.geometry.attributes.position.count, step = Math.max(1, Math.floor(n / 1500));
+      for (let i = 0; i < n; i += step) { o.boneTransform(i, v.fromBufferAttribute(o.geometry.attributes.position, i)); box.expandByPoint(v.applyMatrix4(o.matrixWorld)); }
+    });
+    return box;
+  }
+  const MODEL_DEF = { fox: { len: 1.35 }, horse: { len: 2.3 }, stag: { len: 2.3 }, hind: { len: 1.9 }, roe: { len: 1.45 }, bear: { len: 2.1 }, stork: { len: 1.8 }, flamingo: { len: 1.9 } };
   function modelInstance(name, pal, scale = 1) {
     const src = MODELS[name], def = MODEL_DEF[name] || { len: 1 };
     let skinned = false; src.scene.traverse(o => { if (o.isSkinnedMesh) skinned = true; });
@@ -3467,7 +3481,7 @@ function createWorld() {
       if (map && o.material.map) o.material.map = recolorTexture(o.material.map, map);
       if (map && o.geometry.attributes.color) { o.geometry = o.geometry.clone(); recolorVertices(o.geometry, map); }
     });
-    if (!src.box) { src.box = new T.Box3().setFromObject(src.scene); src.size = src.box.getSize(new T.Vector3()); }
+    if (!src.box) { src.box = modelBox(src.scene); src.size = src.box.getSize(new T.Vector3()); }
     const k = def.len / Math.max(src.size.x, src.size.z) * scale;
     root.scale.multiplyScalar(k); root.position.y = -src.box.min.y * k;
     const g = new T.Group(); g.add(root);
@@ -3484,10 +3498,41 @@ function createWorld() {
       m.mixer.update(dt);
     } } };
   }
-  // Modèles d'artiste gardés pour les échassiers sans gabarit sculpté (hérons, cigognes, flamants)
+  // Modèle d'artiste articulé (squelette + animations dessinées à la main : repos, marche, galop, manger)
+  // Couleurs : chaque matériau porte un rôle (principal, clair, foncé) rempli avec la palette de l'espèce ou de la photo
+  function riggedModel(name, pal, scale, roles) {
+    const m = modelInstance(name, roles ? null : pal, scale);
+    m.g.traverse(o => {
+      if (!o.isMesh) return;
+      const r = roles && pal && roles[o.material.name];
+      if (r) o.material.color.copy(lin(r(pal)));
+      o.material.flatShading = true; o.material.roughness = .88; o.material.metalness = 0; o.material.needsUpdate = true;
+    });
+    const acts = {}; m.clips.forEach(c => { acts[c.name] = m.mixer.clipAction(c); });
+    const pick = (...n) => n.map(k => acts[k]).find(Boolean);
+    const A = { idle: pick("Idle", "Survey"), walk: pick("Walk"), run: pick("Gallop", "Run"), eat: pick("Eating") };
+    let cur = null, eatUntil = 0, nextEat = 3 + Math.random() * 8;
+    const play = a => { if (!a || cur === a) return; a.reset().setEffectiveWeight(1).fadeIn(.4).play(); if (cur) cur.fadeOut(.4); cur = a; };
+    play(A.idle); if (cur) cur.time = Math.random() * cur.getClip().duration;
+    return { group: m.g, parts: { wings: [], update({ t, dt, moving, speed, sleeping }) {
+      if (!moving && !sleeping && A.eat && t > nextEat) { eatUntil = t + 3.5 + Math.random() * 3; nextEat = eatUntil + 8 + Math.random() * 12; }
+      play(sleeping ? A.idle : moving ? (speed > 1.25 && A.run ? A.run : A.walk) : t < eatUntil ? A.eat : A.idle);
+      if (cur) cur.timeScale = sleeping ? .25 : moving ? (cur === A.run ? .7 + speed * .25 : .6 + speed * .45) : 1;
+      m.mixer.update(dt);
+    } } };
+  }
+  const QROLES = { Main: p => p[0], Main_Light: p => p[1] || p[0], Main_Dark: p => shade(p[0], .6), Material: p => shade(p[0], .75), "Material.001": p => p[0], "Material.003": p => p[1] || p[0] };
+  // Modèles d'artiste : cervidés, ours, renard et canidés, cheval, échassiers ; les autres espèces restent sculptées
   function modelFor(sp) {
     if (!MODELS) return null;
-    const fam = sp.family || "", photo = (state.captured[sp.id] || {}).palette || null;
+    const fam = sp.family || "", gen = (sp.sci || "").split(" ")[0], photo = (state.captured[sp.id] || {}).palette || null;
+    if ((sp.id === 7 || gen === "Vulpes") && MODELS.fox) return riggedModel("fox", photo, 1);
+    if (fam === "Canidae" && MODELS.fox) return riggedModel("fox", photo || (sp.id === 9 ? ["#8D8A84", "#DCD7CE", "#3A3836"] : mammalColors(sp) || ["#8D8A84", "#DCD7CE"]), sp.id === 9 || gen === "Canis" ? 1.4 : 1.1);
+    if (gen === "Capreolus" && MODELS.roe) return riggedModel("roe", photo, 1, QROLES);
+    if (sp.sci === "Cervus elaphus" && MODELS.stag) return riggedModel("stag", photo, 1, QROLES);
+    if (fam === "Cervidae" && MODELS.hind) return riggedModel("hind", photo || mammalColors(sp), 1, QROLES);
+    if (fam === "Ursidae" && MODELS.bear) return riggedModel("bear", photo || (gen === "Ursus" && /maritimus/.test(sp.sci) ? ["#EDE8DA", "#F7F3E8"] : null), 1, QROLES);
+    if (fam === "Equidae" && MODELS.horse) return morphModel("horse", photo, 1);
     if (/Ardeidae|Ciconiidae/.test(fam) && MODELS.stork) return morphModel("stork", photo, 1, { fly: true, hover: true });
     if (/Phoenicopteridae/.test(fam) && MODELS.flamingo) return morphModel("flamingo", photo, 1, { fly: true, hover: true });
     return null;
@@ -3786,10 +3831,14 @@ function createWorld() {
       let turn = 0;
       if (moving) {
         const sp2 = a.speed * (cond === "rain" && TRAITS.rain.includes(sp.id) ? 1.6 : 1) * (a.kind === "fly" ? 2 : 1) * (a.parts.sideways ? .7 : 1);
-        g.position.x += dx / dist * sp2 * dt; g.position.z += dz / dist * sp2 * dt;
         const want = Math.atan2(dx, dz) + (a.parts.sideways ? Math.PI / 2 : 0);
         turn = ((want - g.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
-        g.rotation.y += turn * Math.min(1, dt * 4);
+        g.rotation.y += turn * Math.min(1, dt * 3);
+        if (a.parts.sideways || a.kind !== "ground") { g.position.x += dx / dist * sp2 * dt; g.position.z += dz / dist * sp2 * dt; }
+        else {
+          const k = Math.max(.15, Math.cos(turn)) * sp2 * dt;                 // ralentit dans les virages, avance droit devant
+          g.position.x += Math.sin(g.rotation.y) * k; g.position.z += Math.cos(g.rotation.y) * k;
+        }
       }
       const flying = a.kind === "fly" && (moving || (a.parts.hover && !sleeping));
       const jump = jumps.get(sp.id); let jy = 0;
