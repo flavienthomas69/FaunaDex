@@ -2554,10 +2554,16 @@ function createWorld() {
     }
     inst.count = n; inst.castShadow = true; inst.receiveShadow = true; return inst;
   }
+  // Fusionne des pièces simples en un seul maillage coloré (sapins en cônes empilés…)
+  function mergeColored(parts) {
+    const P = [], C = [], c = new T.Color();
+    parts.forEach(([g, hex]) => { const ng = g.toNonIndexed(), pa = ng.attributes.position; c.set(hex).convertSRGBToLinear(); for (let i = 0; i < pa.count; i++) { P.push(pa.getX(i), pa.getY(i), pa.getZ(i)); C.push(c.r, c.g, c.b); } });
+    const out = new T.BufferGeometry(); out.setAttribute("position", new T.Float32BufferAttribute(P, 3)); out.setAttribute("color", new T.Float32BufferAttribute(C, 3)); out.computeVertexNormals(); return out;
+  }
   function buildTerrain() {
     if (terrain) { island.remove(terrain); terrain.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
     terrain = new T.Group(); island.add(terrain);
-    const RINGS = 72, SEG = 200, RMAX = 26;
+    const RINGS = 36, SEG = 104, RMAX = 26;
     const pos = [], col = [], uv = [], idx = [], c = new T.Color();
     for (let i = 0; i <= RINGS; i++) {
       const r = Math.pow(i / RINGS, 1.08) * RMAX;
@@ -2570,7 +2576,7 @@ function createWorld() {
         else if (h > 2.35) c.set("#F2F2EE");
         else if (h > 1.5) c.set(mixHex("#8E8A80", "#A7A298", seeded(i + j)));
         else c.set(SB[b].ground);
-        c.offsetHSL(0, 0, (seeded(i * 7.3 + j * 1.7) - .5) * .06); c.convertSRGBToLinear(); col.push(c.r, c.g, c.b);
+        c.offsetHSL(0, 0, (seeded(i * 7.3 + j * 1.7) - .5) * .05); c.convertSRGBToLinear(); col.push(c.r, c.g, c.b);
       }
     }
     for (let i = 0; i < RINGS; i++) for (let j = 0; j < SEG; j++) { const a = i * (SEG + 1) + j, b = a + SEG + 1; idx.push(a, a + 1, b, a + 1, b + 1, b); }
@@ -2580,32 +2586,32 @@ function createWorld() {
     const ground = new T.Mesh(geo, new T.MeshStandardMaterial({ vertexColors: true, roughness: .95, flatShading: LOWPOLY }));
     ground.receiveShadow = true; terrain.add(ground);
     // Végétation propre à chaque biome
-    const tuftGeo = new T.ConeGeometry(.03, .22, 4); tuftGeo.translate(0, .11, 0);
-    terrain.add(scatter(1400, tuftGeo, new T.MeshStandardMaterial({ roughness: .9 }), (b, h) => h > .26 && h < 1.5 && b !== "coast",
-      b => ({ s: .7 + Math.random() * .9, c: shade(SB[b].tuft, .85 + Math.random() * .3), tilt: (Math.random() - .5) * .4 })));
-    const flowerGeo = new T.SphereGeometry(.07, 8, 6); flowerGeo.translate(0, .22, 0);
-    terrain.add(scatter(260, flowerGeo, new T.MeshStandardMaterial({ roughness: .6 }), (b, h) => b === "meadow" && h > .26,
-      () => ({ s: 1, c: pick(["#E3483A", "#F5C83A", "#FFFFFF", "#9A6CC8", "#F08AB0"]) })));
-    const reedGeo = new T.CylinderGeometry(.02, .025, 1.1, 5); reedGeo.translate(0, .55, 0);
-    terrain.add(scatter(260, reedGeo, new T.MeshStandardMaterial({ roughness: .8 }), (b, h) => (b === "wetland" || h < .3) && h > -.25 && h < .35,
-      () => ({ s: .7 + Math.random() * .6, c: pick(["#6E8A45", "#7F9A4E", "#8A9A5A"]), tilt: (Math.random() - .5) * .25 })));
-    const catGeo = new T.CylinderGeometry(.05, .05, .22, 8); catGeo.translate(0, 1.05, 0);
-    terrain.add(scatter(45, catGeo, new T.MeshStandardMaterial({ color: lin("#5A3A22"), roughness: .9 }), (b, h) => b === "wetland" && h > -.2 && h < .3, () => ({ s: .8 + Math.random() * .4 })));
-    const padGeo = new T.CircleGeometry(.28, 10); padGeo.rotateX(-Math.PI / 2);
-    terrain.add(scatter(120, padGeo, new T.MeshStandardMaterial({ color: lin("#4F8A3A"), roughness: .6, side: T.DoubleSide }), (b, h, r) => h < -.15 && (b === "wetland" || r < 3.5),
+    // Touffe d'herbe en lames de papier (trois triangles en éventail)
+    const blades = (w, hgt) => { const g = new T.BufferGeometry(), P = []; [-.5, 0, .5].forEach((a, i) => { const x = Math.sin(a) * hgt * .5, hh = hgt * (i === 1 ? 1 : .75); P.push(-w + i * w * .6 - w * .3, 0, 0, w + i * w * .6 - w * .3, 0, 0, x, hh, (i - 1) * w); }); g.setAttribute("position", new T.Float32BufferAttribute(P, 3)); g.computeVertexNormals(); return g; };
+    const paper = (o = {}) => new T.MeshStandardMaterial({ roughness: .9, flatShading: true, side: T.DoubleSide, ...o });
+    terrain.add(scatter(520, blades(.05, .34), paper(), (b, h) => h > .26 && h < 1.5 && b !== "coast",
+      b => ({ s: .7 + Math.random() * .8, c: shade(SB[b].tuft, .85 + Math.random() * .3) })));
+    const flowerGeo = new T.ConeGeometry(.08, .06, 5); flowerGeo.rotateX(Math.PI); flowerGeo.translate(0, .2, 0);
+    terrain.add(scatter(110, flowerGeo, paper(), (b, h) => b === "meadow" && h > .26,
+      () => ({ s: 1, c: pick(["#E86A4A", "#F2C14E", "#FBF7EF", "#B58BD6"]) })));
+    const reedGeo = blades(.03, 1);
+    terrain.add(scatter(110, reedGeo, paper(), (b, h) => (b === "wetland" || h < .3) && h > -.25 && h < .35,
+      () => ({ s: .7 + Math.random() * .5, c: pick(["#7F9A4E", "#93A95A", "#A9B86A"]) })));
+    const padGeo = new T.CircleGeometry(.28, 6); padGeo.rotateX(-Math.PI / 2);
+    terrain.add(scatter(90, padGeo, paper({ color: lin("#4F8A3A") }), (b, h, r) => h < -.15 && (b === "wetland" || r < 3.5),
       () => ({ s: .7 + Math.random() * .7, y: .02 })));
-    const fernGeo = new T.ConeGeometry(.28, .35, 12); fernGeo.translate(0, .17, 0);
-    terrain.add(scatter(120, fernGeo, new T.MeshStandardMaterial({ roughness: .8 }), (b, h) => b === "forest" && h > .26, () => ({ s: .8 + Math.random() * .7, sy: .7, c: pick(["#2F6A2E", "#3B7A34", "#46823A"]) })));
-    const capGeo = new T.SphereGeometry(.09, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2); capGeo.translate(0, .12, 0);
-    terrain.add(scatter(60, capGeo, new T.MeshStandardMaterial({ roughness: .5 }), (b, h) => b === "forest" && h > .26, () => ({ s: 1, c: pick(["#C8322A", "#B8864A", "#E8DCC8"]) })));
-    const stoneGeo = new T.IcosahedronGeometry(.25, 2);
-    terrain.add(scatter(60, stoneGeo, new T.MeshStandardMaterial({ roughness: .95 }), (b, h) => (b === "mountain" && h > .3) || (b === "coast" && h > -.1 && h < .5),
-      b => ({ s: .4 + Math.random() * 1.4, sy: .6, c: b === "coast" ? pick(["#EDE6D6", "#C9BFA8"]) : pick(["#8C8A80", "#9E9A8E", "#77746C"]) })));
-    const shrubGeo = new T.IcosahedronGeometry(.35, 3); shrubGeo.translate(0, .25, 0);
-    terrain.add(scatter(110, shrubGeo, new T.MeshStandardMaterial({ roughness: .9 }), (b, h) => (b === "scrub" || b === "savanna") && h > .26,
+    // Jeunes sapins en cônes empilés (forêt)
+    const pineGeo = mergeColored([[new T.CylinderGeometry(.04, .05, .25, 5).translate(0, .12, 0), "#5A3A22"], [new T.ConeGeometry(.32, .45, 6).translate(0, .38, 0), "#2F6B3A"], [new T.ConeGeometry(.23, .4, 6).translate(0, .64, 0), "#4E8A3A"]]);
+    terrain.add(scatter(70, pineGeo, new T.MeshStandardMaterial({ vertexColors: true, roughness: .9, flatShading: true }), (b, h) => b === "forest" && h > .26, () => ({ s: .7 + Math.random() * .7 })));
+    const capGeo = new T.ConeGeometry(.1, .08, 6); capGeo.translate(0, .13, 0);
+    terrain.add(scatter(50, capGeo, paper(), (b, h) => b === "forest" && h > .26, () => ({ s: 1, c: pick(["#C8322A", "#B8864A", "#E8DCC8"]) })));
+    const stoneGeo = new T.IcosahedronGeometry(.25, 0);
+    terrain.add(scatter(60, stoneGeo, paper(), (b, h) => (b === "mountain" && h > .3) || (b === "coast" && h > -.1 && h < .5),
+      b => ({ s: .4 + Math.random() * 1.4, sy: .6, c: b === "coast" ? pick(["#EDE6D6", "#C9BFA8"]) : pick(["#8C8A80", "#9E9A8E", "#A9A69C"]) })));
+    const shrubGeo = new T.IcosahedronGeometry(.35, 0); shrubGeo.translate(0, .25, 0);
+    terrain.add(scatter(110, shrubGeo, paper(), (b, h) => (b === "scrub" || b === "savanna") && h > .26,
       b => ({ s: .6 + Math.random() * .8, sy: .7, c: b === "savanna" ? pick(["#8E9A4E", "#A2A45A"]) : pick(["#6E7A45", "#5E6E3E", "#7F8A50"]) })));
-    const grassGeo = new T.ConeGeometry(.12, .55, 8); grassGeo.translate(0, .27, 0);
-    terrain.add(scatter(160, grassGeo, new T.MeshStandardMaterial({ roughness: .9 }), (b, h) => b === "savanna" && h > .26, () => ({ s: .7 + Math.random() * .6, c: pick(["#D6BE72", "#C8AE5E", "#E0CC86"]) })));
+    terrain.add(scatter(180, blades(.07, .6), paper(), (b, h) => b === "savanna" && h > .26, () => ({ s: .7 + Math.random() * .6, c: pick(["#D6BE72", "#C8AE5E", "#E0CC86"]) })));
     // Noms des biomes au-dessus de leur secteur
     if (layout.sectors.length > 1) layout.sectors.forEach(s => {
       const a = (s.a0 + s.a1) / 2, x = Math.cos(a) * 11, z = Math.sin(a) * 11;
@@ -2710,6 +2716,67 @@ function createWorld() {
   // Primitives : ell(c, r, bone, opts) et cone(a, b, r1, r2, bone, opts) ; opts = { k: fusion, color: fn(p, n) | "#hex", rot: [rx, ry, rz], bump }
   const ELL = (c, r, bone, o = {}) => ({ kind: "ell", c, r, bone, ...o });
   const CONE = (a, b, r1, r2, bone, o = {}) => ({ kind: "cone", a, b, r1, r2, bone, ...o });
+  // Simplification par erreur quadratique (comme « Decimate » dans Blender) : on fusionne d'abord les arêtes
+  // dont la disparition déforme le moins la surface, jusqu'à ne garder que quelques centaines de grandes facettes planes
+  function decimate(P, I, target) {
+    const nv = P.length / 3, Q = new Float64Array(nv * 10), faces = [], vf = Array.from({ length: nv }, () => new Set()), ver = new Int32Array(nv), dead = new Uint8Array(nv);
+    const addQ = (v, a, b, c, d, w) => { const o = v * 10; Q[o] += w * a * a; Q[o + 1] += w * a * b; Q[o + 2] += w * a * c; Q[o + 3] += w * a * d; Q[o + 4] += w * b * b; Q[o + 5] += w * b * c; Q[o + 6] += w * b * d; Q[o + 7] += w * c * c; Q[o + 8] += w * c * d; Q[o + 9] += w * d * d; };
+    const nrmOf = (a, b, c, px) => {
+      const ax = px[a * 3], ay = px[a * 3 + 1], az = px[a * 3 + 2];
+      const ux = px[b * 3] - ax, uy = px[b * 3 + 1] - ay, uz = px[b * 3 + 2] - az, wx = px[c * 3] - ax, wy = px[c * 3 + 1] - ay, wz = px[c * 3 + 2] - az;
+      return [uy * wz - uz * wy, uz * wx - ux * wz, ux * wy - uy * wx];
+    };
+    for (let t = 0; t < I.length; t += 3) {
+      const f = [I[t], I[t + 1], I[t + 2]], fi = faces.length; faces.push(f);
+      const n = nrmOf(f[0], f[1], f[2], P), L = Math.hypot(...n) || 1e-12, a = n[0] / L, b = n[1] / L, c = n[2] / L, d = -(a * P[f[0] * 3] + b * P[f[0] * 3 + 1] + c * P[f[0] * 3 + 2]);
+      f.forEach(v => { addQ(v, a, b, c, d, L * .5); vf[v].add(fi); });
+    }
+    let live = faces.length;
+    const S = new Float64Array(10);
+    const heap = [], push = e => { heap.push(e); let i = heap.length - 1; while (i) { const p = (i - 1) >> 1; if (heap[p].c <= e.c) break; heap[i] = heap[p]; i = p; } heap[i] = e; };
+    const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { let i = 0; for (;;) { let l = i * 2 + 1, r = l + 1, m = i; if (l < heap.length && heap[l].c < (m === i ? last.c : heap[m].c)) m = l; if (r < heap.length && heap[r].c < (m === i ? last.c : heap[m].c)) m = r; if (m === i) break; heap[i] = heap[m]; i = m; } heap[i] = last; } return top; };
+    const consider = (a, b) => {
+      for (let k = 0; k < 10; k++) S[k] = Q[a * 10 + k] + Q[b * 10 + k];
+      const cand = [[P[a * 3], P[a * 3 + 1], P[a * 3 + 2]], [P[b * 3], P[b * 3 + 1], P[b * 3 + 2]], [(P[a * 3] + P[b * 3]) / 2, (P[a * 3 + 1] + P[b * 3 + 1]) / 2, (P[a * 3 + 2] + P[b * 3 + 2]) / 2]];
+      let best = null, bc = Infinity;
+      for (const p of cand) { const e = S[0] * p[0] * p[0] + 2 * S[1] * p[0] * p[1] + 2 * S[2] * p[0] * p[2] + 2 * S[3] * p[0] + S[4] * p[1] * p[1] + 2 * S[5] * p[1] * p[2] + 2 * S[6] * p[1] + S[7] * p[2] * p[2] + 2 * S[8] * p[2] + S[9]; if (e < bc) { bc = e; best = p; } }
+      push({ c: bc, a, b, p: best, va: ver[a], vb: ver[b] });
+    };
+    const seen = new Set();
+    faces.forEach(f => [[f[0], f[1]], [f[1], f[2]], [f[2], f[0]]].forEach(([a, b]) => { const k = a < b ? a * nv + b : b * nv + a; if (!seen.has(k)) { seen.add(k); consider(a, b); } }));
+    const nbrs = v => { const s = new Set(); vf[v].forEach(fi => faces[fi].forEach(u => { if (u !== v) s.add(u); })); return s; };
+    while (live > target && heap.length) {
+      const e = pop(), { a, b } = e;
+      if (dead[a] || dead[b] || ver[a] !== e.va || ver[b] !== e.vb) continue;
+      // Topologie : deux sommets voisins ne doivent partager que les deux sommets de leurs faces communes
+      const na = nbrs(a), nb = nbrs(b); let common = 0; na.forEach(u => { if (nb.has(u)) common++; });
+      if (common > 2) continue;
+      // Pas de facette retournée
+      const old = [P[a * 3], P[a * 3 + 1], P[a * 3 + 2]], oldB = [P[b * 3], P[b * 3 + 1], P[b * 3 + 2]];
+      let flip = false;
+      for (const v of [a, b]) for (const fi of vf[v]) {
+        const f = faces[fi]; if (f.includes(a) && f.includes(b)) continue;
+        const n0 = nrmOf(f[0], f[1], f[2], P);
+        P[a * 3] = e.p[0]; P[a * 3 + 1] = e.p[1]; P[a * 3 + 2] = e.p[2]; P[b * 3] = e.p[0]; P[b * 3 + 1] = e.p[1]; P[b * 3 + 2] = e.p[2];
+        const n1 = nrmOf(f[0], f[1], f[2], P);
+        P[a * 3] = old[0]; P[a * 3 + 1] = old[1]; P[a * 3 + 2] = old[2]; P[b * 3] = oldB[0]; P[b * 3 + 1] = oldB[1]; P[b * 3 + 2] = oldB[2];
+        const d = n0[0] * n1[0] + n0[1] * n1[1] + n0[2] * n1[2];
+        if (d <= Math.hypot(...n0) * Math.hypot(...n1) * .3) { flip = true; break; }
+      }
+      if (flip) continue;
+      P[a * 3] = e.p[0]; P[a * 3 + 1] = e.p[1]; P[a * 3 + 2] = e.p[2];
+      for (let k = 0; k < 10; k++) Q[a * 10 + k] += Q[b * 10 + k];
+      for (const fi of [...vf[b]]) {
+        const f = faces[fi];
+        if (f.includes(a)) { f.forEach(u => vf[u].delete(fi)); live--; continue; }
+        f[f.indexOf(b)] = a; vf[a].add(fi);
+      }
+      vf[b].clear(); dead[b] = 1; ver[a]++;
+      nbrs(a).forEach(u => consider(a, u));
+    }
+    const out = []; faces.forEach((f, fi) => { if (vf[f[0]].has(fi)) out.push(f); });
+    return out;
+  }
   function sculpt(prims, boneDefs, opt = {}) {
     let minR = 1e9;
     prims.forEach(q => {
@@ -2807,28 +2874,19 @@ function createWorld() {
     }
     const geo = new T.BufferGeometry();
     if (LOWPOLY) {
-      // Facettes : les sommets proches sont fusionnés sur une grille dont le pas suit l'épaisseur de la forme
-      // (grandes facettes sur le corps, petites sur les pattes), puis chaque triangle reçoit une couleur unie
-      const f = opt.facet || 1.15, groups = new Map(), repOf = new Int32Array(nv), cp = [], cc = [], cnt = [], first = [];
-      for (let vI = 0; vI < nv; vI++) {
-        const q = prims[dom[vI]], R = q.kind === "ell" ? [...q.r].sort((a, b) => a - b)[1] : (q.r1 + q.r2) / 2;
-        const bk = Math.round(Math.log2(Math.max(R, 1e-3)) * 2), cs = 2 ** (bk / 2) * f;
-        const x = pos[vI * 3], y = pos[vI * 3 + 1], z = pos[vI * 3 + 2];
-        const key = bk + "," + Math.floor(x / cs) + "," + Math.floor(y / cs) + "," + Math.floor(z / cs);
-        let r = groups.get(key);
-        if (r === undefined) { r = cnt.length; groups.set(key, r); cnt.push(0); cp.push(0, 0, 0); cc.push(0, 0, 0); first.push(vI); }
-        repOf[vI] = r; cnt[r]++;
-        for (let a = 0; a < 3; a++) { cp[r * 3 + a] += pos[vI * 3 + a]; cc[r * 3 + a] += col[vI * 3 + a]; }
-      }
-      for (let r = 0; r < cnt.length; r++) for (let a = 0; a < 3; a++) { cp[r * 3 + a] /= cnt[r]; cc[r * 3 + a] /= cnt[r]; }
-      const P2 = [], C2 = [], I2 = [], W2 = [];
-      for (let t = 0; t < idx.length; t += 3) {
-        const tri = [repOf[idx[t]], repOf[idx[t + 1]], repOf[idx[t + 2]]];
-        if (tri[0] === tri[1] || tri[1] === tri[2] || tri[0] === tri[2]) continue;
-        const j = 1 + (seeded(t * .37 + tri[0]) - .5) * .09;   // légère variation d'une facette à l'autre, comme du papier plié
-        const fc = [0, 1, 2].map(a => (cc[tri[0] * 3 + a] + cc[tri[1] * 3 + a] + cc[tri[2] * 3 + a]) / 3 * j);
-        tri.forEach(r => { P2.push(cp[r * 3], cp[r * 3 + 1], cp[r * 3 + 2]); C2.push(...fc); const o = first[r]; for (let a = 0; a < 4; a++) { I2.push(si[o * 4 + a]); W2.push(sw[o * 4 + a]); } });
-      }
+      // Grandes facettes planes (simplification quadratique), une couleur franche par facette selon la zone du corps
+      const P0 = Float64Array.from(pos), tris = decimate(P0, idx, opt.faces || 700);
+      const P2 = [], C2 = [], I2 = [], W2 = [], cen = new T.Vector3(), fn = new T.Vector3(), cA = new T.Vector3(), cB = new T.Vector3(), tc = new T.Color();
+      tris.forEach((f, fi) => {
+        const [a, b, c] = f.map(v => new T.Vector3(P0[v * 3], P0[v * 3 + 1], P0[v * 3 + 2]));
+        cen.copy(a).add(b).add(c).divideScalar(3);
+        fn.crossVectors(cA.subVectors(c, b), cB.subVectors(a, b)).normalize();
+        let best = prims[0], bd = 1e9; for (const q of prims) { const d = sdPrim(q, cen.x, cen.y, cen.z); if (d < bd) { bd = d; best = q; } }
+        tc.set(typeof best.color === "function" ? best.color(cen, fn) : best.color || "#888888");
+        const hsl = {}; tc.getHSL(hsl); const j = seeded(fi * 1.7 + a.x * 13), l2 = Math.min(.97, hsl.l * (1 + (j - .5) * .1));
+        tc.setHSL(hsl.h + (j - .5) * .012, hsl.s, l2).convertSRGBToLinear();
+        f.forEach(v => { P2.push(P0[v * 3], P0[v * 3 + 1], P0[v * 3 + 2]); C2.push(tc.r, tc.g, tc.b); for (let k = 0; k < 4; k++) { I2.push(si[v * 4 + k]); W2.push(sw[v * 4 + k]); } });
+      });
       geo.setAttribute("position", new T.Float32BufferAttribute(P2, 3));
       geo.setAttribute("color", new T.Float32BufferAttribute(C2, 3));
       geo.setAttribute("skinIndex", new T.Uint16BufferAttribute(I2, 4));
@@ -2893,8 +2951,8 @@ function createWorld() {
     const P = [
       ELL([0, h + w * .02, -len * .32], [w * .76 * fat, w * .86 * fat, len * .3], 0, { color: wool ? woolC : coat, ...bump }),
       ELL([0, h - w * .02, -len * .02], [w * .82 * fat, w * .95 * fat, len * .36], 1, { k: w * .5, color: wool ? woolC : coat, ...bump }),
-      ELL([0, h + w * .06, len * .26], [w * .74 * fat, w * 1.0 * fat, len * .28], 2, { k: w * .5, color: wool ? woolC : coat, ...bump }),
-      CONE([0, h + w * .25, len * .3], [0, headY - hs * .2, headZ - hs * .3], w * .56 * Math.min(fat, 1.15), hs * .42, 3, { k: w * .35, color: (p, n) => o.mane && n.y > .2 && n.z < .2 ? c2 : coat(p, n) }),
+      ELL([0, h + w * .06, len * .26], [w * .74 * fat, w * 1.0 * fat, len * .28], 2, { k: w * .5, color: wool ? woolC : (p, n) => o.bib && n.z > .45 && p.y > h - w * .5 ? c1 : coat(p, n), ...bump }),
+      CONE([0, h + w * .25, len * .3], [0, headY - hs * .2, headZ - hs * .3], w * .56 * Math.min(fat, 1.15), hs * .42, 3, { k: w * .35, color: (p, n) => o.mane && n.y > .2 && n.z < .2 ? c2 : o.bib && n.z > .25 && n.y < .35 ? c1 : coat(p, n) }),
       ELL([0, headY, headZ], [hs * .58, hs * .6, hs * .66], 4, { k: hs * .22, color: (p, n) => o.face ? o.face : coat(p, n, .6) }),
       CONE([0, headY - hs * .1, headZ + hs * .22], [0, headY - hs * .24 - muz * .22, headZ + hs * .38 + muz], hs * .42, Math.max(hs * .15, muz * .2), 4,
         { k: hs * .2, color: (p, n) => o.face ? o.face : light ? mixHex(c0, c1, smooth(.4, -.2, n.y)) : shade(c0, .95) }),
@@ -2914,7 +2972,7 @@ function createWorld() {
                       : [[x, h, zf], [x, h * .58, zf + len * .1], [x, h * .28, zf - len * .12], [x, w * .05, zf - len * .06]];
       const b0 = B.length;
       B.push({ pos: J[0], parent: front ? 2 : 0 }, { pos: J[1], parent: b0 }, { pos: J[2], parent: b0 + 1 });
-      const legC = (p, n) => { if (o.face && wool && p.y < h * .6) return shade(o.face, .85); const lowK = smooth(h * .55, h * .2, p.y); let c = coat(p, n, .4); if (o.socks) c = mixHex(c, c2, lowK); else c = mixHex(c, shade(c0, .75), lowK * .6); if (wool) c = mixHex(c, o.face || "#3a322c", smooth(h * .7, h * .45, p.y)); return c; };
+      const legC = (p, n) => { if (o.face && wool && p.y < h * .6) return shade(o.face, .85); const lowK = smooth(h * .55, h * .2, p.y); let c = coat(p, n, .4); if (o.socks) c = lowK > .35 ? (o.sockC || c2) : c; else c = mixHex(c, shade(c0, .75), lowK * .6); if (wool) c = mixHex(c, o.face || "#3a322c", smooth(h * .7, h * .45, p.y)); return c; };
       const r0 = (front ? w * .38 : w * .46) * Math.min(fat, 1.2) * Math.sqrt(lt);
       P.push(CONE(J[0], J[1], r0, w * .17 * lt, b0, { k: w * .3, color: legC }));
       P.push(CONE(J[1], J[2], w * .15 * lt, w * .1 * lt, b0 + 1, { k: w * .1 * lt, color: legC }));
@@ -2933,7 +2991,7 @@ function createWorld() {
       const t0 = i / nT, t1 = (i + 1) / nT, rad = t => Math.max(o.tailR * (o.bushy ? .45 + Math.sin(t * Math.PI * .85) * .75 : 1 - t * .75), .012);
       P.push(CONE(TP[i], TP[i + 1], rad(t0), rad(t1), tb + i, { k: i ? o.tailR * .3 : w * .25, color: (p, n) => o.tip && i === nT - 1 && t1 > .9 ? c1 : coat(p, n, .5) }));
     }
-    const S = sculpt(P, B, { res: 70 });
+    const S = sculpt(P, B, { res: 70, faces: 480 });
     g.add(S.mesh);
     const head = 4, hc = [0, headY + hs * .1, headZ + hs * .1];
     [1, -1].forEach(sd => {
@@ -3023,7 +3081,7 @@ function createWorld() {
       return o.headC || c2;
     };
     P.push(ELL(hpos, [hr, hr * (o.disc ? 1.02 : .95), hr * (o.disc ? .9 : 1.08)], head, { k: s * .1, color: headCol }));
-    const S = sculpt(P, B, { res: 64, rough: .75 });
+    const S = sculpt(P, B, { res: 64, faces: 280 });
     g.add(S.mesh);
     // Bec, yeux
     const bs = S.surface(hpos, o.disc ? [0, -.35, 1] : [0, -.1, 1]);
@@ -3339,7 +3397,7 @@ function createWorld() {
 
   // ── Choix du gabarit selon l'espèce, avec les proportions propres à chacune
   const QUAD = {
-    7: { w: .3, len: .72, h: .62, neck: .2, hs: .24, muz: .3, ear: [.1, .24], tail: .95, tailR: .15, bushy: true, tip: true, socks: true, iris: "#b8862a" },
+    7: { w: .3, len: .72, h: .62, neck: .2, hs: .24, muz: .3, ear: [.1, .24], tail: .95, tailR: .15, bushy: true, tip: true, socks: true, sockC: "#2B201C", bib: true, earBack: "#3A2A22", iris: "#b8862a" },
     // Le chevreuil broute : l'angle est limité pour que le museau touche l'herbe sans rentrer dans le sol
     9: { w: .36, len: .88, h: .85, neck: .25, hs: .29, muz: .34, ear: [.11, .22], tail: .75, tailR: .13, bushy: true, iris: "#b89a3a" },
     8: { w: .3, len: .8, h: 1.0, neck: .5, hs: .22, muz: .28, ear: [.12, .28], tail: .12, tailR: .08, antlers: true, earIn: "#e8d8c8", grazer: true, graze: .55, hooves: true },
@@ -3364,7 +3422,7 @@ function createWorld() {
     if (o === "Proboscidea") return { ...base, w: .7, len: 1.2, h: 1.35, neck: .12, hs: .45, muz: .1, ear: [.05, .05], roundEar: true, tail: .5, tailR: .04, trunk: true, bigEars: true, tusks: true, muzzleLight: false, legT: 1.9 };
     if (f === "Felidae") return { ...base, w: .26, len: .62, h: .5, neck: .16, hs: .22, muz: .12, ear: [.08, .14], tail: .75, tailR: .06, iris: "#c9a13a" };
     if (f === "Ursidae") return { ...base, legT: 1.7, w: .45, len: .8, h: .72, neck: .2, hs: .3, muz: .22, ear: [.08, .08], roundEar: true, tail: .12, tailR: .08, muzzleLight: false, fat: 1.15 };
-    if (f === "Canidae") return { ...QUAD[7], socks: false, tip: false };
+    if (f === "Canidae") return { ...QUAD[7], socks: false, tip: false, earBack: null };
     if (f === "Mustelidae") return { ...base, w: .16, len: .6, h: .22, neck: .12, hs: .14, muz: .1, ear: [.05, .05], roundEar: true, tail: .4, tailR: .06 };
     if (o === "Lagomorpha") return { ...base, w: .2, len: .34, h: .28, neck: .06, hs: .15, muz: .08, ear: [.05, .4], earSpread: .08, tail: .08, tailR: .08, muzzleLight: false };
     if (o === "Rodentia") return { ...base, w: .12, len: .24, h: .14, neck: .04, hs: .1, muz: .08, ear: [.05, .05], roundEar: true, tail: f === "Sciuridae" ? .45 : .4, tailR: f === "Sciuridae" ? .1 : .015, bushy: f === "Sciuridae", tailUp: f === "Sciuridae", muzzleLight: false };
@@ -3486,7 +3544,7 @@ function createWorld() {
   }
   function buildDecor(d) {
     const g = new T.Group(); const k = d.size;
-    const kenney = d.type === "tree" ? decorModel(/Pin|Sapin/.test(d.variant) ? "tree-small" : "tree-big", (/Pin|Sapin/.test(d.variant) ? 4.2 : 3.6) * k,
+    const kenney = d.type === "tree" && !/Pin|Sapin/.test(d.variant) ? decorModel("tree-big", 3.6 * k,
         m => { if (!/wood/i.test(m.name)) m.color.copy(lin(d.color)); else if (/Bouleau/.test(d.variant)) m.color.copy(lin("#E8E4D8")); })
       : d.type === "rock" ? decorModel(["formation-rock", "formation-large-rock", "formation-stone"][Math.floor(seeded(d.rot * 13) * 3)], 1.3 * k, m => m.color.copy(lin(d.color)))
       : null;
@@ -3500,7 +3558,7 @@ function createWorld() {
     else if (d.type === "tree" && !kenney) {
       const conifer = /Pin|Sapin/.test(d.variant), birch = /Bouleau/.test(d.variant);
       add(g, cyl(0.15 * k, 0.22 * k, 1.8 * k, birch ? "#EDEDE6" : conifer && /Pin/.test(d.variant) ? "#A0522D" : "#6B4A2E", 6), 0, 0.9 * k, 0);
-      if (conifer) [0, 1, 2].forEach(i => add(g, cone((1.3 - i * 0.3) * k, 1.4 * k, d.color, 7), 0, (1.9 + i * 0.75) * k, 0));
+      if (conifer) [0, 1, 2, 3].forEach(i => add(g, cone((1.35 - i * 0.28) * k, 1.25 * k, shade(d.color, i % 2 ? 1.25 : 1), 6), 0, (1.7 + i * 0.68) * k, 0).rotation.y = i * .5);
       else [[0, 2.4, 0, 1], [0.6, 2.1, 0.2, 0.75], [-0.55, 2.15, -0.2, 0.8], [0.1, 2.9, -0.3, 0.7]].forEach(([x, y, z, r]) => add(g, new T.Mesh(new T.IcosahedronGeometry(r * k, 3), M(d.color)), x * k, y * k, z * k));
     } else if (d.type === "mountain") {
       add(g, cone(4.5, 8, d.color, 7), 0, 4, 0).rotation.y = d.rot;

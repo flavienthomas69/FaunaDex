@@ -516,7 +516,8 @@ La maquette applique déjà les étapes 2 et 3 de façon simplifiée : un gabari
 - La peau est liée à un squelette : bassin, dos, poitrail, cou, tête, trois articulations par patte et queue. Chaque sommet est influencé par les os voisins, ce qui permet de marcher, brouter, se coucher et voler sans déchirure.
 - Les couleurs sont peintes par zone selon la palette de la photo : dos plus sombre, ventre et museau clairs, chaussettes, bout de queue, disque facial des chouettes, joues et bavette des mésanges, etc.
 - Les yeux, le bec, les oreilles, les cornes et les bois sont posés sur la surface par lancer de rayon depuis la tête. Ils ne peuvent donc pas être noyés dans le volume.
-- La peau est ensuite réduite en grandes facettes : les sommets proches sont fusionnés sur une grille dont le pas suit l'épaisseur locale (grandes facettes sur le corps, petites sur les pattes), puis chaque facette reçoit une couleur unie.
+- La peau est ensuite simplifiée comme avec l'outil « Decimate » de Blender (erreur quadratique) : environ 480 grandes facettes planes pour un mammifère, 280 pour un oiseau. Chaque facette reçoit la couleur franche de sa zone (poitrail blanc, pattes noires…), avec une variation de teinte de ±5 % façon papier plié.
+- Le décor suit le même style : sapins en cônes empilés, herbes en lames, rochers et buissons taillés en quelques faces, terrain à grandes facettes.
 - Une génération prend 0,1 à 0,4 s. Le sanctuaire en construit deux par image pour ne pas figer l'écran.
 - Chaque nouvel animal apparaît avec un rebond, un anneau lumineux et des étincelles.
 
