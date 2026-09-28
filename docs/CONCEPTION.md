@@ -508,7 +508,7 @@ La maquette applique déjà les étapes 2 et 3 de façon simplifiée : un gabari
 
 **Comportements.** Chaque animal erre, vole ou nage selon ses traits ; il faut un plan d'eau pour que les espèces aquatiques apparaissent. La nuit, seuls les animaux nocturnes restent actifs ; sous la pluie, les autres rejoignent l'abri des arbres scannés.
 
-**Direction artistique.** Le rendu est lisse et naturel, avec des couleurs nettes et sans textures bruitées.
+**Direction artistique.** Le style est « low poly moderne », façon papier plié : facettes nettes, aplats de couleur légèrement variés d'une facette à l'autre, lumière chaude et douce. Le plan de refonte complet (charte, pipeline d'assets, moteur, diorama, interface, performance) est dans `REFONTE_3D.md`.
 
 **Animaux sculptés.** Les mammifères et la plupart des oiseaux sont sculptés à la volée, et non assemblés en pièces séparées :
 - Le gabarit de l'espèce décrit des volumes simples : ellipsoïdes pour le bassin, le ventre, le poitrail et le crâne ; cônes arrondis pour le cou, le museau, les segments de pattes et la queue.
@@ -516,7 +516,9 @@ La maquette applique déjà les étapes 2 et 3 de façon simplifiée : un gabari
 - La peau est liée à un squelette : bassin, dos, poitrail, cou, tête, trois articulations par patte et queue. Chaque sommet est influencé par les os voisins, ce qui permet de marcher, brouter, se coucher et voler sans déchirure.
 - Les couleurs sont peintes par zone selon la palette de la photo : dos plus sombre, ventre et museau clairs, chaussettes, bout de queue, disque facial des chouettes, joues et bavette des mésanges, etc.
 - Les yeux, le bec, les oreilles, les cornes et les bois sont posés sur la surface par lancer de rayon depuis la tête. Ils ne peuvent donc pas être noyés dans le volume.
-- Une génération prend 0,1 à 0,3 s. Le sanctuaire en construit deux par image pour ne pas figer l'écran.
+- La peau est ensuite réduite en grandes facettes : les sommets proches sont fusionnés sur une grille dont le pas suit l'épaisseur locale (grandes facettes sur le corps, petites sur les pattes), puis chaque facette reçoit une couleur unie.
+- Une génération prend 0,1 à 0,4 s. Le sanctuaire en construit deux par image pour ne pas figer l'écran.
+- Chaque nouvel animal apparaît avec un rebond, un anneau lumineux et des étincelles.
 
 **Autres éléments.**
 - Hérons, cigognes et flamants gardent un modèle animé réalisé par un artiste, recoloré selon la photo.
