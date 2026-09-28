@@ -623,6 +623,46 @@
     .critter, .compart.egg, .bigegg, .rain, .critter .hearts { animation: none; }
   }
 
+
+  /* Carte navigable */
+  .mapwrap { position: relative; }
+  #mapsvg { touch-action: none; cursor: grab; }
+  #mapsvg:active { cursor: grabbing; }
+  .pl { font: 600 7px/1 var(--body); fill: #1B2621; paint-order: stroke; stroke: #FFFDF5; stroke-width: 2px; text-anchor: middle; pointer-events: none; }
+  .mapctl { position: absolute; right: 8px; top: 8px; display: grid; gap: 6px; z-index: 3; }
+  .mapctl button {
+    width: 34px; height: 34px; border-radius: 10px; border: 0; cursor: pointer;
+    background: rgba(255, 255, 255, .92); font: 700 18px/1 var(--body); color: var(--ink) !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, .2);
+  }
+  .maphint { position: absolute; left: 8px; bottom: 6px; margin: 0; font-size: 10.5px; color: #fff; background: rgba(0, 0, 0, .45); padding: 4px 8px; border-radius: 8px; pointer-events: none; }
+
+  /* Sanctuaire 3D */
+  .world3d { position: relative; margin: 12px 20px 0; height: 340px; border-radius: 18px; overflow: hidden; border: 1px solid var(--line); background: #BFE3F2; }
+  .w3dcanvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  .w3dmsg { position: absolute; inset: 0; display: grid; place-items: center; font-size: 13px; color: var(--muted); }
+  .emptyworld {
+    position: absolute; left: 12px; right: 56px; top: 12px; padding: 10px 12px; border-radius: 12px;
+    background: rgba(255, 255, 255, .9); font-size: 12px; line-height: 1.4; color: var(--muted); pointer-events: none;
+  }
+  .emptyworld b { display: block; color: var(--ink); font: 700 14px/1.3 var(--display); }
+  .scanbar { margin: 10px 20px 0; display: flex; align-items: center; gap: 10px; }
+  .scanbar button { border: 0; border-radius: 12px; padding: 11px 14px; background: var(--ink); color: #fff !important; font: 600 13px/1 var(--body); cursor: pointer; }
+  .scanbar span { font-size: 12.5px; color: var(--muted); }
+  .sanctbar button { background: var(--card) !important; color: var(--ink) !important; border: 1px solid var(--line) !important; }
+  .selwrap { margin: 10px 20px 0; }
+  .selcard { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px; display: grid; gap: 10px; }
+  .selhead { display: flex; gap: 12px; align-items: center; }
+  .selhead b { display: block; font: 700 16px/1.2 var(--display); }
+  .selhead small { font-size: 12px; color: var(--muted); font-style: italic; }
+  .thumb { width: 52px; height: 52px; flex: 0 0 auto; border-radius: 12px; background: #E6EDE2 center/cover no-repeat; display: grid; place-items: center; font-size: 28px; }
+  .palrow { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 12px; color: var(--muted); }
+  .pal { display: flex; gap: 4px; flex: 0 0 auto; }
+  .pal i, .swatch { width: 22px; height: 22px; border-radius: 6px; border: 1px solid rgba(0, 0, 0, .15); display: inline-block; }
+  .selbtns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .selbtns button { border: 1px solid var(--line); background: var(--bg); border-radius: 12px; padding: 10px; font: 600 13px/1 var(--body); cursor: pointer; }
+  .selbtns button:first-child { background: var(--moss); color: #fff !important; border-color: var(--moss); }
+
   /* Capture */
   .cam { position: absolute; inset: 0; background: #0D1411; color: #fff; display: flex; flex-direction: column; }
   .viewfinder {
@@ -805,9 +845,9 @@
         <ol>
           <li><b>Collection.</b> Trois Dex en haut de l'écran : Faune (21 000 espèces, par famille ou par zone), Paléo (dinosaures à photographier en musée) et Micro (organismes au microscope). Le losange de couleur indique la rareté, ✨ une variante rare trouvée.</li>
           <li><b>Capture.</b> Le bouton central. Changez l'heure et la météo (jour, nuit, pluie) et le lieu : de nuit, vous tombez sur des espèces nocturnes ; au lac du Der, sur des grues. Parfois, une variante rare ✨ double l'XP. Au zoo, la photo est refusée.</li>
-          <li><b>Carte.</b> Le brouillard se lève là où vous avez photographié. Les cercles sont des hotspots anonymisés par secteur de 50 km.</li>
+          <li><b>Carte.</b> Glissez, pincez ou utilisez + et − pour naviguer ; les noms des lieux apparaissent en zoomant. Le brouillard se lève là où vous avez photographié. Les cercles sont des hotspots anonymisés par secteur de 50 km.</li>
           <li><b>Quêtes.</b> Quêtes du jour, bonus de nuit et de pluie, événement « Grande migration d'automne ». Les badges sont dans le même onglet.</li>
-          <li><b>Sanctuaire.</b> Votre œuf éclot à la prochaine capture : choisissez un compagnon. Vos animaux vivent dans le sanctuaire, on peut les nourrir, et la météo y suit la vôtre.</li>
+          <li><b>Sanctuaire 3D.</b> Tournez autour de l'île (glisser), déplacez-vous (clic droit ou deux doigts), zoomez, touchez un animal pour le voir et le nourrir. Le décor est vide au départ : « Scanner le décor » ajoute rochers, arbres, montagnes, mares, fleurs et buissons. Une mare permet d'accueillir les animaux aquatiques. Importez une photo lors d'une capture : le modèle 3D prend ses couleurs.</li>
         </ol>
         <div class="jump">
           <button type="button" data-go="dex">Collection</button>
@@ -1371,7 +1411,56 @@ const BIOMES = {
   ocean: { name: "Océan", icon: "🌊", deco: ["🪸", "🐚", "🪨", "🌊", "🪸", "🐚"] },
   jungle: { name: "Jungle", icon: "🌴", deco: ["🌴", "🌺", "🌿", "🌴", "🍃", "🌺"] },
 };
-const PLANTS = ["Pissenlit", "Ortie dioïque", "Trèfle des prés", "Ronce commune", "Plantain lancéolé"];
+const DECOR = {
+  rock: { name: "Rocher", icon: "🪨", variants: [["Granite", "#9A928C"], ["Calcaire", "#D6CEBD"], ["Grès rose", "#C4855A"], ["Basalte", "#4A4A50"]] },
+  tree: { name: "Arbre", icon: "🌳", plant: true, variants: [["Chêne pédonculé", "#4E8C3A"], ["Hêtre commun", "#5E9A3A"], ["Bouleau verruqueux", "#8DBA4E"], ["Pin sylvestre", "#2F5E3A"], ["Sapin pectiné", "#24503A"]] },
+  mountain: { name: "Montagne", icon: "⛰️", variants: [["Barre des Écrins", "#7D7F86"], ["Mont Blanc", "#8A8C93"], ["Pic du Midi de Bigorre", "#76726C"]] },
+  water: { name: "Plan d'eau", icon: "💧", variants: [["Mare", "#4A90B8"], ["Étang", "#3D7FA6"], ["Ruisseau", "#5AA3C9"]] },
+  flower: { name: "Fleurs", icon: "🌼", plant: true, variants: [["Coquelicot", "#D7263D"], ["Pissenlit", "#F2C72E"], ["Marguerite", "#FFFFFF"]] },
+  bush: { name: "Buisson", icon: "🌿", plant: true, variants: [["Ronce commune", "#3E6B32"], ["Noisetier", "#4F7A35"], ["Aubépine", "#5B8A3C"]] },
+};
+const DECOR_TYPES = Object.keys(DECOR);
+// Couleurs par défaut du modèle 3D quand on n'a pas de photo : [dos, ventre, tête]
+const SPECIES_COLORS = {
+  1: ["#6E8F5A", "#E8C63A", "#1C1C1C"], 2: ["#8A6A48", "#C9A882", "#8A6A48"], 3: ["#8C8C8C", "#7A5A44", "#1F6B3A"],
+  4: ["#F4F4F2", "#F4F4F2", "#F4F4F2"], 5: ["#B5562A", "#F1E4D3"], 6: ["#5B4636", "#CDB89D"], 7: ["#D86A28", "#F4EEE6"],
+  8: ["#9B6A45", "#F1E8DA"], 9: ["#8D8A84", "#D9D4CB"], 10: ["#D22A1E", "#111111"], 11: ["#C99A2E", "#2A2016"],
+  12: ["#F2D35C", "#1F1F1F"], 13: ["#5DAA3C", "#3F7F2A"], 14: ["#7A6A55", "#A69576"], 15: ["#8A7440", "#5E6B3A"],
+  16: ["#A86F3E", "#6B4A2E"], 17: ["#F07A1A", "#FFFFFF"], 18: ["#3F5A73", "#F3F3EE"], 19: ["#8A5B34", "#F3EBDD"],
+  20: ["#5E6E2E", "#A8A24B"], 21: ["#B0624A", "#D99A80"], 22: ["#C9A574", "#9D8A73"], 23: ["#1C1C1C", "#E8C53A"],
+  24: ["#E0922A", "#1C1C1C"], 25: ["#1E2A4A", "#F3EDE3", "#A5352A"], 26: ["#9EA3A6", "#9EA3A6", "#1C1C1C"],
+};
+const CAT_COLORS = { mam: ["#8C6A4E", "#D8C8B0"], ois: ["#7A6A58", "#D9CDB8", "#5A4A3A"], rep: ["#6E7A4A", "#A6A57A"],
+  amp: ["#6E8A3E", "#C9C08A"], poi: ["#4A7A9A", "#DDE6EA"], ins: ["#3A3A30", "#C9A23A"], ara: ["#5A4A3A", "#C9B89A"],
+  cru: ["#B0503A", "#E0A080"], mol: ["#B08A60", "#8A7A6A"], aut: ["#7A8AA6", "#C0CCE0"] };
+const AQUATIC = new Set([17, 18, 21]);
+
+// Couleurs dominantes du sujet (centre de la photo). Dans l'app : segmentation de l'animal puis extraction.
+function paletteFromPhoto(dataUrl) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement("canvas"); c.width = c.height = 40;
+      const g = c.getContext("2d");
+      const sw = img.width * .5, sh = img.height * .5;
+      g.drawImage(img, img.width * .25, img.height * .25, sw, sh, 0, 0, 40, 40);
+      const d = g.getImageData(0, 0, 40, 40).data, bins = new Map();
+      for (let i = 0; i < d.length; i += 4) {
+        const k = (d[i] >> 5) << 6 | (d[i + 1] >> 5) << 3 | (d[i + 2] >> 5);
+        const b = bins.get(k) || { n: 0, r: 0, g: 0, b: 0 };
+        b.n++; b.r += d[i]; b.g += d[i + 1]; b.b += d[i + 2]; bins.set(k, b);
+      }
+      const cols = [...bins.values()].sort((a, b) => b.n - a.n).map(b => [b.r / b.n, b.g / b.n, b.b / b.n]);
+      const hex = c3 => "#" + c3.map(v => Math.round(v).toString(16).padStart(2, "0")).join("");
+      const far = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) > 70;
+      const first = cols[0] || [128, 128, 128];
+      const second = cols.find(c3 => far(c3, first)) || first;
+      resolve([hex(first), hex(second)]);
+    };
+    img.onerror = () => resolve(null);
+    img.src = dataUrl;
+  });
+}
 const GARDEN = [10, 11, 13, 19, 22];
 const TIERS = [["bronze", 3, "#B87333"], ["argent", 10, "#9AA4AB"], ["or", 25, "#D9A82B"]];
 const VOLUME = [[1, "Premier pas"], [10, "Explorateur"], [25, "Naturaliste"], [50, "Biologiste"], [100, "Centurion"]];
@@ -1390,6 +1479,7 @@ function resetState() {
     + Object.keys(state.dinos).length * 60 + Object.keys(state.micros).length * 25 + 25;
   state.companion = { kind: null, xp: 0, egg: 2 };
   state.biome = "forest"; state.food = 3; state.happy = 60; state.hearts = null; state.toast = null;
+  state.decor = []; state.decorKind = 0; state.sel = null; state.photoPalette = null; state.mapVB = {};
 }
 resetState();
 
@@ -1695,10 +1785,12 @@ function renderCapture() {
       steps: ["Vérification du lieu : pas de zoo ni d'aquarium", "Comparaison avec 450 000 taxons", "Filtre géographique · Lyon"] },
     fossil: { close: "dinos", pill: "Cadrez le squelette entier", hint: "Incluez si possible le cartel du musée", m1: "Musée", m2: "squelette",
       steps: ["Détection d'un squelette monté", `Comparaison avec ${DINOS.length} squelettes répertoriés`, "Vérification du musée"] },
+    decor: { close: "sanct", pill: "Cadrez l'élément en entier", hint: "Rocher, arbre, montagne, plan d'eau, fleurs, buisson", m1: "Décor", m2: "sanctuaire",
+      steps: ["Détection de l'élément", "Identification (roche, essence d'arbre, relief…)", "Extraction des couleurs et de la forme"] },
     micro: { close: "micros", pill: "Collez l'objectif à l'oculaire", hint: "Faites la mise au point avant de déclencher", m1: "Microscope", m2: "oculaire",
       steps: ["Détection du champ de l'oculaire", `Comparaison avec ${MICROS.length} organismes répertoriés`, "Estimation du grossissement"] },
   }[mode];
-  const seg = [["live", "Animal"], ["fossil", "Squelette"], ["micro", "Microscope"]];
+  const seg = [["live", "Animal"], ["fossil", "Squelette"], ["micro", "Micro"], ["decor", "Décor"]];
   return `<div class="cam">
     <div class="viewfinder ${state.photo ? "photo" : ""} ${fossil ? "museum" : ""} ${micro ? "scope" : ""}" ${bg}></div>
     ${micro && !state.photo ? '<div class="scopefield"><i></i><i></i><i></i><i></i></div>' : ""}
@@ -1711,6 +1803,7 @@ function renderCapture() {
       ${seg.map(([k, label]) => `<button type="button" role="tab" aria-selected="${mode === k}" class="${mode === k ? "on" : ""}" data-cammode="${k}">${label}</button>`).join("")}
     </div>`}
     ${mode !== "fossil" && !scanning ? `<div class="campills">
+    ${mode === "decor" ? `<button type="button" class="pospill" data-decorkind><span class="posdot ok" style="background:none;box-shadow:none;width:auto;height:auto">${DECOR[DECOR_TYPES[state.decorKind]].icon}</span><span><b>Élément : ${DECOR[DECOR_TYPES[state.decorKind]].name}</b><small>Élément simulé · toucher pour changer</small></span></button>` : ""}
     ${mode === "live" ? `<button type="button" class="pospill" data-cond><span class="posdot ok" style="background:none;box-shadow:none;width:auto;height:auto">${CONDS[state.cond].icon}</span><span><b>${CONDS[state.cond].label}</b><small>Heure et météo simulées · toucher pour changer</small></span></button>` : ""}
     <button type="button" class="pospill" data-pos>
       <span class="posdot ${micro ? "ok" : POSITIONS[state.pos].verdict}"></span>
@@ -1822,39 +1915,54 @@ function explorePoints() {
   ];
   return [...new Set(labels)];
 }
+function placeName(label) {
+  if (label.startsWith("mus:")) { const m = MUSEUMS[label.slice(4)]; return m ? m.city : label; }
+  return label.split(",")[0];
+}
 function renderMap() {
   const head = `<div class="bhead"><p class="kicker">Exploration</p><h2>Carte</h2></div>`;
   if (!mapData) return head + '<p class="count">Chargement de la carte…</p>';
   if (mapData.error) return head + '<div class="gbif-note"><b>Carte indisponible</b>Le fond de carte n\'a pas pu être chargé.</div>';
   const m = mapData[state.mapView];
-  const pts = explorePoints().map(l => m.places[l]).filter(Boolean);
+  const seen = new Set();
+  const labels = explorePoints().filter(l => { const xy = m.places[l]; if (!xy || seen.has(xy.join())) return false; seen.add(xy.join()); return true; });
+  const pts = labels.map(l => m.places[l]);
   const r = Math.max(m.px10km * 4, 6);
   const cell = Math.max(m.px10km * 5, 1);
   const sectors = new Set(pts.map(([x, y]) => `${Math.floor(x / cell)}:${Math.floor(y / cell)}`)).size;
   const hot = state.mapView === "france" ? m.hotspots : [];
   const sel = state.hot !== null && hot[state.hot];
+  const vb = state.mapVB[state.mapView] || [0, 0, m.width, m.height];
   return `${head}
     <div class="seg" style="margin-top:14px">
       <button type="button" class="${state.mapView === "france" ? "on" : ""}" data-mapview="france">France</button>
       <button type="button" class="${state.mapView === "world" ? "on" : ""}" data-mapview="world">Monde</button>
     </div>
     <div class="mapwrap">
-      <svg viewBox="0 0 ${m.width} ${m.height}" role="img" aria-label="Carte des zones explorées">
+      <svg id="mapsvg" viewBox="${vb.join(" ")}" role="img" aria-label="Carte des zones explorées. Glissez pour vous déplacer, pincez ou utilisez les boutons pour zoomer.">
         <defs>
           <filter id="soft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="${Math.max(r / 2.5, 2)}"/></filter>
-          <mask id="fogmask"><rect width="100%" height="100%" fill="#fff"/><g filter="url(#soft)">${pts.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#000"/>`).join("")}</g></mask>
+          <mask id="fogmask" maskUnits="userSpaceOnUse" x="-50" y="-50" width="${m.width + 100}" height="${m.height + 100}"><rect x="-50" y="-50" width="${m.width + 100}" height="${m.height + 100}" fill="#fff"/><g filter="url(#soft)">${pts.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#000"/>`).join("")}</g></mask>
           <pattern id="fogtex" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="#1B2621"/><circle cx="1.5" cy="1.5" r=".7" fill="#2A3830"/></pattern>
         </defs>
-        <rect width="100%" height="100%" fill="#A9C8D6"/>
-        <path d="${m.graticule}" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width=".5"/>
-        <path d="${m.land}" fill="#E4DFC9" stroke="#B8B197" stroke-width=".6"/>
-        ${m.borders ? `<path d="${m.borders}" fill="none" stroke="#B8B197" stroke-width=".6" stroke-dasharray="2 2"/>` : ""}
-        <rect width="100%" height="100%" fill="url(#fogtex)" fill-opacity=".7" mask="url(#fogmask)"/>
+        <rect x="-50" y="-50" width="${m.width + 100}" height="${m.height + 100}" fill="#A9C8D6"/>
+        <path d="${m.graticule}" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width=".5" vector-effect="non-scaling-stroke"/>
+        <path d="${m.land}" fill="#E4DFC9" stroke="#B8B197" stroke-width=".8" vector-effect="non-scaling-stroke"/>
+        ${m.borders ? `<path d="${m.borders}" fill="none" stroke="#B8B197" stroke-width=".8" stroke-dasharray="2 2" vector-effect="non-scaling-stroke"/>` : ""}
+        <rect x="-50" y="-50" width="${m.width + 100}" height="${m.height + 100}" fill="#1E2A24" fill-opacity=".52" mask="url(#fogmask)"/>
         ${hot.map((h, i) => `<g class="hot ${state.hot === i ? "sel" : ""}" data-hot="${i}" tabindex="0" role="button" aria-label="${esc(h.family)}">
-          <circle cx="${h.xy[0]}" cy="${h.xy[1]}" r="${m.px10km * 2.6}"/>
-          <text x="${h.xy[0]}" y="${h.xy[1] + 3}" text-anchor="middle">${h.observers}</text></g>`).join("")}
-        ${pts.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="2.2" fill="#F2A541" stroke="#fff" stroke-width=".8"/>`).join("")}
+          <circle cx="${h.xy[0]}" cy="${h.xy[1]}" r="${m.px10km * 2.6}" vector-effect="non-scaling-stroke"/>
+          <text class="ht" x="${h.xy[0]}" y="${h.xy[1]}" text-anchor="middle" dominant-baseline="central">${h.observers}</text></g>`).join("")}
+        ${pts.map(([x, y]) => `<circle class="mk" cx="${x}" cy="${y}" r="2.2" fill="#F2A541" stroke="#fff" stroke-width="1" vector-effect="non-scaling-stroke"/>`).join("")}
+        ${labels.map((l, i) => `<text class="pl" x="${pts[i][0]}" y="${pts[i][1]}" dy="-5">${esc(placeName(l))}</text>`).join("")}
       </svg>
+      <div class="mapctl">
+        <button type="button" data-mapzoom="1.6" aria-label="Zoomer">+</button>
+        <button type="button" data-mapzoom="0.625" aria-label="Dézoomer">−</button>
+        <button type="button" data-mapreset aria-label="Autour de moi">⌖</button>
+        <button type="button" data-mapall aria-label="Vue d'ensemble">⤢</button>
+      </div>
+      <p class="maphint">Glissez pour vous déplacer · pincez ou molette pour zoomer</p>
     </div>
     <div class="stats" style="grid-template-columns:1fr 1fr">
       <div class="stat"><b>${sectors}</b><small>secteurs de 50 km explorés</small></div>
@@ -1866,6 +1974,59 @@ function renderMap() {
     </div>` : ""}
     <div class="gbif-note" style="margin-top:16px"><b>Protection de la faune</b>Les hotspots agrègent les observations par secteurs de 50 km, avec au moins 5 observateurs, et un délai d'une semaine. Les espèces menacées ou sensibles n'y apparaissent jamais. Démo : hotspots fictifs.</div>
     <div class="sources">Fond de carte : ${esc(mapData.source)}.</div>`;
+}
+
+// Navigation : glisser, pincer, molette, boutons. On modifie le viewBox sans reconstruire la carte.
+let mapDragged = false;
+function mapApply(svg, vb) {
+  const m = mapData[state.mapView];
+  const w = Math.min(m.width, Math.max(m.width / 12, vb[2]));
+  const h = w * m.height / m.width;
+  const x = Math.min(m.width - w, Math.max(0, vb[0] + (vb[2] - w) / 2));
+  const y = Math.min(m.height - h, Math.max(0, vb[1] + (vb[3] - h) / 2));
+  const nv = [x, y, w, h];
+  state.mapVB[state.mapView] = nv;
+  svg.setAttribute("viewBox", nv.join(" "));
+  const z = m.width / w;
+  svg.querySelectorAll(".mk").forEach(c => c.setAttribute("r", 2.2 / Math.sqrt(z) * 1.3));
+  svg.querySelectorAll(".pl").forEach(t => { t.style.fontSize = (7 / z) + "px"; t.style.display = z >= 2 ? "" : "none"; t.setAttribute("dy", -4 / z); });
+  svg.querySelectorAll(".ht").forEach(t => { t.style.fontSize = (8 / Math.sqrt(z)) + "px"; });
+}
+function mapZoom(svg, factor, cx, cy) {
+  const vb = state.mapVB[state.mapView] || [0, 0, mapData[state.mapView].width, mapData[state.mapView].height];
+  const px = cx ?? vb[0] + vb[2] / 2, py = cy ?? vb[1] + vb[3] / 2;
+  const w = vb[2] / factor, h = vb[3] / factor;
+  mapApply(svg, [px - (px - vb[0]) / factor, py - (py - vb[1]) / factor, w, h].map((v, i) => i < 2 ? v : v));
+}
+function attachMapNav() {
+  const svg = document.getElementById("mapsvg");
+  if (!svg || !mapData || mapData.error) return;
+  mapApply(svg, state.mapVB[state.mapView] || [0, 0, mapData[state.mapView].width, mapData[state.mapView].height]);
+  const pts = new Map(); let last = null, moved = 0;
+  const toUser = (e) => {
+    const rc = svg.getBoundingClientRect(), vb = state.mapVB[state.mapView];
+    return [vb[0] + (e.clientX - rc.left) / rc.width * vb[2], vb[1] + (e.clientY - rc.top) / rc.height * vb[3]];
+  };
+  svg.addEventListener("pointerdown", e => { pts.set(e.pointerId, [e.clientX, e.clientY]); svg.setPointerCapture(e.pointerId); moved = 0; last = null; mapDragged = false; });
+  svg.addEventListener("pointermove", e => {
+    if (!pts.has(e.pointerId)) return;
+    const prev = pts.get(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]);
+    const rc = svg.getBoundingClientRect(), vb = state.mapVB[state.mapView];
+    if (pts.size === 1) {
+      const dx = (e.clientX - prev[0]) / rc.width * vb[2], dy = (e.clientY - prev[1]) / rc.height * vb[3];
+      moved += Math.abs(e.clientX - prev[0]) + Math.abs(e.clientY - prev[1]);
+      if (moved > 6) mapDragged = true;
+      mapApply(svg, [vb[0] - dx, vb[1] - dy, vb[2], vb[3]]);
+    } else if (pts.size === 2) {
+      const [a, b] = [...pts.values()];
+      const dist = Math.hypot(a[0] - b[0], a[1] - b[1]);
+      if (last) { const mid = toUser({ clientX: (a[0] + b[0]) / 2, clientY: (a[1] + b[1]) / 2 }); mapZoom(svg, dist / last, mid[0], mid[1]); }
+      last = dist; mapDragged = true;
+    }
+  });
+  const up = e => { pts.delete(e.pointerId); last = null; };
+  svg.addEventListener("pointerup", up); svg.addEventListener("pointercancel", up);
+  svg.addEventListener("wheel", e => { e.preventDefault(); const [x, y] = toUser(e); mapZoom(svg, e.deltaY < 0 ? 1.25 : 0.8, x, y); }, { passive: false });
 }
 
 /* Quêtes et événements */
@@ -1901,49 +2062,455 @@ function renderQuests() {
     <div class="bpad"></div>`;
 }
 
-/* Sanctuaire, compagnon et météo-morphisme */
+/* Sanctuaire 3D, compagnon et météo-morphisme */
 function seeded(n) { const x = Math.sin(n * 9301 + 49297) * 233280; return x - Math.floor(x); }
-function renderSanct() {
-  const c = state.companion, cond = CONDS[state.cond].id, biome = BIOMES[state.biome];
-  const animals = Object.keys(state.captured).map(Number).filter(id => id <= CURATED).slice(0, 18).map(id => byId[id])
-    .concat(Object.keys(state.captured).map(Number).filter(id => id > CURATED).slice(0, 4).map(id => byId[id]));
-  const mood = sp => cond === "night" ? (TRAITS.noct.includes(sp.id) ? "awake" : "sleep") : cond === "rain" ? (TRAITS.rain.includes(sp.id) ? "rainy" : "shelter") : "";
-  let comp;
-  if (!c.kind) {
-    comp = `<div class="compcard"><div class="compart egg">🥚</div><div>
+function sanctAnimals() {
+  return Object.keys(state.captured).map(Number).map(id => byId[id]).filter(Boolean).slice(0, 30);
+}
+function companionCard() {
+  const c = state.companion, cond = CONDS[state.cond].id;
+  if (!c.kind) return `<div class="compcard"><div class="compart egg">🥚</div><div>
       <p class="kicker">Œuf mystère</p><b>Encore ${EGG_TARGET - c.egg} capture${EGG_TARGET - c.egg > 1 ? "s" : ""} pour éclore</b>
       <div class="bar" style="margin-top:8px"><i style="width:${c.egg / EGG_TARGET * 100}%"></i></div>
-      <small>Photographiez des animaux dans la vraie vie pour le faire éclore.</small></div></div>`;
-  } else {
-    const info = COMPANIONS[c.kind], st = compStage(c.xp), lv = compLevel(c.xp);
-    const feel = cond === "night" ? (c.kind === "owl" ? "Pleinement éveillée, elle scrute l'obscurité." : "Dort en boule 💤") :
-      cond === "rain" ? (c.kind === "lizard" ? "S'abrite sous une pierre en attendant le soleil." : "S'ébroue sous la pluie.") :
-      c.kind === "lizard" ? "Se chauffe au soleil, ravi." : "Joyeux, prêt à explorer.";
-    comp = `<div class="compcard"><div class="compart st${st} ${cond === "night" && c.kind !== "owl" ? "sleep" : ""}">${info.em}</div><div>
+      <small>Il est posé au centre de votre sanctuaire. Photographiez des animaux pour le faire éclore.</small></div></div>`;
+  const info = COMPANIONS[c.kind], st = compStage(c.xp), lv = compLevel(c.xp);
+  const feel = cond === "night" ? (c.kind === "owl" ? "Pleinement éveillée, elle scrute l'obscurité." : "Dort en boule.") :
+    cond === "rain" ? (c.kind === "lizard" ? "S'abrite en attendant le soleil." : "S'ébroue sous la pluie.") :
+    c.kind === "lizard" ? "Se chauffe au soleil, ravi." : "Joyeux, prêt à explorer.";
+  return `<div class="compcard"><div class="compart st${st}">${info.em}</div><div>
       <p class="kicker">Compagnon · niveau ${lv}</p><b>${info.stages[st]}</b>
       <div class="bar" style="margin-top:8px"><i style="width:${(c.xp % 120) / 120 * 100}%"></i></div>
       <small>${feel} ${st < 2 ? `Évolue au niveau ${st === 0 ? 4 : 8}.` : "Forme finale."}</small></div></div>`;
+}
+function sanctPanel() {
+  const sel = state.sel;
+  let card = "";
+  if (sel && sel.kind === "animal") {
+    const sp = byId[sel.id], got = state.captured[sel.id] || {};
+    const pal = got.palette || SPECIES_COLORS[sp.id] || CAT_COLORS[sp.cat];
+    const photo = state.photos[sp.id];
+    card = `<div class="selcard">
+      <div class="selhead">${photo ? `<span class="thumb" style="background-image:url(${photo})"></span>` : `<span class="thumb em">${sp.em}</span>`}
+        <div><b>${esc(displayName(sp))}</b><small>${gem(rarityOf(sp))}${esc(sp.sci)}</small></div></div>
+      <div class="palrow"><span>${got.palette ? "Modèle 3D généré à partir de votre photo" : "Couleurs types de l'espèce : importez une photo à la capture pour personnaliser le modèle"}</span>
+        <span class="pal">${pal.map(c => `<i style="background:${c}"></i>`).join("")}</span></div>
+      <div class="selbtns"><button type="button" data-feed="${sp.id}">🍃 Nourrir</button><button type="button" data-fiche="${sp.id}">Voir la fiche</button></div>
+    </div>`;
+  } else if (sel && sel.kind === "decor") {
+    const d = state.decor.find(x => x.uid === sel.uid);
+    if (d) card = `<div class="selcard"><div class="selhead"><span class="thumb em" style="background:${d.color}33">${DECOR[d.type].icon}</span>
+      <div><b>${esc(d.variant)}</b><small>${DECOR[d.type].name} · scanné le ${fmtDate(d.date)} · ${esc(d.place)}</small></div></div>
+      <div class="palrow"><span>Couleur ${d.color ? "extraite du scan" : "type"}</span><span class="pal"><i style="background:${d.color}"></i></span></div></div>`;
+  } else if (sel && sel.kind === "companion") {
+    card = companionCard();
   }
+  const waiting = sanctAnimals().filter(sp => (AQUATIC.has(sp.id) || sp.cat === "poi") && !state.decor.some(d => d.type === "water"));
+  return `${card || '<p class="count" style="margin:0">Touchez un animal ou un élément du décor.</p>'}
+    ${waiting.length ? `<div class="toast" style="margin:10px 0 0">${waiting.map(sp => sp.em).join(" ")} ${waiting.length > 1 ? "attendent" : "attend"} un plan d'eau : scannez une mare ou un étang.</div>` : ""}
+    ${state.toast ? `<p class="toast" style="margin:10px 0 0">${esc(state.toast)}</p>` : ""}`;
+}
+function updateSanctPanel() {
+  const el = document.getElementById("sanctpanel");
+  if (el) el.innerHTML = sanctPanel();
+  const f = document.getElementById("sanctfood"); if (f) f.textContent = state.food;
+  const h = document.getElementById("sancthappy"); if (h) h.textContent = state.happy + " %";
+}
+function renderSanct() {
+  const decorCounts = DECOR_TYPES.map(t => [t, state.decor.filter(d => d.type === t).length]).filter(([, n]) => n);
   return `
-    <div class="bhead"><p class="kicker">Mon sanctuaire</p><h2>${animals.length} animaux</h2>
+    <div class="bhead"><p class="kicker">Mon sanctuaire</p><h2>${sanctAnimals().length} animaux · ${state.decor.length} éléments</h2>
       <button type="button" class="condrow" data-cond style="margin-top:10px">${CONDS[state.cond].icon} Météo chez vous : <b>${CONDS[state.cond].label}</b><small>simulée · toucher pour changer</small></button></div>
-    <div style="padding:14px 20px 0">${comp}</div>
-    <div class="chips">${Object.entries(BIOMES).map(([k, b]) => `<button type="button" class="chip ${state.biome === k ? "on" : ""}" data-biome="${k}">${b.icon} ${b.name}</button>`).join("")}</div>
-    <div class="scene b-${state.biome} w-${cond}">
-      ${biome.deco.map((d, i) => `<span class="deco" style="left:${8 + i * 16}%;top:${i % 2 ? 14 : 58}%">${d}</span>`).join("")}
-      ${animals.map((sp, i) => { const md = mood(sp);
-        return `<button type="button" class="critter ${md}" data-feed="${sp.id}" style="left:${6 + seeded(sp.id) * 80}%;top:${18 + seeded(sp.id + 7) * 62}%;--d:${4 + seeded(sp.id + 3) * 5}s" aria-label="Nourrir ${esc(displayName(sp))}">
-          <span>${sp.em}</span>${md === "sleep" ? '<i class="zz">💤</i>' : ""}${state.hearts === sp.id ? '<i class="hearts">💚</i>' : ""}</button>`; }).join("")}
-      ${cond === "rain" ? '<div class="rain"></div>' : ""}
+    <div class="world3d" id="sanct3d">
+      <div class="w3dmsg" id="w3dmsg">Chargement du monde 3D…</div>
+      <div class="mapctl">
+        <button type="button" data-w3zoom="0.8" aria-label="Rapprocher">+</button>
+        <button type="button" data-w3zoom="1.25" aria-label="Éloigner">−</button>
+        <button type="button" data-w3reset aria-label="Recentrer">⌖</button>
+      </div>
+      ${state.decor.length ? "" : `<div class="emptyworld"><b>Votre sanctuaire est vide</b>Scannez des rochers, des arbres, une montagne ou une mare dans la vraie vie pour construire son décor.</div>`}
+      <p class="maphint">Glissez pour tourner · deux doigts ou clic droit pour vous déplacer · pincez pour zoomer</p>
+    </div>
+    <div class="scanbar">
+      <button type="button" data-decorcam>📷 Scanner le décor</button>
+      <span>${decorCounts.length ? decorCounts.map(([t, n]) => `${DECOR[t].icon} ${n}`).join(" · ") : "Aucun élément"}</span>
     </div>
     <div class="sanctbar">
-      <div><b>🍃 ${state.food}</b><small>nourriture</small></div>
-      <div><b>${state.happy} %</b><small>bien-être</small></div>
-      <button type="button" data-plant>🌱 Scanner une plante</button>
+      <div><b>🍃 <span id="sanctfood">${state.food}</span></b><small>nourriture</small></div>
+      <div><b id="sancthappy">${state.happy} %</b><small>bien-être</small></div>
+      <button type="button" data-selcomp>${state.companion.kind ? COMPANIONS[state.companion.kind].em : "🥚"} Compagnon</button>
     </div>
-    ${state.toast ? `<p class="toast">${esc(state.toast)}</p>` : ""}
-    <div class="gbif-note" style="margin-top:12px"><b>Comment ça marche</b>Chaque animal photographié en vrai apparaît ici. Touchez-en un pour le nourrir. Scanner une plante rapporte de la nourriture. La météo du sanctuaire suit la vôtre : sous la pluie, les amphibiens sortent et les autres s'abritent ; la nuit, seuls les animaux nocturnes restent éveillés.</div>
+    <div class="selwrap" id="sanctpanel">${sanctPanel()}</div>
+    <div class="chips">${Object.entries(BIOMES).map(([k, b]) => `<button type="button" class="chip ${state.biome === k ? "on" : ""}" data-biome="${k}">${b.icon} ${b.name}</button>`).join("")}</div>
+    <div class="gbif-note" style="margin-top:12px"><b>Comment ça marche</b>Chaque animal photographié en vrai apparaît ici en 3D, avec les couleurs extraites de votre photo. Le décor se construit en scannant des éléments réels. La météo suit la vôtre : sous la pluie, les amphibiens et les escargots sortent et les autres s'abritent sous les arbres ; la nuit, seuls les animaux nocturnes restent actifs.</div>
     <div class="bpad"></div>`;
+}
+
+/* Moteur 3D (three.js) : le même monde est conservé d'un rendu à l'autre */
+let W3 = null, threeLoading = null;
+function loadThree() {
+  if (window.THREE) return Promise.resolve(true);
+  if (threeLoading) return threeLoading;
+  const tryLoad = src => new Promise(res => { const sc = document.createElement("script"); sc.src = src; sc.onload = () => res(!!window.THREE); sc.onerror = () => res(false); document.head.appendChild(sc); });
+  threeLoading = tryLoad("three.min.js").then(ok => ok || tryLoad("https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"));
+  return threeLoading;
+}
+function mountSanct() {
+  const box = document.getElementById("sanct3d");
+  if (!box) return;
+  loadThree().then(ok => {
+    if (state.view !== "sanct" || !document.getElementById("sanct3d")) return;
+    const msg = document.getElementById("w3dmsg");
+    if (!ok) { if (msg) msg.textContent = "Le moteur 3D n'a pas pu être chargé."; return; }
+    try {
+      if (!W3) W3 = createWorld();
+      document.getElementById("sanct3d").prepend(W3.renderer.domElement);
+      if (msg) msg.remove();
+      W3.resize(); W3.sync(); W3.start();
+    } catch (e) { if (msg) msg.textContent = "WebGL n'est pas disponible sur cet appareil."; }
+  });
+}
+
+function createWorld() {
+  const T = THREE;
+  const renderer = new T.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.domElement.className = "w3dcanvas";
+  const scene = new T.Scene();
+  const camera = new T.PerspectiveCamera(48, 1, 0.1, 300);
+  const orbit = { theta: 0.8, phi: 1.02, r: 30, target: new T.Vector3(0, 0, 0) };
+  const hemi = new T.HemisphereLight(0xffffff, 0x556644, 0.85); scene.add(hemi);
+  const sun = new T.DirectionalLight(0xffffff, 0.85);
+  sun.position.set(12, 24, 8); sun.castShadow = true;
+  Object.assign(sun.shadow.camera, { left: -24, right: 24, top: 24, bottom: -24 });
+  sun.shadow.mapSize.set(1024, 1024); scene.add(sun);
+
+  const M = c => new T.MeshLambertMaterial({ color: c, flatShading: true });
+  const add = (g, mesh, x = 0, y = 0, z = 0) => { mesh.position.set(x, y, z); mesh.castShadow = true; g.add(mesh); return mesh; };
+  const sph = (r, c, sx = 1, sy = 1, sz = 1) => { const m = new T.Mesh(new T.SphereGeometry(r, 10, 8), M(c)); m.scale.set(sx, sy, sz); return m; };
+  const cyl = (rt, rb, h, c, seg = 7) => new T.Mesh(new T.CylinderGeometry(rt, rb, h, seg), M(c));
+  const cone = (r, h, c, seg = 7) => new T.Mesh(new T.ConeGeometry(r, h, seg), M(c));
+  const eyes = (g, y, z, dx, r = 0.05) => { add(g, sph(r, "#111"), dx, y, z); add(g, sph(r, "#111"), -dx, y, z); };
+
+  // Île du sanctuaire
+  const island = new T.Group(); scene.add(island);
+  const ground = new T.Mesh(new T.CylinderGeometry(20, 17, 3, 48, 1), M("#6FA35A"));
+  ground.position.y = -1.5; ground.receiveShadow = true; island.add(ground);
+  const soil = new T.Mesh(new T.CylinderGeometry(17, 12, 4, 48, 1), M("#6B4E34")); soil.position.y = -5; island.add(soil);
+
+  // Modèles d'animaux par plan d'organisation, colorés avec la palette (photo ou espèce)
+  function buildAnimal(sp, pal) {
+    const g = new T.Group(); const [c0, c1, c2] = [pal[0], pal[1] || pal[0], pal[2] || pal[0]];
+    const parts = { wings: [] };
+    const id = sp.id, cat = sp.cat;
+    if (cat === "mam") {
+      const leg = id === 8 ? 0.8 : id === 6 ? 0.18 : 0.5;
+      if (id === 6) { add(g, new T.Mesh(new T.IcosahedronGeometry(0.55, 1), M(c0)), 0, 0.45, 0).scale.set(1, 0.75, 1.2); add(g, sph(0.2, c1), 0, 0.35, 0.6); add(g, sph(0.05, "#111"), 0, 0.36, 0.8); }
+      else {
+        add(g, sph(0.5, c0, 0.8, 0.75, 1.35), 0, leg + 0.3, 0);
+        add(g, sph(0.3, c1, 0.7, 0.6, 1.1), 0, leg + 0.15, 0.15);
+        add(g, sph(0.33, c0), 0, leg + 0.62, 0.72);
+        add(g, cone(0.14, 0.32, c1), 0, leg + 0.55, 1.05).rotation.x = Math.PI / 2;
+        eyes(g, leg + 0.72, 0.98, 0.13);
+        [0.17, -0.17].forEach(x => add(g, cone(0.1, 0.25, c0, 4), x, leg + 0.95, 0.66));
+        [[0.24, 0.42], [-0.24, 0.42], [0.24, -0.42], [-0.24, -0.42]].forEach(([x, z]) => add(g, cyl(0.07, 0.06, leg + 0.1, c0, 5), x, (leg + 0.1) / 2, z));
+        const tail = add(g, cone(id === 5 ? 0.25 : 0.14, id === 5 ? 0.9 : 0.75, c0), 0, leg + (id === 5 ? 0.7 : 0.35), -0.85);
+        tail.rotation.x = id === 5 ? -0.3 : -Math.PI / 2 - 0.45;
+        if (id === 7 || id === 9) add(g, sph(0.1, c1), 0, leg + 0.1, -1.18);
+        if (id === 8) [0.12, -0.12].forEach(x => add(g, cyl(0.02, 0.03, 0.4, "#6B4A2E", 4), x, leg + 1.1, 0.68));
+      }
+    } else if (cat === "ois") {
+      const tall = id === 4 || id === 26;
+      const legH = id === 26 ? 0.9 : 0.2;
+      add(g, sph(0.35, c0, 0.8, 0.8, 1.25), 0, legH + 0.35, 0);
+      add(g, sph(0.28, c1, 0.75, 0.7, 1), 0, legH + 0.27, 0.08);
+      const neck = tall ? 0.7 : 0;
+      if (tall) add(g, cyl(0.07, 0.09, 0.8, c0, 5), 0, legH + 0.75, 0.3).rotation.x = 0.35;
+      add(g, sph(0.2, c2), 0, legH + 0.65 + neck, 0.32 + neck * 0.35);
+      add(g, cone(0.06, 0.2, id === 26 ? "#6B6B5A" : "#E8A33D", 5), 0, legH + 0.62 + neck, 0.55 + neck * 0.35).rotation.x = Math.PI / 2;
+      eyes(g, legH + 0.7 + neck, 0.44 + neck * 0.35, 0.1, 0.035);
+      if (id === 26) add(g, sph(0.07, "#C8322A"), 0, legH + 0.84 + neck, 0.32 + neck * 0.35);
+      [0.28, -0.28].forEach((x, i) => { const piv = new T.Group(); piv.position.set(x * 0.9, legH + 0.45, 0); g.add(piv); const w = add(piv, sph(0.3, c0, 0.25, 0.5, 1.1), x * 0.4, 0, -0.05); w.rotation.z = i ? -0.3 : 0.3; parts.wings.push(piv); });
+      add(g, sph(0.2, c0, 0.6, 0.15, 1), 0, legH + 0.35, -0.5).rotation.x = -0.3;
+      [0.1, -0.1].forEach(x => add(g, cyl(0.02, 0.02, legH + 0.1, "#9A7A4A", 4), x, (legH + 0.1) / 2, 0));
+      parts.fly = id !== 4 && id !== 26 && id !== 3;
+    } else if (cat === "ins" || cat === "ara") {
+      if (id === 10) { add(g, sph(0.35, c0, 1, 0.6, 1.1), 0, 0.22, 0); add(g, sph(0.15, c1), 0, 0.18, 0.38); [[0.15, 0.1], [-0.15, 0.1], [0.13, -0.15], [-0.13, -0.15], [0, 0.3], [0.2, -0.3], [-0.2, -0.3]].forEach(([x, z]) => add(g, sph(0.06, c1), x, 0.4, z)); }
+      else if (cat === "ara") {
+        add(g, sph(0.35, c0, 1, 0.85, 1.15), 0, 0.4, -0.2); add(g, sph(0.2, c0), 0, 0.3, 0.3);
+        [[0, 0.62, -0.1], [0, 0.6, -0.3], [0.1, 0.58, -0.2], [-0.1, 0.58, -0.2]].forEach(([x, y, z]) => add(g, sph(0.05, c1), x, y, z));
+        for (let i = 0; i < 8; i++) { const side = i < 4 ? 1 : -1, k = i % 4; const l = add(g, cyl(0.025, 0.02, 0.8, c0, 4), side * 0.4, 0.3, 0.45 - k * 0.2); l.rotation.z = side * 1.1; l.rotation.y = (k - 1.5) * 0.3 * side; }
+      } else {
+        const big = id === 12 ? 1 : 0;
+        const body = id === 13 ? [c0, c0, c1] : [c0, c1, c0];
+        add(g, sph(0.12, body[2]), 0, 0.35, 0.35); add(g, sph(0.15, body[1]), 0, 0.35, 0.12);
+        [0, 1, 2].forEach(k => add(g, sph(0.17 - k * 0.02, k % 2 ? c1 : c0, 1, 1, 0.9), 0, 0.33, -0.12 - k * 0.2));
+        eyes(g, 0.42, 0.44, 0.07, 0.035);
+        for (let i = 0; i < 6; i++) { const side = i < 3 ? 1 : -1; const l = add(g, cyl(0.015, 0.015, id === 13 && i % 3 === 2 ? 0.7 : 0.4, "#2A2A22", 4), side * 0.15, 0.2, 0.2 - (i % 3) * 0.18); l.rotation.z = side * 0.9; }
+        [1, -1].forEach(side => { const piv = new T.Group(); piv.position.set(side * 0.08, 0.48, 0.05); g.add(piv);
+          const wm = big ? M(c0) : new T.MeshLambertMaterial({ color: "#ffffff", transparent: true, opacity: .55 });
+          const w = new T.Mesh(new T.PlaneGeometry(big ? 0.9 : 0.5, big ? 0.7 : 0.22), wm); w.material.side = T.DoubleSide;
+          w.rotation.x = -Math.PI / 2; w.position.x = side * (big ? 0.45 : 0.25); piv.add(w);
+          if (big) { const spot = new T.Mesh(new T.CircleGeometry(0.1, 8), M(c1)); spot.rotation.x = -Math.PI / 2; spot.position.set(side * 0.55, 0.01, -0.15); piv.add(spot); }
+          parts.wings.push(piv); });
+        parts.fly = id !== 13;
+      }
+    } else if (cat === "rep") {
+      if (id === 15) { add(g, sph(0.55, c0, 1, 0.55, 1.2), 0, 0.35, 0); add(g, sph(0.18, c1), 0, 0.3, 0.72); [[0.35, 0.4], [-0.35, 0.4], [0.35, -0.4], [-0.35, -0.4]].forEach(([x, z]) => add(g, sph(0.12, c1), x, 0.12, z)); eyes(g, 0.36, 0.86, 0.08, 0.03); }
+      else { add(g, sph(0.25, c0, 0.8, 0.5, 2.2), 0, 0.2, 0); add(g, sph(0.16, c0, 0.9, 0.6, 1.4), 0, 0.22, 0.62); eyes(g, 0.3, 0.75, 0.09, 0.03);
+        add(g, cone(0.12, 1.2, c1), 0, 0.15, -1.1).rotation.x = -Math.PI / 2;
+        [[0.25, 0.35], [-0.25, 0.35], [0.25, -0.3], [-0.25, -0.3]].forEach(([x, z]) => { const l = add(g, cyl(0.04, 0.04, 0.3, c0, 4), x, 0.1, z); l.rotation.z = x > 0 ? 1 : -1; }); }
+    } else if (cat === "amp") {
+      add(g, sph(0.4, c0, 1, 0.7, 1.1), 0, 0.3, 0); add(g, sph(0.3, c1, 0.9, 0.5, 0.9), 0, 0.2, 0.1);
+      [0.18, -0.18].forEach(x => { add(g, sph(0.11, c0), x, 0.55, 0.28); add(g, sph(0.06, "#111"), x, 0.58, 0.36); });
+      [0.35, -0.35].forEach(x => add(g, sph(0.15, c0, 1, 0.5, 1.6), x, 0.12, -0.2));
+    } else if (cat === "mol") {
+      if (id === 21) { add(g, sph(0.45, c0, 1, 1.2, 1), 0, 0.9, 0); eyes(g, 0.85, 0.4, 0.15, 0.05);
+        for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; const t = add(g, cone(0.08, 0.9, c1, 5), Math.cos(a) * 0.3, 0.35, Math.sin(a) * 0.3); t.rotation.x = Math.PI; t.rotation.z = Math.cos(a) * 0.4; } }
+      else { add(g, sph(0.2, c1, 0.8, 0.5, 2.2), 0, 0.12, 0.1); const shell = add(g, sph(0.35, c0), 0, 0.42, -0.1);
+        const spiral = new T.Mesh(new T.TorusGeometry(0.2, 0.05, 6, 16), M(c1)); spiral.rotation.y = Math.PI / 2; add(g, spiral, 0.2, 0.42, -0.1);
+        [0.06, -0.06].forEach(x => add(g, cyl(0.015, 0.015, 0.3, c1, 4), x, 0.3, 0.52).rotation.x = 0.5); shell.scale.set(0.8, 1, 1); }
+    } else if (cat === "poi") {
+      const k = id === 18 ? 2.2 : 1;
+      add(g, sph(0.35 * k, c0, 0.5, 0.8, 1.5), 0, 0, 0);
+      add(g, cone(0.25 * k, 0.4 * k, c0, 4), 0, 0, -0.6 * k).rotation.x = Math.PI / 2;
+      eyes(g, 0.1 * k, 0.4 * k, 0.12 * k, 0.04 * k);
+      if (id === 17) [0.25, -0.1, -0.4].forEach(z => { const ring = new T.Mesh(new T.TorusGeometry(0.2, 0.04, 4, 12), M(c1)); ring.scale.set(0.9, 1.4, 1); add(g, ring, 0, 0, z); });
+      if (id === 18) for (let i = 0; i < 14; i++) add(g, sph(0.05, c1), (seeded(i) - .5) * 0.3, 0.15 + seeded(i + 3) * 0.3, (seeded(i + 7) - .5) * 1.6);
+    } else if (cat === "cru") {
+      add(g, sph(0.4, c0, 1.2, 0.45, 0.9), 0, 0.25, 0); eyes(g, 0.4, 0.35, 0.1, 0.04);
+      [0.45, -0.45].forEach(x => add(g, sph(0.13, c1, 1, 0.8, 1.3), x, 0.3, 0.4));
+      for (let i = 0; i < 6; i++) { const side = i < 3 ? 1 : -1; const l = add(g, cyl(0.03, 0.03, 0.5, c0, 4), side * 0.5, 0.15, 0.1 - (i % 3) * 0.2); l.rotation.z = side * 1.2; }
+    } else {
+      add(g, sph(0.4, c0), 0, 0.4, 0);
+    }
+    // Zone de contact invisible, plus large que le modèle, pour pouvoir le toucher au doigt
+    const hit = new T.Mesh(new T.SphereGeometry(cat === "poi" && id === 18 ? 2 : 1, 8, 6), new T.MeshBasicMaterial({ visible: false }));
+    hit.position.y = 0.5; g.add(hit);
+    return { group: g, parts };
+  }
+
+  function buildCompanion() {
+    const c = state.companion;
+    if (!c.kind) {
+      const g = new T.Group(); add(g, sph(0.55, "#F4EEDC", 0.85, 1.1, 0.85), 0, 0.6, 0);
+      [[0.2, 0.8, 0.4], [-0.25, 0.5, 0.35], [0.1, 0.3, 0.45]].forEach(([x, y, z]) => add(g, sph(0.08, "#C9A96B"), x, y, z));
+      return { group: g, parts: { egg: true, wings: [] } };
+    }
+    const fake = { fox: { id: 7, cat: "mam" }, owl: { id: 2, cat: "ois" }, lizard: { id: 14, cat: "rep" } }[c.kind];
+    const a = buildAnimal(fake, SPECIES_COLORS[fake.id]);
+    const ring = new T.Mesh(new T.RingGeometry(0.9, 1.05, 32), new T.MeshBasicMaterial({ color: "#F2C14E", side: T.DoubleSide }));
+    ring.rotation.x = -Math.PI / 2; ring.position.y = 0.03; a.group.add(ring);
+    return a;
+  }
+
+  function buildDecor(d) {
+    const g = new T.Group(); const k = d.size;
+    if (d.type === "rock") { const m = add(g, new T.Mesh(new T.IcosahedronGeometry(0.8, 0), M(d.color)), 0, 0.4 * k, 0); m.scale.set(1.3 * k, 0.8 * k, 1.1 * k); m.rotation.y = d.rot; }
+    else if (d.type === "tree") {
+      const conifer = /Pin|Sapin/.test(d.variant), birch = /Bouleau/.test(d.variant);
+      add(g, cyl(0.15 * k, 0.22 * k, 1.8 * k, birch ? "#EDEDE6" : conifer && /Pin/.test(d.variant) ? "#A0522D" : "#6B4A2E", 6), 0, 0.9 * k, 0);
+      if (conifer) [0, 1, 2].forEach(i => add(g, cone((1.3 - i * 0.3) * k, 1.4 * k, d.color, 7), 0, (1.9 + i * 0.75) * k, 0));
+      else [[0, 2.4, 0, 1], [0.6, 2.1, 0.2, 0.75], [-0.55, 2.15, -0.2, 0.8], [0.1, 2.9, -0.3, 0.7]].forEach(([x, y, z, r]) => add(g, new T.Mesh(new T.IcosahedronGeometry(r * k, 0), M(d.color)), x * k, y * k, z * k));
+    } else if (d.type === "mountain") {
+      add(g, cone(4.5, 8, d.color, 7), 0, 4, 0).rotation.y = d.rot;
+      add(g, cone(1.6, 2.9, "#F7F7F7", 7), 0, 6.6, 0).rotation.y = d.rot;
+      add(g, cone(2.8, 5, d.color, 6), 3, 2.5, 1.2);
+    } else if (d.type === "water") {
+      const w = new T.Mesh(new T.CircleGeometry(d.size, 32), new T.MeshPhongMaterial({ color: d.color, transparent: true, opacity: 0.88, shininess: 90 }));
+      w.rotation.x = -Math.PI / 2; w.position.y = 0.04; w.receiveShadow = true; g.add(w);
+      const shore = new T.Mesh(new T.RingGeometry(d.size, d.size + 0.5, 32), M("#D9C99A")); shore.rotation.x = -Math.PI / 2; shore.position.y = 0.03; g.add(shore);
+    } else if (d.type === "flower") {
+      for (let i = 0; i < 9; i++) { const x = (seeded(i + d.rot) - .5) * 1.6, z = (seeded(i + 5 + d.rot) - .5) * 1.6;
+        add(g, cyl(0.02, 0.02, 0.5, "#3E7A2E", 4), x, 0.25, z); add(g, sph(0.1, d.color), x, 0.52, z);
+        if (d.color === "#FFFFFF") add(g, sph(0.05, "#F2C72E"), x, 0.56, z + 0.05); }
+    } else if (d.type === "bush") {
+      [[0, 0.45, 0, 0.6], [0.5, 0.35, 0.2, 0.45], [-0.45, 0.35, -0.1, 0.5]].forEach(([x, y, z, r]) => add(g, new T.Mesh(new T.IcosahedronGeometry(r * k, 0), M(d.color)), x * k, y * k, z * k));
+      if (/Ronce/.test(d.variant)) for (let i = 0; i < 6; i++) add(g, sph(0.06, "#3B1E3F"), (seeded(i) - .5) * k, 0.5 * k + seeded(i + 2) * 0.3, 0.45 * k);
+    }
+    g.position.set(d.pos[0], 0, d.pos[1]);
+    return g;
+  }
+
+  const animals = new Map(), decor = new Map();
+  let companion = null, selRing = null, lastBiome = null;
+  const rainGeo = new T.BufferGeometry(); const rainN = 900; const rp = new Float32Array(rainN * 3);
+  for (let i = 0; i < rainN; i++) { rp[i * 3] = (Math.random() - .5) * 40; rp[i * 3 + 1] = Math.random() * 20; rp[i * 3 + 2] = (Math.random() - .5) * 40; }
+  rainGeo.setAttribute("position", new T.BufferAttribute(rp, 3));
+  const rain = new T.Points(rainGeo, new T.PointsMaterial({ color: 0xcfe3f2, size: 0.12, transparent: true, opacity: 0.8 }));
+  scene.add(rain);
+
+  const SKY = { forest: "#BFE3F2", savanna: "#F6E7C1", ocean: "#BDE6F5", jungle: "#CDEBC8" };
+  const GROUND = { forest: "#6FA35A", savanna: "#C9A55A", ocean: "#E3D3A3", jungle: "#3F8A3E" };
+  const waterOf = () => state.decor.filter(d => d.type === "water");
+  const inWater = (x, z) => waterOf().find(w => Math.hypot(w.pos[0] - x, w.pos[1] - z) < w.size - 0.6);
+  function randomSpot(kind, a) {
+    if (kind === "swim") { const w = waterOf()[0]; const ang = Math.random() * 6.28, rr = Math.random() * (w.size - 1); return [w.pos[0] + Math.cos(ang) * rr, w.pos[1] + Math.sin(ang) * rr]; }
+    for (let i = 0; i < 20; i++) { const ang = Math.random() * 6.28, rr = Math.random() * 15; const x = Math.cos(ang) * rr, z = Math.sin(ang) * rr; if (!inWater(x, z)) return [x, z]; }
+    return [0, 0];
+  }
+
+  function sync() {
+    const cond = CONDS[state.cond].id;
+    const sky = cond === "night" ? "#0E1630" : cond === "rain" ? "#8E9AA6" : SKY[state.biome];
+    scene.background = new T.Color(sky); scene.fog = new T.Fog(sky, 45, 90);
+    if (lastBiome !== state.biome) { ground.material.color.set(GROUND[state.biome]); lastBiome = state.biome; }
+    hemi.intensity = cond === "night" ? 0.28 : cond === "rain" ? 0.6 : 0.85;
+    sun.intensity = cond === "night" ? 0.2 : cond === "rain" ? 0.35 : 0.85;
+    sun.color.set(cond === "night" ? "#8FA3FF" : "#ffffff");
+    rain.visible = cond === "rain";
+    // décor
+    const wantD = new Set(state.decor.map(d => d.uid));
+    for (const [uid, g] of decor) if (!wantD.has(uid)) { scene.remove(g); decor.delete(uid); }
+    state.decor.forEach(d => { if (!decor.has(d.uid)) { const g = buildDecor(d); g.userData = { kind: "decor", uid: d.uid }; scene.add(g); decor.set(d.uid, g); } });
+    // animaux
+    const hasWater = waterOf().length > 0;
+    const list = sanctAnimals().filter(sp => !(AQUATIC.has(sp.id) || sp.cat === "poi") || hasWater);
+    const want = new Set(list.map(sp => sp.id));
+    for (const [id, a] of animals) if (!want.has(id)) { scene.remove(a.group); animals.delete(id); }
+    list.forEach(sp => {
+      const pal = (state.captured[sp.id] || {}).palette || SPECIES_COLORS[sp.id] || CAT_COLORS[sp.cat];
+      const key = pal.join();
+      const cur = animals.get(sp.id);
+      if (cur && cur.key === key) return;
+      if (cur) scene.remove(cur.group);
+      const built = buildAnimal(sp, pal);
+      const kind = AQUATIC.has(sp.id) || sp.cat === "poi" ? "swim" : built.parts.fly ? "fly" : "ground";
+      const [x, z] = randomSpot(kind);
+      const size = sp.cat === "ins" || sp.cat === "ara" ? 1.1 : sp.id === 18 ? 1 : 1;
+      built.group.scale.setScalar(size);
+      built.group.position.set(x, kind === "swim" ? -0.25 : 0, z);
+      built.group.userData = { kind: "animal", id: sp.id };
+      scene.add(built.group);
+      animals.set(sp.id, { ...built, sp, key, kind, target: randomSpot(kind), speed: 0.6 + seeded(sp.id) * 0.9, phase: seeded(sp.id + 1) * 6 });
+    });
+    // compagnon
+    const ck = state.companion.kind || "egg";
+    if (!companion || companion.ck !== ck) {
+      if (companion) scene.remove(companion.group);
+      companion = { ...buildCompanion(), ck }; companion.group.userData = { kind: "companion" };
+      companion.group.position.set(0, 0, 2); companion.target = [0, 2]; scene.add(companion.group);
+    }
+    const st = compStage(state.companion.xp);
+    companion.group.scale.setScalar(state.companion.kind ? 0.9 + st * 0.3 : 1);
+    // sélection
+    if (selRing) { selRing.parent && selRing.parent.remove(selRing); }
+    const selObj = selected();
+    if (selObj) {
+      selRing = new T.Mesh(new T.RingGeometry(1.1, 1.3, 32), new T.MeshBasicMaterial({ color: "#F2A541", side: T.DoubleSide }));
+      selRing.rotation.x = -Math.PI / 2; selRing.position.y = 0.05; selObj.add(selRing);
+    }
+  }
+  function selected() {
+    const s = state.sel; if (!s) return null;
+    if (s.kind === "animal") return animals.get(s.id)?.group;
+    if (s.kind === "decor") return decor.get(s.uid);
+    if (s.kind === "companion") return companion?.group;
+    return null;
+  }
+
+  // Caméra en orbite
+  function placeCamera() {
+    const { theta, phi, r, target } = orbit;
+    camera.position.set(target.x + r * Math.sin(phi) * Math.cos(theta), target.y + r * Math.cos(phi), target.z + r * Math.sin(phi) * Math.sin(theta));
+    camera.lookAt(target);
+  }
+  function resize() {
+    const el = renderer.domElement.parentElement; if (!el) return;
+    const w = el.clientWidth, h = el.clientHeight;
+    renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix();
+  }
+  const cvs = renderer.domElement;
+  const pointers = new Map(); let pinch = null, downAt = null, dragDist = 0, mode = null;
+  cvs.addEventListener("contextmenu", e => e.preventDefault());
+  cvs.addEventListener("pointerdown", e => { cvs.setPointerCapture(e.pointerId); pointers.set(e.pointerId, [e.clientX, e.clientY]); downAt = [e.clientX, e.clientY]; dragDist = 0; mode = e.button === 2 || e.shiftKey ? "pan" : "rotate"; pinch = null; });
+  cvs.addEventListener("pointermove", e => {
+    if (!pointers.has(e.pointerId)) return;
+    const prev = pointers.get(e.pointerId); pointers.set(e.pointerId, [e.clientX, e.clientY]);
+    const dx = e.clientX - prev[0], dy = e.clientY - prev[1]; dragDist += Math.abs(dx) + Math.abs(dy);
+    if (pointers.size === 2) {
+      const [a, b] = [...pointers.values()]; const d = Math.hypot(a[0] - b[0], a[1] - b[1]);
+      if (pinch) { orbit.r = Math.min(55, Math.max(7, orbit.r * pinch / d)); pan(dx / 2, dy / 2); }
+      pinch = d; return;
+    }
+    if (mode === "pan") pan(dx, dy);
+    else { orbit.theta += dx * 0.008; orbit.phi = Math.min(1.45, Math.max(0.3, orbit.phi - dy * 0.006)); }
+  });
+  function pan(dx, dy) {
+    const k = orbit.r * 0.0022;
+    // droite caméra = (sin θ, −cos θ), avant = (−cos θ, −sin θ)
+    orbit.target.x += (-Math.sin(orbit.theta) * dx - Math.cos(orbit.theta) * dy) * k;
+    orbit.target.z += (Math.cos(orbit.theta) * dx - Math.sin(orbit.theta) * dy) * k;
+    const len = Math.hypot(orbit.target.x, orbit.target.z); if (len > 18) { orbit.target.x *= 18 / len; orbit.target.z *= 18 / len; }
+  }
+  const ray = new T.Raycaster(), ndc = new T.Vector2();
+  cvs.addEventListener("pointerup", e => {
+    pointers.delete(e.pointerId); if (pointers.size < 2) pinch = null;
+    if (dragDist > 6 || !downAt) return;
+    const rc = cvs.getBoundingClientRect();
+    ndc.set((e.clientX - rc.left) / rc.width * 2 - 1, -((e.clientY - rc.top) / rc.height) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    const objs = [...animals.values()].map(a => a.group).concat([...decor.values()], companion ? [companion.group] : []);
+    const hit = ray.intersectObjects(objs, true)[0];
+    let o = hit && hit.object; while (o && !o.userData.kind) o = o.parent;
+    if (!o) { state.sel = null; }
+    else if (o.userData.kind === "animal") state.sel = { kind: "animal", id: o.userData.id };
+    else if (o.userData.kind === "decor") state.sel = { kind: "decor", uid: o.userData.uid };
+    else state.sel = { kind: "companion" };
+    state.toast = null; sync(); updateSanctPanel();
+  });
+  cvs.addEventListener("pointercancel", e => pointers.delete(e.pointerId));
+  cvs.addEventListener("wheel", e => { e.preventDefault(); orbit.r = Math.min(55, Math.max(7, orbit.r * (e.deltaY > 0 ? 1.1 : 0.9))); }, { passive: false });
+
+  // Animation : errance, vol, nage, sommeil, abri sous la pluie
+  let raf = null, lastT = performance.now(); const jumps = new Map();
+  function tick(now) {
+    raf = requestAnimationFrame(tick);
+    if (!renderer.domElement.isConnected || state.view !== "sanct") { cancelAnimationFrame(raf); raf = null; return; }
+    const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now; const t = now / 1000;
+    const cond = CONDS[state.cond].id;
+    const trees = state.decor.filter(d => d.type === "tree");
+    for (const a of animals.values()) {
+      const g = a.group, sp = a.sp;
+      const sleeping = cond === "night" && !TRAITS.noct.includes(sp.id) && a.kind !== "swim";
+      const shelter = cond === "rain" && !TRAITS.rain.includes(sp.id) && a.kind !== "swim";
+      if (shelter && trees.length) { const tr = trees[sp.id % trees.length]; a.target = [tr.pos[0] + Math.cos(sp.id) * 1.2, tr.pos[1] + Math.sin(sp.id) * 1.2]; }
+      let moving = !sleeping && !(shelter && !trees.length);
+      const dx = a.target[0] - g.position.x, dz = a.target[1] - g.position.z, dist = Math.hypot(dx, dz);
+      if (dist < 0.3) { if (!shelter) a.target = randomSpot(a.kind); moving = false; }
+      if (moving && dist >= 0.3) {
+        const sp2 = a.speed * (cond === "rain" && TRAITS.rain.includes(sp.id) ? 1.6 : 1) * (a.kind === "fly" ? 1.8 : 1);
+        g.position.x += dx / dist * sp2 * dt; g.position.z += dz / dist * sp2 * dt;
+        const want = Math.atan2(dx, dz); g.rotation.y += ((want - g.rotation.y + Math.PI * 3) % (Math.PI * 2) - Math.PI) * Math.min(1, dt * 6);
+      }
+      const jump = jumps.get(sp.id); let jy = 0;
+      if (jump) { const k = (t - jump) / 0.6; if (k > 1) jumps.delete(sp.id); else jy = Math.sin(k * Math.PI) * 0.8; }
+      if (a.kind === "fly") { g.position.y = sleeping ? 0 : 1.6 + Math.sin(t * 2 + a.phase) * 0.3 + jy; a.parts.wings.forEach((w, i) => { w.rotation.z = sleeping ? 0 : Math.sin(t * 18 + a.phase) * 0.6 * (i ? -1 : 1); }); }
+      else if (a.kind === "swim") { g.position.y = -0.25 + Math.sin(t * 2 + a.phase) * 0.06 + jy; }
+      else { g.position.y = (moving ? Math.abs(Math.sin(t * 9 + a.phase)) * 0.06 : 0) + jy; a.parts.wings.forEach((w, i) => { w.rotation.z = moving ? 0 : Math.sin(t * 3 + a.phase) * 0.1 * (i ? -1 : 1); }); }
+      g.scale.y = sleeping ? g.scale.x * 0.8 : g.scale.x;
+    }
+    if (companion) {
+      const g = companion.group;
+      if (companion.parts.egg) g.rotation.z = Math.sin(t * 3) * 0.12;
+      else {
+        const asleep = cond === "night" && state.companion.kind !== "owl";
+        const dx = companion.target[0] - g.position.x, dz = companion.target[1] - g.position.z, dist = Math.hypot(dx, dz);
+        if (dist < 0.3) { const ang = Math.random() * 6.28; companion.target = [Math.cos(ang) * 3, Math.sin(ang) * 3]; }
+        else if (!asleep) { g.position.x += dx / dist * 0.9 * dt; g.position.z += dz / dist * 0.9 * dt; g.rotation.y = Math.atan2(dx, dz); }
+        g.position.y = asleep ? 0 : Math.abs(Math.sin(t * 8)) * 0.05;
+      }
+    }
+    if (rain.visible) { const arr = rain.geometry.attributes.position.array; for (let i = 1; i < arr.length; i += 3) { arr[i] -= 22 * dt; if (arr[i] < 0) arr[i] = 20; } rain.geometry.attributes.position.needsUpdate = true; }
+    placeCamera(); renderer.render(scene, camera);
+  }
+  function start() { if (!raf) { lastT = performance.now(); raf = requestAnimationFrame(tick); } }
+  function zoom(f) { orbit.r = Math.min(55, Math.max(7, orbit.r * f)); }
+  function reset() { orbit.theta = 0.8; orbit.phi = 1.02; orbit.r = 30; orbit.target.set(0, 0, 0); }
+  function jump(id) { jumps.set(id, performance.now() / 1000); }
+  function focus(sel) { const o = selected(); if (o) { orbit.target.set(o.position.x, 0, o.position.z); orbit.r = Math.min(orbit.r, 16); } }
+  window.addEventListener("resize", resize);
+  return { renderer, resize, sync, start, zoom, reset, jump, focus };
 }
 
 function museumLabel(key) { const m = MUSEUMS[key]; return `${m.name}, ${m.city}`; }
@@ -2042,6 +2609,8 @@ function render(keepScroll = false) {
   if (v !== "capture" && !keepScroll) $screen.scrollTop = 0;
   const f = document.getElementById("file");
   if (f) f.addEventListener("change", onFile);
+  if (v === "map") attachMapNav();
+  if (v === "sanct") mountSanct();
   const q = document.getElementById("q");
   if (q) q.addEventListener("input", () => {
     state.query = q.value; state.limit = 60;
@@ -2054,7 +2623,7 @@ function go(view) {
   if (view === "fiche") { state.back = state.view === "badges" ? "badges" : "dex"; }
   state.toast = null; state.hearts = null;
   if (view === "capture") { state.scan = null; if (state.view !== "capture") state.camMode = ["dinos", "dino", "museums"].includes(state.view) ? "fossil" : ["micros", "micro"].includes(state.view) ? "micro" : "live"; }
-  if (view !== "capture") state.photo = null;
+  if (view !== "capture") { state.photo = null; state.photoPalette = null; }
   state.view = view;
   render();
 }
@@ -2064,7 +2633,7 @@ function onFile(e) {
   const file = e.target.files && e.target.files[0];
   if (!file) return;
   const r = new FileReader();
-  r.onload = () => { state.photo = r.result; render(); };
+  r.onload = async () => { state.photo = r.result; state.photoPalette = await paletteFromPhoto(r.result); render(); };
   r.readAsDataURL(file);
 }
 
@@ -2123,6 +2692,7 @@ function showResult() {
   if (state.view !== "capture") return;
   if (state.camMode === "fossil") return showFossilResult();
   if (state.camMode === "micro") return showMicroResult();
+  if (state.camMode === "decor") return showDecorResult();
   if (POSITIONS[state.pos].verdict !== "ok") return showRefusal(POSITIONS[state.pos]);
   const target = pickTarget();
   const isNew = !state.captured[target.id];
@@ -2244,6 +2814,53 @@ function doMicroCapture(id) {
   setTimeout(() => showBadges(gained, 0), 1700);
 }
 
+function showDecorResult() {
+  const type = DECOR_TYPES[state.decorKind], info = DECOR[type];
+  const [variant, base] = pick(info.variants);
+  const color = state.photoPalette && type !== "water" && type !== "flower" ? state.photoPalette[0] : base;
+  state.pendingDecor = { type, variant, color, place: POSITIONS[state.pos].label };
+  state.scan = "done";
+  const pill = document.querySelector(".cam .pill"); if (pill) pill.textContent = "Élément identifié";
+  document.querySelector(".scanline")?.remove();
+  $layer.innerHTML = `<div class="sheet">
+    <div class="grab"></div>
+    <div class="res">
+      <div class="pic" style="background:${color}22;font-size:40px">${info.icon}</div>
+      <div><span class="okpill newsp">Nouveau décor</span><h3>${esc(variant)}</h3><p class="sci" style="font-family:var(--body);font-style:normal;font-size:13px">${info.name}</p></div>
+    </div>
+    <div class="rewards">
+      <div class="rrow"><span>${state.photoPalette ? "Couleur extraite de votre photo" : "Couleur type"}</span><span class="swatch" style="background:${color}"></span></div>
+      <div class="xrow"><span>Ajout au sanctuaire</span><b>+5 XP</b></div>
+      ${info.plant ? '<div class="xrow"><span>Nourriture pour vos animaux</span><b>+2 🍃</b></div>' : ""}
+    </div>
+    <button type="button" class="cta" data-dadd>Placer dans mon sanctuaire</button>
+    <button type="button" class="ghost" data-retry>Ce n'est pas ça, reprendre</button>
+  </div>`;
+}
+
+function addDecor() {
+  const d = state.pendingDecor; if (!d) return;
+  const n = state.decor.length + 1;
+  const water = state.decor.filter(x => x.type === "water");
+  let pos;
+  for (let tries = 0; tries < 40; tries++) {
+    const a = Math.random() * Math.PI * 2;
+    const rad = d.type === "mountain" ? 15.5 + Math.random() : d.type === "water" ? Math.random() * 6 : 3 + Math.random() * 13;
+    pos = [Math.cos(a) * rad, Math.sin(a) * rad];
+    const clash = water.some(w => Math.hypot(w.pos[0] - pos[0], w.pos[1] - pos[1]) < w.size + (d.type === "water" ? 5 : 1.2));
+    if (!clash) break;
+  }
+  const item = { uid: "d" + n + "-" + Date.now(), ...d, pos, size: d.type === "water" ? 3.5 + Math.random() * 1.5 : 0.8 + Math.random() * 0.6, rot: Math.random() * 6.28, date: TODAY };
+  state.decor.push(item);
+  if (DECOR[d.type].plant) state.food += 2;
+  state.xp += 5;
+  state.sel = { kind: "decor", uid: item.uid };
+  state.pendingDecor = null;
+  state.photo = null; state.photoPalette = null;
+  $layer.innerHTML = "";
+  state.view = "sanct"; render();
+}
+
 function showFossilResult() {
   const left = DINOS.filter(d => !state.dinos[d.id]);
   const d = left.length ? pick(left) : pick(DINOS);
@@ -2301,7 +2918,7 @@ function doCapture(id) {
     state.fresh.add(id);
   }
   if (pc.variant) (state.captured[id].variants ||= []).push(pc.variant);
-  if (state.photo) state.photos[id] = state.photo;
+  if (state.photo) { state.photos[id] = state.photo; if (state.photoPalette) state.captured[id].palette = state.photoPalette; }
   const items = progressAfter({ kind: "live", id, isNew: pc.isNew, cond: pc.cond, rarity: pc.rarity, place: POSITIONS[state.pos].label }, pc.gain.total, before);
   const total = Object.keys(state.captured).length;
   $layer.innerHTML = `<div class="overlay ${pc.variant ? "shiny" : ""}"><div class="inner">
@@ -2377,20 +2994,28 @@ document.addEventListener("click", e => {
     return showBadges(state.pending, Number(t.dataset.next));
   }
   if (t.dataset.mapview) { state.mapView = t.dataset.mapview; state.hot = null; return render(true); }
-  if (t.dataset.hot !== undefined) { state.hot = Number(t.dataset.hot); return render(true); }
+  if (t.dataset.hot !== undefined) { if (mapDragged && t.tagName !== "BUTTON") { mapDragged = false; return; } state.hot = Number(t.dataset.hot); return render(true); }
+  if (t.dataset.mapzoom) { const svg = document.getElementById("mapsvg"); if (svg) mapZoom(svg, Number(t.dataset.mapzoom)); return; }
+  if ("mapall" in t.dataset) { const svg = document.getElementById("mapsvg"); if (svg) mapApply(svg, [0, 0, mapData[state.mapView].width, mapData[state.mapView].height]); return; }
+  if ("mapreset" in t.dataset) {
+    // Autour de moi : centré sur Lyon (position simulée), zoom ×4
+    const svg = document.getElementById("mapsvg"), m = mapData[state.mapView];
+    const [cx, cy] = m.places["Monts du Lyonnais"]; const w = m.width / 4, h = m.height / 4;
+    if (svg) mapApply(svg, [cx - w / 2, cy - h / 2, w, h]); return;
+  }
+  if (t.dataset.w3zoom) { W3 && W3.zoom(Number(t.dataset.w3zoom)); return; }
+  if ("w3reset" in t.dataset) { W3 && W3.reset(); return; }
+  if ("decorcam" in t.dataset) { go("capture"); state.camMode = "decor"; return render(); }
+  if ("decorkind" in t.dataset) { state.decorKind = (state.decorKind + 1) % DECOR_TYPES.length; return render(); }
+  if ("dadd" in t.dataset) return addDecor();
+  if ("selcomp" in t.dataset) { state.sel = { kind: "companion" }; if (W3) { W3.sync(); W3.focus(); } return updateSanctPanel(); }
   if ("cond" in t.dataset) { state.cond = (state.cond + 1) % CONDS.length; return render(state.view !== "capture"); }
   if (t.dataset.biome) { state.biome = t.dataset.biome; return render(true); }
   if (t.dataset.feed) {
     const sp = byId[t.dataset.feed];
-    if (state.food <= 0) { state.toast = "Plus de nourriture : scannez une plante ou photographiez un animal."; return render(true); }
-    state.food--; state.happy = Math.min(100, state.happy + 5); state.hearts = sp.id;
-    state.toast = `${displayName(sp)} a mangé avec appétit.`;
-    return render(true);
-  }
-  if ("plant" in t.dataset) {
-    const p = pick(PLANTS); state.food += 2;
-    state.toast = `${p} scanné : +2 nourriture. Les plantes ne comptent pas dans la collection.`;
-    return render(true);
+    if (state.food <= 0) state.toast = "Plus de nourriture : scannez un arbre, des fleurs ou un buisson, ou photographiez un animal.";
+    else { state.food--; state.happy = Math.min(100, state.happy + 5); state.toast = `${displayName(sp)} a mangé avec appétit.`; W3 && W3.jump(sp.id); }
+    return updateSanctPanel();
   }
   if (t.dataset.mcapture) return doMicroCapture(Number(t.dataset.mcapture));
   if (t.dataset.micro) { state.micro = Number(t.dataset.micro); return go("micro"); }

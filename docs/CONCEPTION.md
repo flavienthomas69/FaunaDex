@@ -439,6 +439,7 @@ CREATE TABLE capture_variants (
 
 ### 2.8 Carte, brouillard de guerre et hotspots
 
+- **Navigation** : carte glissable et zoomable (MapLibre sur mobile, tuiles vectorielles), bouton « autour de moi » et vue d'ensemble ; les noms des lieux d'observation apparaissent en zoomant.
 - **Brouillard** : la carte est couverte, sauf dans un rayon de 40 km autour de chaque lieu d'observation du joueur. Stockage : cellules H3 de résolution 5 (≈ 250 km²) dans `user_explored_cells (user_id, h3_cell)`, remplies à chaque capture. Le client ne reçoit que les cellules, jamais les coordonnées des autres joueurs.
 - **Hotspots** : agrégats par maille de 50 km et par famille, recalculés chaque nuit. Règles de protection : au moins 5 observateurs distincts, délai d'une semaine, exclusion de toute espèce UICN vulnérable ou plus et des listes d'espèces sensibles (rapaces nicheurs, chiroptères en gîte…). La position exacte d'une observation n'est jamais exposée.
 
@@ -474,6 +475,30 @@ CREATE TABLE taxon_traits (
   PRIMARY KEY (taxon_id, trait)
 );
 ```
+
+### 2.11 Sanctuaire 3D et modélisation à partir de la photo
+
+**Monde navigable.** Le sanctuaire est une île en 3D : on tourne autour (un doigt), on se déplace (deux doigts), on zoome (pincer) et on touche un animal ou un élément pour l'inspecter. Sur mobile : `expo-gl` + `@react-three/fiber/native` ; la maquette utilise three.js dans le navigateur.
+
+**Décor à construire.** L'île est vide au départ. Un mode « Décor » de l'appareil photo ajoute ce que le joueur scanne dans la vraie vie :
+
+| Élément scanné | Identification | Ce qui est repris de la photo |
+|---|---|---|
+| Rocher | Classifieur de textures (granite, calcaire, grès, basalte…) | Couleur, forme générale |
+| Arbre, buisson, fleurs | Identification végétale (Pl@ntNet) | Essence → silhouette (conifère, feuillu), couleur du feuillage ; rapporte de la nourriture |
+| Montagne | Position + boussole + modèle numérique de terrain pour nommer le sommet visé | Silhouette, enneigement |
+| Plan d'eau | Classifieur (mare, étang, ruisseau) | Couleur de l'eau ; permet d'accueillir poissons et animaux aquatiques |
+
+**Modéliser l'animal à partir de la photo.** Objectif : que le chat roux photographié ressemble à *ce* chat roux, tout en restant animable.
+1. **Segmentation** de l'animal sur la photo (modèle de type Segment Anything) côté serveur.
+2. **Gabarit** : l'espèce (ou sa famille) donne un modèle 3D riggé parmi une bibliothèque d'environ 15 plans d'organisation : quadrupède, oiseau percheur, oiseau échassier, insecte volant, coléoptère, araignée, lézard, tortue, grenouille, poisson, escargot, pieuvre, crabe… Une table de proportions par espèce ajuste le gabarit (taille des oreilles, longueur des pattes, queue touffue…).
+3. **Transfert d'apparence** : les couleurs dominantes de la zone segmentée sont affectées aux zones du gabarit (dos, ventre, tête, queue, pattes). Pour les motifs (tigré, taches, rayures), la photo est projetée sur la texture du modèle depuis l'angle de prise de vue, et les zones non visibles sont complétées par symétrie.
+4. **Option haut de gamme** : reconstruction 3D à partir d'une seule image (modèles de type TripoSR ou Stable Fast 3D) pour les éléments fixes du décor comme les rochers, où l'animation n'est pas nécessaire.
+5. Le résultat est stocké en glTF par capture (`captures.model_url`) et régénéré si le joueur fournit une meilleure photo.
+
+La maquette applique déjà les étapes 2 et 3 de façon simplifiée : un gabarit procédural par groupe, coloré avec les deux couleurs dominantes du centre de la photo importée.
+
+**Comportements.** Chaque animal erre, vole ou nage selon ses traits ; il faut un plan d'eau pour que les espèces aquatiques apparaissent. La nuit, seuls les animaux nocturnes restent actifs ; sous la pluie, les autres rejoignent l'abri des arbres scannés.
 
 ---
 
