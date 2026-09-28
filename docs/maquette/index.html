@@ -2368,6 +2368,7 @@ function renderSanct() {
       <div class="chips" style="padding:0">${sanctLayout().sectors.map(s => `<button type="button" class="chip" data-sbiome="${s.b}">${SB[s.b].icon} ${SB[s.b].name} <small>${sanctAnimals().filter(sp => habitatOf(sp) === s.b).length}</small></button>`).join("")}</div>
       <p class="count" style="margin:8px 0 0">Chaque biome apparaît quand vous trouvez une espèce qui y vit. Des rivières les séparent et rejoignent le lac central.</p></div>
     <div class="gbif-note" style="margin-top:12px"><b>Comment ça marche</b>Chaque animal photographié en vrai apparaît ici en 3D, avec les couleurs extraites de votre photo, dans le biome où il vit : forêt, prairie, zone humide, montagne, garrigue, savane ou littoral. Les rochers, arbres et montagnes scannés s'ajoutent de préférence dans le biome qui leur correspond. La météo suit la vôtre : sous la pluie, les amphibiens et les escargots sortent et les autres s'abritent sous les arbres ; la nuit, seuls les animaux nocturnes restent actifs.</div>
+    <div class="sources">Modèles 3D : renard de PixelMannen (CC0), squelette et animations de tomkranis (CC-BY 4.0) ; cheval, perroquet, cigogne et flamant de mirada (projet ro.me, exemples three.js) ; arbres et rochers de Kenney (CC0).</div>
     <div class="bpad"></div>`;
 }
 
@@ -2380,10 +2381,33 @@ function loadThree() {
   threeLoading = tryLoad("three.min.js").then(ok => ok || tryLoad("https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"));
   return threeLoading;
 }
+// Modèles 3D réalisés par des artistes (voir docs/maquette/models/LICENCES.md)
+const MODEL_FILES = ["fox", "horse", "parrot", "stork", "flamingo", "tree-big", "tree-small", "palm-short", "formation-rock", "formation-large-rock", "formation-stone"];
+let MODELS = null, modelsLoading = null;
+function loadScriptOnce(src, test) {
+  if (test()) return Promise.resolve(true);
+  return new Promise(res => { const sc = document.createElement("script"); sc.src = src; sc.onload = () => res(test()); sc.onerror = () => res(false); document.head.appendChild(sc); });
+}
+function loadModels() {
+  if (modelsLoading) return modelsLoading;
+  const cdn = "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/";
+  modelsLoading = loadScriptOnce("GLTFLoader.js", () => !!THREE.GLTFLoader)
+    .then(ok => ok || loadScriptOnce(cdn + "loaders/GLTFLoader.js", () => !!THREE.GLTFLoader))
+    .then(() => loadScriptOnce("SkeletonUtils.js", () => !!THREE.SkeletonUtils))
+    .then(ok => ok || loadScriptOnce(cdn + "utils/SkeletonUtils.js", () => !!THREE.SkeletonUtils))
+    .then(() => new Promise(res => {
+      if (!THREE.GLTFLoader) return res(null);
+      const out = {}, loader = new THREE.GLTFLoader();
+      let left = MODEL_FILES.length;
+      const done = () => { if (--left === 0) res(MODELS = out); };
+      MODEL_FILES.forEach(n => loader.load(`models/${n}.json`, g => { out[n] = g; done(); }, undefined, done));
+    }));
+  return modelsLoading;
+}
 function mountSanct() {
   const box = document.getElementById("sanct3d");
   if (!box) return;
-  loadThree().then(ok => {
+  loadThree().then(ok => ok ? loadModels().then(() => true) : false).then(ok => {
     if (state.view !== "sanct" || !document.getElementById("sanct3d")) return;
     const msg = document.getElementById("w3dmsg");
     if (!ok) { if (msg) msg.textContent = "Le moteur 3D n'a pas pu être chargé."; return; }
@@ -2431,11 +2455,10 @@ function createWorld() {
     t.repeat.set(kind === "grass" ? 14 : 2, kind === "grass" ? 14 : 2); return t;
   }
   const TEX = { fur: makeTex("fur"), feather: makeTex("feather"), scale: makeTex("scale"), smooth: makeTex("smooth"), grass: makeTex("grass"), wool: makeTex("wool") };
-  const mat = (c, tex = "smooth", o = {}) => new T.MeshStandardMaterial({ color: lin(c), roughness: .8, metalness: 0,
-    map: TEX[tex], bumpMap: TEX[tex], bumpScale: tex === "fur" ? .014 : tex === "wool" ? .03 : tex === "scale" ? .01 : .004, ...o });
+  const mat = (c, tex = "smooth", o = {}) => new T.MeshStandardMaterial({ color: lin(c), roughness: tex === "wool" ? 1 : .82, metalness: 0, flatShading: true, ...o });
   const M = c => mat(c, "smooth");
   const add = (g, mesh, x = 0, y = 0, z = 0) => { mesh.position.set(x, y, z); mesh.castShadow = true; g.add(mesh); return mesh; };
-  const ball = (r, c, tex = "smooth", sx = 1, sy = 1, sz = 1, o) => { const m = new T.Mesh(new T.SphereGeometry(r, 24, 18), mat(c, tex, o)); m.scale.set(sx, sy, sz); m.castShadow = true; return m; };
+  const ball = (r, c, tex = "smooth", sx = 1, sy = 1, sz = 1, o) => { const m = new T.Mesh(new T.SphereGeometry(r, 12, 9), mat(c, tex, o)); m.scale.set(sx, sy, sz); m.castShadow = true; return m; };
   const sph = (r, c, sx, sy, sz) => ball(r, c, "smooth", sx, sy, sz);
   const cyl = (rt, rb, h, c, seg = 12) => new T.Mesh(new T.CylinderGeometry(rt, rb, h, seg), M(c));
   const cone = (r, h, c, seg = 12) => new T.Mesh(new T.ConeGeometry(r, h, seg), M(c));
@@ -2552,35 +2575,35 @@ function createWorld() {
     const geo = new T.BufferGeometry(); geo.setIndex(idx);
     geo.setAttribute("position", new T.Float32BufferAttribute(pos, 3)); geo.setAttribute("color", new T.Float32BufferAttribute(col, 3)); geo.setAttribute("uv", new T.Float32BufferAttribute(uv, 2));
     geo.computeVertexNormals();
-    const ground = new T.Mesh(geo, new T.MeshStandardMaterial({ vertexColors: true, roughness: .95, map: TEX.grass, bumpMap: TEX.grass, bumpScale: .02 }));
+    const ground = new T.Mesh(geo, new T.MeshStandardMaterial({ vertexColors: true, roughness: .95, flatShading: true }));
     ground.receiveShadow = true; terrain.add(ground);
     // Végétation propre à chaque biome
     const tuftGeo = new T.ConeGeometry(.03, .22, 4); tuftGeo.translate(0, .11, 0);
-    terrain.add(scatter(4200, tuftGeo, new T.MeshStandardMaterial({ roughness: .9 }), (b, h) => h > .26 && h < 1.5 && b !== "coast",
+    terrain.add(scatter(1400, tuftGeo, new T.MeshStandardMaterial({ roughness: .9 }), (b, h) => h > .26 && h < 1.5 && b !== "coast",
       b => ({ s: .7 + Math.random() * .9, c: shade(SB[b].tuft, .85 + Math.random() * .3), tilt: (Math.random() - .5) * .4 })));
     const flowerGeo = new T.SphereGeometry(.07, 8, 6); flowerGeo.translate(0, .22, 0);
-    terrain.add(scatter(700, flowerGeo, new T.MeshStandardMaterial({ roughness: .6 }), (b, h) => b === "meadow" && h > .26,
+    terrain.add(scatter(260, flowerGeo, new T.MeshStandardMaterial({ roughness: .6 }), (b, h) => b === "meadow" && h > .26,
       () => ({ s: 1, c: pick(["#E3483A", "#F5C83A", "#FFFFFF", "#9A6CC8", "#F08AB0"]) })));
     const reedGeo = new T.CylinderGeometry(.02, .025, 1.1, 5); reedGeo.translate(0, .55, 0);
-    terrain.add(scatter(700, reedGeo, new T.MeshStandardMaterial({ roughness: .8 }), (b, h) => (b === "wetland" || h < .3) && h > -.25 && h < .35,
+    terrain.add(scatter(260, reedGeo, new T.MeshStandardMaterial({ roughness: .8 }), (b, h) => (b === "wetland" || h < .3) && h > -.25 && h < .35,
       () => ({ s: .7 + Math.random() * .6, c: pick(["#6E8A45", "#7F9A4E", "#8A9A5A"]), tilt: (Math.random() - .5) * .25 })));
     const catGeo = new T.CylinderGeometry(.05, .05, .22, 8); catGeo.translate(0, 1.05, 0);
-    terrain.add(scatter(160, catGeo, new T.MeshStandardMaterial({ color: lin("#5A3A22"), roughness: .9 }), (b, h) => b === "wetland" && h > -.2 && h < .3, () => ({ s: .8 + Math.random() * .4 })));
+    terrain.add(scatter(45, catGeo, new T.MeshStandardMaterial({ color: lin("#5A3A22"), roughness: .9 }), (b, h) => b === "wetland" && h > -.2 && h < .3, () => ({ s: .8 + Math.random() * .4 })));
     const padGeo = new T.CircleGeometry(.28, 10); padGeo.rotateX(-Math.PI / 2);
-    terrain.add(scatter(220, padGeo, new T.MeshStandardMaterial({ color: lin("#4F8A3A"), roughness: .6, side: T.DoubleSide }), (b, h, r) => h < -.15 && (b === "wetland" || r < 3.5),
+    terrain.add(scatter(120, padGeo, new T.MeshStandardMaterial({ color: lin("#4F8A3A"), roughness: .6, side: T.DoubleSide }), (b, h, r) => h < -.15 && (b === "wetland" || r < 3.5),
       () => ({ s: .7 + Math.random() * .7, y: .02 })));
     const fernGeo = new T.ConeGeometry(.28, .35, 6); fernGeo.translate(0, .17, 0);
-    terrain.add(scatter(420, fernGeo, new T.MeshStandardMaterial({ roughness: .8 }), (b, h) => b === "forest" && h > .26, () => ({ s: .8 + Math.random() * .7, sy: .7, c: pick(["#2F6A2E", "#3B7A34", "#46823A"]) })));
+    terrain.add(scatter(120, fernGeo, new T.MeshStandardMaterial({ roughness: .8 }), (b, h) => b === "forest" && h > .26, () => ({ s: .8 + Math.random() * .7, sy: .7, c: pick(["#2F6A2E", "#3B7A34", "#46823A"]) })));
     const capGeo = new T.SphereGeometry(.09, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2); capGeo.translate(0, .12, 0);
     terrain.add(scatter(60, capGeo, new T.MeshStandardMaterial({ roughness: .5 }), (b, h) => b === "forest" && h > .26, () => ({ s: 1, c: pick(["#C8322A", "#B8864A", "#E8DCC8"]) })));
     const stoneGeo = new T.IcosahedronGeometry(.25, 1);
-    terrain.add(scatter(260, stoneGeo, new T.MeshStandardMaterial({ roughness: .95 }), (b, h) => (b === "mountain" && h > .3) || (b === "coast" && h > -.1 && h < .5),
+    terrain.add(scatter(60, stoneGeo, new T.MeshStandardMaterial({ roughness: .95 }), (b, h) => (b === "mountain" && h > .3) || (b === "coast" && h > -.1 && h < .5),
       b => ({ s: .4 + Math.random() * 1.4, sy: .6, c: b === "coast" ? pick(["#EDE6D6", "#C9BFA8"]) : pick(["#8C8A80", "#9E9A8E", "#77746C"]) })));
     const shrubGeo = new T.IcosahedronGeometry(.35, 1); shrubGeo.translate(0, .25, 0);
-    terrain.add(scatter(300, shrubGeo, new T.MeshStandardMaterial({ roughness: .9 }), (b, h) => (b === "scrub" || b === "savanna") && h > .26,
+    terrain.add(scatter(110, shrubGeo, new T.MeshStandardMaterial({ roughness: .9 }), (b, h) => (b === "scrub" || b === "savanna") && h > .26,
       b => ({ s: .6 + Math.random() * .8, sy: .7, c: b === "savanna" ? pick(["#8E9A4E", "#A2A45A"]) : pick(["#6E7A45", "#5E6E3E", "#7F8A50"]) })));
     const grassGeo = new T.ConeGeometry(.12, .55, 5); grassGeo.translate(0, .27, 0);
-    terrain.add(scatter(500, grassGeo, new T.MeshStandardMaterial({ roughness: .9 }), (b, h) => b === "savanna" && h > .26, () => ({ s: .7 + Math.random() * .6, c: pick(["#D6BE72", "#C8AE5E", "#E0CC86"]) })));
+    terrain.add(scatter(160, grassGeo, new T.MeshStandardMaterial({ roughness: .9 }), (b, h) => b === "savanna" && h > .26, () => ({ s: .7 + Math.random() * .6, c: pick(["#D6BE72", "#C8AE5E", "#E0CC86"]) })));
     // Noms des biomes au-dessus de leur secteur
     if (layout.sectors.length > 1) layout.sectors.forEach(s => {
       const a = (s.a0 + s.a1) / 2, x = Math.cos(a) * 11, z = Math.sin(a) * 11;
@@ -2599,7 +2622,7 @@ function createWorld() {
   // ── Squelettes : un corps continu (maillage « skinné ») déformé par une chaîne d'os
   const UPV = new T.Vector3(0, 1, 0), FWDV = new T.Vector3(0, 0, 1);
   function skinTube(pts, radii, colorFn, tex = "fur", o = {}) {
-    const segs = o.segs || 5, radial = o.radial || 20;
+    const segs = o.segs || 4, radial = o.radial || 12;
     const V = pts.map(p => new T.Vector3(...p));
     const curve = new T.CatmullRomCurve3(V, false, "catmullrom", .5);
     const n = V.length, rings = (n - 1) * segs + 1;
@@ -2638,7 +2661,7 @@ function createWorld() {
     bones.forEach((b, i) => { if (i) bones[i - 1].add(b); });
     const m = new T.SkinnedMesh(geo, new T.MeshStandardMaterial({
       vertexColors: true, skinning: true, roughness: o.rough ?? .8, metalness: 0,
-      map: o.map || TEX[tex], bumpMap: TEX[tex], bumpScale: tex === "fur" ? .012 : tex === "wool" ? .035 : .006,
+      map: o.map || null, flatShading: true,
     }));
     m.add(bones[0]); m.bind(new T.Skeleton(bones));
     m.castShadow = true; m.frustumCulled = false;
@@ -3141,7 +3164,91 @@ function createWorld() {
     if (o === "Eulipotyphla") return { ...base, w: .12, len: .22, h: .1, neck: .03, hs: .09, muz: .14, ear: [.02, .02], roundEar: true, tail: .15, tailR: .02 };
     return base;
   }
+  // Recoloration : chaque couleur du modèle est rangée en sombre / clair / teinte, puis remplacée par la palette
+  function paletteMapper(pal) {
+    const c0 = new T.Color(pal[0]), c1 = new T.Color(pal[1] || pal[0]), c2 = new T.Color(pal[2] || shade(pal[0], .3)), hsl = {};
+    return col => {
+      col.getHSL(hsl);
+      if (hsl.l < .2) return c2.clone().multiplyScalar(.7 + hsl.l);
+      if (hsl.l > .66 && hsl.s < .35) return c1.clone().multiplyScalar(.82 + (hsl.l - .66) * .5);
+      return c0.clone().multiplyScalar(.6 + hsl.l * .8);
+    };
+  }
+  function recolorTexture(tex, map) {
+    const img = tex.image, w = img.width, h = img.height, c = document.createElement("canvas"); c.width = w; c.height = h;
+    const g = c.getContext("2d"); g.drawImage(img, 0, 0);
+    const d = g.getImageData(0, 0, w, h), px = d.data, col = new T.Color();
+    for (let i = 0; i < px.length; i += 4) { col.setRGB(px[i] / 255, px[i + 1] / 255, px[i + 2] / 255); const o = map(col); px[i] = o.r * 255; px[i + 1] = o.g * 255; px[i + 2] = o.b * 255; }
+    g.putImageData(d, 0, 0);
+    const t = new T.CanvasTexture(c); t.flipY = tex.flipY; t.encoding = tex.encoding; t.wrapS = tex.wrapS; t.wrapT = tex.wrapT; return t;
+  }
+  function recolorVertices(geo, map) {
+    const a = geo.attributes.color, col = new T.Color();
+    for (let i = 0; i < a.count; i++) { col.setRGB(a.getX(i), a.getY(i), a.getZ(i)).convertLinearToSRGB(); const o = map(col).convertSRGBToLinear(); a.setXYZ(i, o.r, o.g, o.b); }
+    a.needsUpdate = true;
+  }
+  const MODEL_DEF = { fox: { len: 1.5 }, horse: { len: 2.3 }, parrot: { len: .9 }, stork: { len: 1.8 }, flamingo: { len: 1.9 } };
+  function modelInstance(name, pal, scale = 1) {
+    const src = MODELS[name], def = MODEL_DEF[name] || { len: 1 };
+    let skinned = false; src.scene.traverse(o => { if (o.isSkinnedMesh) skinned = true; });
+    const root = skinned ? THREE.SkeletonUtils.clone(src.scene) : src.scene.clone(true);
+    const map = pal ? paletteMapper(pal) : null;
+    root.traverse(o => {
+      if (!o.isMesh) return;
+      o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false;
+      o.material = o.material.clone();
+      if (map && o.material.map) o.material.map = recolorTexture(o.material.map, map);
+      if (map && o.geometry.attributes.color) { o.geometry = o.geometry.clone(); recolorVertices(o.geometry, map); }
+    });
+    if (!src.box) { src.box = new T.Box3().setFromObject(src.scene); src.size = src.box.getSize(new T.Vector3()); }
+    const k = def.len / Math.max(src.size.x, src.size.z) * scale;
+    root.scale.multiplyScalar(k); root.position.y = -src.box.min.y * k;
+    const g = new T.Group(); g.add(root);
+    return { g, mixer: new T.AnimationMixer(root), clips: src.animations };
+  }
+  // Renard articulé : attente (« Survey »), marche, course, avec fondus entre les animations
+  function foxModel(pal, scale) {
+    const m = modelInstance("fox", pal, scale), acts = {};
+    m.clips.forEach(c => { acts[c.name] = m.mixer.clipAction(c); });
+    let cur = null;
+    const play = n => { const a = acts[n]; if (!a || cur === a) return; a.reset().setEffectiveWeight(1).fadeIn(.3).play(); if (cur) cur.fadeOut(.3); cur = a; };
+    play("Survey");
+    return { group: m.g, parts: { wings: [], update({ dt, moving, speed, sleeping }) {
+      play(moving && !sleeping ? (speed > 1.25 ? "Run" : "Walk") : "Survey");
+      if (cur) cur.timeScale = sleeping ? .2 : moving ? .8 + speed * .3 : 1;
+      m.mixer.update(dt);
+    } } };
+  }
+  // Modèles animés par morphing (cheval au galop, oiseaux en vol)
+  function morphModel(name, pal, scale, o = {}) {
+    const m = modelInstance(name, pal, scale), a = m.mixer.clipAction(m.clips[0]), dur = m.clips[0].duration;
+    a.play(); a.time = seeded(scale * 97) * dur;
+    return { group: m.g, parts: { fly: !!o.fly, hover: !!o.hover, wings: [], update({ dt, moving, flying, speed, sleeping }) {
+      const active = o.fly ? flying : moving;
+      if (active && !sleeping) { a.paused = false; a.timeScale = o.fly ? (moving ? 1 : .7) : .45 + speed * .35; }
+      else { a.paused = true; a.time = dur * (o.rest ?? .5); }
+      m.mixer.update(dt);
+    } } };
+  }
+  function modelFor(sp, pal) {
+    if (!MODELS) return null;
+    const id = sp.id, fam = sp.family || "", photo = (state.captured[id] || {}).palette || null;
+    if (id === 7 && MODELS.fox) return foxModel(photo, 1);
+    if (id === 9 && MODELS.fox) return foxModel(photo || ["#8D8A84", "#DCD7CE", "#3A3836"], 1.4);
+    if (fam === "Canidae" && MODELS.fox) return foxModel(pal, 1.15);
+    if (fam === "Equidae" && MODELS.horse) return morphModel("horse", photo, 1);
+    if ((id === 26 || /Ardeidae|Ciconiidae|Gruidae/.test(fam)) && MODELS.stork) return morphModel("stork", id === 26 ? (photo || ["#9EA3A6", "#B8BCBF", "#1C1C1C"]) : photo, 1, { fly: true, hover: true });
+    if (/Phoenicopteridae/.test(fam) && MODELS.flamingo) return morphModel("flamingo", photo, 1, { fly: true, hover: true });
+    if (sp.cat === "ois" && ![2, 3, 4].includes(id) && MODELS.parrot) return morphModel("parrot", pal, id === 1 || id === 25 ? .55 : .7, { fly: true, hover: true });
+    return null;
+  }
   function buildAnimal(sp, pal) {
+    const model = modelFor(sp, pal);
+    if (model) {
+      const hit = new T.Mesh(new T.SphereGeometry(1, 8, 6), new T.MeshBasicMaterial({ visible: false }));
+      hit.position.y = .5; model.group.add(hit);
+      return model;
+    }
     const id = sp.id, cat = sp.cat;
     let a;
     if (cat === "mam" && ["Cetacea", "Sirenia"].includes(sp.order)) a = fish(0, pal, { k: 1.8, flukes: true });
@@ -3177,15 +3284,29 @@ function createWorld() {
     return a;
   }
 
+  function decorModel(name, height, colorize) {
+    const src = MODELS && MODELS[name]; if (!src) return null;
+    const root = src.scene.clone(true);
+    if (!src.box) { src.box = new T.Box3().setFromObject(src.scene); src.size = src.box.getSize(new T.Vector3()); }
+    const k = height / src.size.y;
+    root.scale.multiplyScalar(k); root.position.y = -src.box.min.y * k;
+    root.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.material = o.material.clone(); o.material.flatShading = true; colorize && colorize(o.material); o.material.needsUpdate = true; } });
+    return root;
+  }
   function buildDecor(d) {
     const g = new T.Group(); const k = d.size;
-    if (d.type === "rock") {
+    const kenney = d.type === "tree" ? decorModel(/Pin|Sapin/.test(d.variant) ? "tree-small" : "tree-big", (/Pin|Sapin/.test(d.variant) ? 4.2 : 3.6) * k,
+        m => { if (!/wood/i.test(m.name)) m.color.copy(lin(d.color)); else if (/Bouleau/.test(d.variant)) m.color.copy(lin("#E8E4D8")); })
+      : d.type === "rock" ? decorModel(["formation-rock", "formation-large-rock", "formation-stone"][Math.floor(seeded(d.rot * 13) * 3)], 1.3 * k, m => m.color.copy(lin(d.color)))
+      : null;
+    if (kenney) { kenney.rotation.y = d.rot; g.add(kenney); }
+    else if (d.type === "rock") {
       const geo = new T.IcosahedronGeometry(0.8, 2), pos = geo.attributes.position;
       for (let i = 0; i < pos.count; i++) { const f = 1 + (seeded(i + d.rot * 10) - .5) * .28; pos.setXYZ(i, pos.getX(i) * f, pos.getY(i) * f, pos.getZ(i) * f); }
       geo.computeVertexNormals();
       const m = add(g, new T.Mesh(geo, mat(d.color, "smooth", { roughness: .95, bumpScale: .03 })), 0, 0.35 * k, 0); m.scale.set(1.3 * k, 0.8 * k, 1.1 * k); m.rotation.y = d.rot; m.receiveShadow = true;
     }
-    else if (d.type === "tree") {
+    else if (d.type === "tree" && !kenney) {
       const conifer = /Pin|Sapin/.test(d.variant), birch = /Bouleau/.test(d.variant);
       add(g, cyl(0.15 * k, 0.22 * k, 1.8 * k, birch ? "#EDEDE6" : conifer && /Pin/.test(d.variant) ? "#A0522D" : "#6B4A2E", 6), 0, 0.9 * k, 0);
       if (conifer) [0, 1, 2].forEach(i => add(g, cone((1.3 - i * 0.3) * k, 1.4 * k, d.color, 7), 0, (1.9 + i * 0.75) * k, 0));
@@ -3388,7 +3509,7 @@ function createWorld() {
       let moving = !sleeping && t > a.idleUntil && !(shelter && !trees.length);
       const dx = a.target[0] - g.position.x, dz = a.target[1] - g.position.z, dist = Math.hypot(dx, dz);
       if (dist < 0.3) {
-        if (!shelter && moving) { a.target = randomSpot(a.kind, a.sp); a.idleUntil = t + 1.5 + Math.random() * 4.5; }
+        if (!shelter && moving) { a.target = randomSpot(a.kind, a.sp); a.idleUntil = t + (a.parts.hover ? 0 : 1.5 + Math.random() * 4.5); }
         moving = false;
       }
       let turn = 0;
@@ -3399,7 +3520,7 @@ function createWorld() {
         turn = ((want - g.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
         g.rotation.y += turn * Math.min(1, dt * 4);
       }
-      const flying = a.kind === "fly" && moving;
+      const flying = a.kind === "fly" && (moving || (a.parts.hover && !sleeping));
       const jump = jumps.get(sp.id); let jy = 0;
       if (jump) { const k = (t - jump) / 0.6; if (k > 1) jumps.delete(sp.id); else jy = Math.sin(k * Math.PI) * 0.8; }
       const ground = Math.max(0, heightAt(g.position.x, g.position.z));
@@ -3435,7 +3556,7 @@ function createWorld() {
   function focus() { const o = selected(); if (o) { follow = !!(state.sel && state.sel.kind === "animal"); orbit.target.set(o.position.x, Math.max(0, heightAt(o.position.x, o.position.z)) + .5, o.position.z); orbit.r = Math.min(orbit.r, 9); orbit.phi = 1.22; } }
   function focusBiome(b) { const s = layout.sectors.find(x => x.b === b); if (!s) return; const a = (s.a0 + s.a1) / 2; follow = false; orbit.target.set(Math.cos(a) * 10, 0, Math.sin(a) * 10); orbit.r = 18; orbit.phi = 1.05; orbit.theta = a; }
   window.addEventListener("resize", resize);
-  return { renderer, resize, sync, start, zoom, reset, jump, focus, focusBiome };
+  return { renderer, resize, sync, start, zoom, reset, jump, focus, focusBiome, orbit };
 }
 
 function museumLabel(key) { const m = MUSEUMS[key]; return `${m.name}, ${m.city}`; }
