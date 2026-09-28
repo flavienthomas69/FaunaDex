@@ -2343,7 +2343,8 @@ function renderSanct() {
   const decorCounts = DECOR_TYPES.map(t => [t, state.decor.filter(d => d.type === t).length]).filter(([, n]) => n);
   return `
     <div class="bhead"><p class="kicker">Mon sanctuaire</p><h2>${sanctAnimals().length} animaux · ${state.decor.length} éléments</h2>
-      <button type="button" class="condrow" data-cond style="margin-top:10px">${CONDS[state.cond].icon} Météo chez vous : <b>${CONDS[state.cond].label}</b><small>simulée · toucher pour changer</small></button></div>
+      <button type="button" class="condrow" data-cond style="margin-top:10px">${CONDS[state.cond].icon} Météo chez vous : <b>${CONDS[state.cond].label}</b><small>simulée · toucher pour changer</small></button>
+      <button type="button" class="condrow" data-w3studio style="margin-top:8px">📱 ${state.studio ? "Revenir à l'île" : "Aperçu de l'app iOS"}<small>${state.studio ? "rendu de RealSanctuary3DView (SceneKit) : studio, ombres douces" : "reproduit les réglages du code Swift"}</small></button></div>
     <div class="world3d" id="sanct3d">
       <div class="w3dmsg" id="w3dmsg">Chargement du monde 3D…</div>
       <div class="mapctl">
@@ -2351,7 +2352,7 @@ function renderSanct() {
         <button type="button" data-w3zoom="1.25" aria-label="Éloigner">−</button>
         <button type="button" data-w3reset aria-label="Recentrer">⌖</button>
       </div>
-      ${state.decor.length ? "" : `<div class="emptyworld">📷 Scannez rochers, arbres et montagnes pour décorer l'île</div>`}
+      ${state.studio ? `<div class="emptyworld">📱 Aperçu iOS · hibou, renard et caméléon de remplacement (vos .usdz prendront leur place)</div>` : state.decor.length ? "" : `<div class="emptyworld">📷 Scannez rochers, arbres et montagnes pour décorer l'île</div>`}
       <p class="maphint">Glissez pour tourner · deux doigts ou clic droit pour vous déplacer · pincez pour zoomer</p>
     </div>
     <div class="scanbar">
@@ -2415,7 +2416,7 @@ function mountSanct() {
       if (!W3) W3 = createWorld();
       document.getElementById("sanct3d").prepend(W3.renderer.domElement);
       if (msg) msg.remove();
-      W3.resize(); W3.sync(); W3.start();
+      W3.resize(); W3.sync(); W3.studio(!!state.studio); W3.start();
     } catch (e) { if (msg) msg.textContent = "WebGL n'est pas disponible sur cet appareil."; }
   });
 }
@@ -3736,7 +3737,7 @@ function createWorld() {
   const ray = new T.Raycaster(), ndc = new T.Vector2();
   cvs.addEventListener("pointerup", e => {
     pointers.delete(e.pointerId); if (pointers.size < 2) pinch = null;
-    if (dragDist > 6 || !downAt) return;
+    if (dragDist > 6 || !downAt || (studio && studio.on)) return;
     const rc = cvs.getBoundingClientRect();
     ndc.set((e.clientX - rc.left) / rc.width * 2 - 1, -((e.clientY - rc.top) / rc.height) * 2 + 1);
     ray.setFromCamera(ndc, camera);
@@ -3758,6 +3759,7 @@ function createWorld() {
     raf = requestAnimationFrame(tick);
     if (!renderer.domElement.isConnected || state.view !== "sanct") { cancelAnimationFrame(raf); raf = null; return; }
     const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now; const t = now / 1000;
+    if (studio && studio.on) return tickStudio(t, dt);
     const cond = CONDS[state.cond].id;
     const trees = state.decor.filter(d => d.type === "tree");
     for (const a of animals.values()) {
@@ -3819,13 +3821,70 @@ function createWorld() {
     placeCamera(); renderer.render(scene, camera);
   }
   function start() { if (!raf) { lastT = performance.now(); raf = requestAnimationFrame(tick); } }
-  function zoom(f) { orbit.r = Math.min(55, Math.max(7, orbit.r * f)); }
-  function reset() { follow = false; orbit.theta = 0.8; orbit.phi = 1.0; orbit.r = 36; orbit.target.set(0, 0, 0); }
+  function zoom(f) { orbit.r = studio && studio.on ? Math.min(7, Math.max(1.2, orbit.r * f)) : Math.min(55, Math.max(7, orbit.r * f)); }
+  function reset() { if (studio && studio.on) return studioCamera(); follow = false; orbit.theta = 0.8; orbit.phi = 1.0; orbit.r = 36; orbit.target.set(0, 0, 0); }
+
+  // ── Aperçu iOS : reproduit RealSanctuary3DView + StudioLighting (ios/Sanctuary) avec les mêmes réglages.
+  // Les fichiers .usdz n'existant pas encore, les animaux papier plié de la maquette servent de remplaçants.
+  let studio = null, worldCam = null;
+  function studioCamera() {
+    // SceneKit : caméra en (0 ; 1,1 ; 3,0) qui regarde (0 ; 0,28 ; 0), champ de vision 32°
+    orbit.target.set(0, .28, 0); orbit.r = Math.hypot(.82, 3.0); orbit.phi = Math.acos(.82 / orbit.r); orbit.theta = Math.PI / 2; follow = false;
+  }
+  function buildStudio() {
+    const sc = new T.Scene(); sc.background = new T.Color("#F2EDE0");
+    // Directions des lumières converties depuis les eulerAngles SceneKit (la lumière éclaire vers son -Z)
+    const dirLight = (hex, intensity, dir) => { const l = new T.DirectionalLight(hex, intensity); l.position.set(-dir[0] * 6, -dir[1] * 6, -dir[2] * 6); sc.add(l); return l; };
+    const key = dirLight("#FFEDD6", 1.1, [-.327, -.83, -.45]);
+    key.castShadow = true; key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -.0005;
+    Object.assign(key.shadow.camera, { left: -3, right: 3, top: 3, bottom: -3, near: .1, far: 20 });
+    dirLight("#CCE0FF", .38, [.612, -.5, .612]);           // remplissage bleuté
+    dirLight("#FFF5E6", .45, [0, -.588, .809]);            // contour
+    sc.add(new T.AmbientLight("#FFF8EB", .18));
+    // Environnement en dégradé ciel / crème / ocre (lightingEnvironment)
+    const cv = document.createElement("canvas"); cv.width = 256; cv.height = 128; const g2 = cv.getContext("2d"), gr = g2.createLinearGradient(0, 0, 0, 128);
+    gr.addColorStop(0, "#CCE6FF"); gr.addColorStop(.5, "#FAF2E0"); gr.addColorStop(1, "#B89966"); g2.fillStyle = gr; g2.fillRect(0, 0, 256, 128);
+    const envTex = new T.CanvasTexture(cv); envTex.mapping = T.EquirectangularReflectionMapping; envTex.encoding = T.sRGBEncoding;
+    const pm = new T.PMREMGenerator(renderer); sc.environment = pm.fromEquirectangular(envTex).texture; pm.dispose();
+    // Sol qui ne montre que les ombres (shadowOnly)
+    const floor = new T.Mesh(new T.PlaneGeometry(30, 30), new T.ShadowMaterial({ opacity: .28 })); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; sc.add(floor);
+    // Catalogue iOS : hibou 0,6 m, renard 0,55 m, caméléon 0,3 m
+    const cast = [
+      { sp: { id: 2, cat: "ois", name: "Chouette hulotte" }, pal: SPECIES_COLORS[2], h: .6, at: [-.42, -.05], yaw: .5 },
+      { sp: { id: 7, cat: "mam", name: "Renard roux" }, pal: SPECIES_COLORS[7], h: .55, at: [.42, .1], yaw: -.6 },
+      { sp: { id: 14, cat: "rep", name: "Caméléon" }, pal: ["#4E9A3E", "#7CC05A", "#2F6A2A"], h: .3, at: [0, .55], yaw: .2 },
+    ];
+    const actors = cast.map((c, i) => {
+      const built = buildAnimal(c.sp, c.pal), box = new T.Box3().setFromObject(built.group), k = c.h / Math.max(.001, box.max.y - box.min.y);
+      built.group.traverse(o => { if (o.isMesh) { o.castShadow = true; if (o.material && o.material.visible === false) o.castShadow = false; } });
+      const holder = new T.Group(); holder.add(built.group); built.group.scale.setScalar(k); built.group.position.y = -box.min.y * k;
+      holder.position.set(c.at[0], 0, c.at[1]); holder.rotation.y = c.yaw; sc.add(holder);
+      return { holder, parts: built.parts, born: 0, delay: i * .25 };
+    });
+    return { scene: sc, actors, on: false };
+  }
+  function setStudio(on) {
+    if (on && !studio) studio = buildStudio();
+    if (!studio || studio.on === on) return;
+    studio.on = on;
+    if (on) { worldCam = { ...orbit, target: orbit.target.clone(), fov: camera.fov }; camera.fov = 32; camera.updateProjectionMatrix(); studioCamera(); studio.actors.forEach(a => { a.born = performance.now() / 1000 + a.delay; a.holder.scale.setScalar(.01); }); }
+    else if (worldCam) { Object.assign(orbit, { theta: worldCam.theta, phi: worldCam.phi, r: worldCam.r }); orbit.target.copy(worldCam.target); camera.fov = worldCam.fov; camera.updateProjectionMatrix(); }
+  }
+  function tickStudio(t, dt) {
+    studio.actors.forEach(a => {
+      // Apparition avec rebond (easeOutBack), puis respiration 1 → 1,025 toutes les 2,8 s, comme dans le code Swift
+      const k = (t - a.born) / .8;
+      const s = k < 0 ? .01 : k < 1 ? Math.max(.01, 1 + 2.70158 * (k - 1) ** 3 + 1.70158 * (k - 1) ** 2) : 1 + .0125 * (1 - Math.cos((t - a.born - .8) / 2.8 * Math.PI * 2));
+      a.holder.scale.setScalar(s);
+      if (a.parts.update) a.parts.update({ t, dt, moving: false, speed: 0, sleeping: false, turn: 0, flying: false });
+    });
+    placeCamera(); renderer.render(studio.scene, camera);
+  }
   function jump(id) { jumps.set(id, performance.now() / 1000); }
   function focus() { const o = selected(); if (o) { follow = !!(state.sel && state.sel.kind === "animal"); orbit.target.set(o.position.x, Math.max(0, heightAt(o.position.x, o.position.z)) + .5, o.position.z); orbit.r = Math.min(orbit.r, 9); orbit.phi = 1.22; } }
   function focusBiome(b) { const s = layout.sectors.find(x => x.b === b); if (!s) return; const a = (s.a0 + s.a1) / 2; follow = false; orbit.target.set(Math.cos(a) * 10, 0, Math.sin(a) * 10); orbit.r = 18; orbit.phi = 1.05; orbit.theta = a; }
   window.addEventListener("resize", resize);
-  return { renderer, resize, sync, start, zoom, reset, jump, focus, focusBiome, orbit, dev: { buildAnimal, scene, camera, mammalColors } };
+  return { renderer, resize, sync, start, zoom, reset, jump, focus, focusBiome, orbit, studio: setStudio, dev: { buildAnimal, scene, camera, mammalColors } };
 }
 
 function museumLabel(key) { const m = MUSEUMS[key]; return `${m.name}, ${m.city}`; }
@@ -4324,6 +4383,7 @@ document.addEventListener("click", e => {
   }
   if (t.dataset.w3zoom) { W3 && W3.zoom(Number(t.dataset.w3zoom)); return; }
   if ("w3reset" in t.dataset) { W3 && W3.reset(); return; }
+  if ("w3studio" in t.dataset) { state.studio = !state.studio; render(); return; }
   if ("decorcam" in t.dataset) { go("capture"); state.camMode = "decor"; return render(); }
   if ("decorkind" in t.dataset) { state.decorKind = (state.decorKind + 1) % DECOR_TYPES.length; return render(); }
   if ("dadd" in t.dataset) return addDecor();

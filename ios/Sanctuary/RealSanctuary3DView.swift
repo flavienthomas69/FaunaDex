@@ -37,8 +37,9 @@ struct RealSanctuary3DView: UIViewRepresentable {
         camera.zFar = 100
         let cameraNode = SCNNode()
         cameraNode.camera = camera
-        cameraNode.position = SCNVector3(0, 1.6, 4.2)
-        cameraNode.look(at: SCNVector3(0, 0.3, 0))
+        // Assez près pour que des animaux de 0,3 à 0,6 m remplissent l'écran d'un téléphone en portrait
+        cameraNode.position = SCNVector3(0, 1.1, 3.0)
+        cameraNode.look(at: SCNVector3(0, 0.28, 0))
         scene.rootNode.addChildNode(cameraNode)
         scnView.pointOfView = cameraNode
 
@@ -104,8 +105,8 @@ struct RealSanctuary3DView: UIViewRepresentable {
 
 #Preview {
     RealSanctuary3DView(animals: [
-        SanctuaryAnimal(id: "1", scientificName: "Strix aluco", family: "Strigidae", position: [-0.8, 0]),
-        SanctuaryAnimal(id: "2", scientificName: "Vulpes vulpes", family: "Canidae", position: [0.6, 0.2]),
+        SanctuaryAnimal(id: "1", scientificName: "Strix aluco", family: "Strigidae", position: [-0.42, -0.05]),
+        SanctuaryAnimal(id: "2", scientificName: "Vulpes vulpes", family: "Canidae", position: [0.42, 0.1]),
     ])
     .ignoresSafeArea()
 }
