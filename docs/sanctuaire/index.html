@@ -176,11 +176,15 @@ const mixCol = (a, b, t) => a.clone().lerp(b, t);
 
 /* ───────────────────────── Géographie : une grande île, des régions ───────────────────────── */
 await stage("Soulèvement des montagnes et du volcan…");
-const R = 300, SIZE = 800, N = 401, STEP = SIZE / (N - 1), HALF = SIZE / 2;
+const R = 380, SIZE = 1000, N = 501, STEP = SIZE / (N - 1), HALF = SIZE / 2;
+// Nord = froid, sud = chaud ; ouest = sec, est = humide
 const REG = {
-  mount: { x: -120, z: -150, r: 150 }, volc: { x: -225, z: 55, r: 85 }, canyon: { x: -120, z: 190, r: 95 }, desert: { x: 5, z: 225, r: 95 },
-  savanna: { x: 125, z: 185, r: 90 }, jungle: { x: 205, z: 85, r: 85 }, mangrove: { x: 238, z: 168, r: 60 }, lagoon: { x: 290, z: 215, r: 95 },
-  bamboo: { x: 230, z: -55, r: 72 }, autumn: { x: 125, z: -190, r: 92 }, tundra: { x: -10, z: -272, r: 95 }, delta: { x: 262, z: 22, r: 42 },
+  mount: { x: -170, z: -190, r: 175 }, cloudmt: { x: 205, z: 40, r: 100 }, volc: { x: -300, z: 40, r: 90 }, canyon: { x: -165, z: 255, r: 100 },
+  desert: { x: -10, z: 300, r: 100 }, salar: { x: -225, z: 150, r: 62 }, colddesert: { x: -255, z: -55, r: 85 }, steppe: { x: -110, z: 45, r: 95 },
+  garrigue: { x: -30, z: 170, r: 82 }, drytrop: { x: 75, z: 225, r: 85 }, savanna: { x: 175, z: 290, r: 90 }, jungle: { x: 295, z: 135, r: 85 },
+  mangrove: { x: 322, z: 235, r: 60 }, lagoon: { x: 385, z: 285, r: 115 }, bamboo: { x: 325, z: -45, r: 72 }, tropconif: { x: 265, z: -135, r: 62 },
+  autumn: { x: 170, z: -255, r: 90 }, sequoia: { x: 35, z: -225, r: 85 }, bog: { x: 110, z: -140, r: 55 }, tundra: { x: -5, z: -345, r: 90 },
+  glacier: { x: -150, z: -345, r: 95 }, kelp: { x: -330, z: -290, r: 110 }, packice: { x: -120, z: -440, r: 150 }, delta: { x: 345, z: 30, r: 45 },
 };
 const VOLC = { x: REG.volc.x, z: REG.volc.z, cr: 15 };
 const regW = (g, x, z) => { const d = Math.hypot(x - g.x, z - g.z) / g.r + fbm(x * .009 + g.x * .01, z * .009 + g.z * .01, 2) * .22; return Math.max(0, 1 - d * d); };
@@ -189,13 +193,20 @@ function baseHeight(x, z) {
   const coast = 1 - sstep(.62, 1.0, d + warp);
   let h = 3 + fbm(x * .007, z * .007, 4) * 7 + fbm(x * .028 + 11, z * .028, 3) * 1.6;
   const m = regW(REG.mount, x, z); h += m * m * (18 + ridged(x * .012 + 3, z * .012 - 2, 5) * 88) + m * 8;
+  const cm = regW(REG.cloudmt, x, z); h += cm * cm * (26 + ridged(x * .018 - 7, z * .018 + 4, 4) * 34);                 // montagne tropicale (forêt de nuages, páramo)
+  const gw = sstep(.15, .5, regW(REG.glacier, x, z)); h = lerp(h, 16 + fbm(x * .02, z * .02, 2) * 3 + Math.abs(noise(x * .05, z * .05)) * 2, gw);   // calotte de glace
+  const sw = sstep(.2, .55, regW(REG.salar, x, z)); h = lerp(h, 2.3 + noise(x * .08, z * .08) * .08, sw);                    // désert de sel parfaitement plat
+  h += regW(REG.colddesert, x, z) * (5 + ridged(x * .02, z * .02, 3) * 6);                                                   // plateaux rocailleux
+  h = lerp(h, 2.4 + fbm(x * .03, z * .03, 2) * .8, sstep(.2, .6, regW(REG.bog, x, z)));                                      // cuvette de la tourbière
   const vd = Math.hypot(x - VOLC.x, z - VOLC.z), cone = Math.max(0, 1 - vd / 80);
   h += Math.pow(cone, 1.5) * 76 + cone * fbm(x * .05, z * .05, 2) * 3;
   if (vd < VOLC.cr) h -= (1 - (vd / VOLC.cr) ** 2) * 30;
   const cw = sstep(.12, .45, regW(REG.canyon, x, z));
   if (cw > 0) { const ch = sstep(.06, .2, Math.abs(fbm(x * .011 + 5, z * .011 - 8, 2))); let hc = h + 24 * ch; const f = hc / 6; hc = (Math.floor(f) + sstep(.72, 1, f - Math.floor(f))) * 6; h = lerp(h, hc, cw); }
   const dw = regW(REG.desert, x, z); h += dw * (Math.sin(x * .08 + z * .03 + fbm(x * .01, z * .01, 2) * 3) * 1.7 + 1.5);
-  let out = lerp(-16, h, sstep(0, 1, coast)) - (1 - coast) * 3;
+  const gcoast = regW(REG.glacier, x, z) > .15 ? sstep(.2, .45, coast) : sstep(0, 1, coast);   // la glace tombe en falaise sur la mer
+  let out = lerp(-16, h, gcoast) - (1 - coast) * 3;
+  const kw = regW(REG.kelp, x, z); if (out < 0) out = lerp(out, -7 + fbm(x * .05, z * .05, 2) * 2.5, sstep(0, .5, kw));   // plateau rocheux des forêts de kelp
   const lw = regW(REG.lagoon, x, z); if (out < 0) out = lerp(out, -1.9 + fbm(x * .04, z * .04, 2) * .8, sstep(0, .55, lw));
   return out;
 }
@@ -215,7 +226,7 @@ const nearest = (arr, x, z) => arr[gi(clamp(Math.round((x + HALF) / STEP), 0, N 
 
 /* ───────────────────────── Lac de montagne : niveau fixé par le point le plus bas de sa berge ───────────────────────── */
 await stage("Remplissage du lac et creusement des rivières…");
-const LAKE = { x: -62, z: -100, r: 17 };
+const LAKE = { x: -100, z: -125, r: 18 };
 { let lo = 1e9, lx = 0, lz = 0; for (let k = 0; k < 72; k++) { const a = k / 72 * 6.283, x = LAKE.x + Math.cos(a) * (LAKE.r + 4), z = LAKE.z + Math.sin(a) * (LAKE.r + 4), h = heightAt(x, z); if (h < lo) { lo = h; lx = x; lz = z; } }
   LAKE.level = lo - .5; LAKE.outX = lx; LAKE.outZ = lz; }
 for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
@@ -236,9 +247,10 @@ function riverPath(ctrl, w0, w1, meander, seed) {
   return pts;
 }
 const rivers = [
-  { name: "Rivière des Saules", pts: riverPath([[LAKE.outX, LAKE.outZ], [-25, -72], [15, -42], [60, -22], [110, -6], [160, 6], [210, 16], [250, 22], [300, 26], [340, 30]], 3, 10, 9, 1), start: LAKE.level },
-  { name: "Torrent du Nord", pts: riverPath([[-150, -198], [-132, -228], [-114, -254], [-98, -284], [-88, -330]], 2.6, 5, 3, 4), fall: .45 },
-  { name: "Ruisseau des Érables", pts: riverPath([[165, -118], [152, -165], [142, -212], [136, -262], [132, -330]], 2.4, 4.6, 5, 9) },
+  { name: "Rivière des Saules", pts: riverPath([[LAKE.outX, LAKE.outZ], [-55, -95], [-5, -70], [55, -48], [115, -40], [170, -45], [240, -20], [300, 12], [345, 30], [385, 36], [430, 40]], 3, 10, 9, 1), start: LAKE.level },
+  { name: "Torrent du Nord", pts: riverPath([[-215, -255], [-240, -285], [-262, -312], [-280, -345], [-296, -400]], 2.6, 5, 3, 4), fall: .45 },
+  { name: "Ruisseau des Érables", pts: riverPath([[205, -170], [192, -220], [180, -270], [172, -320], [168, -420]], 2.4, 4.6, 5, 9) },
+  { name: "Rivière de la Savane", pts: riverPath([[150, 110], [150, 170], [140, 230], [160, 290], [175, 345], [185, 420]], 2.6, 7, 8, 13) },
 ];
 rivers.forEach(rv => {
   let s = rv.start ?? heightAt(rv.pts[0].x, rv.pts[0].z) - .8;
@@ -261,7 +273,8 @@ rivers.forEach(rv => {
 });
 /* Mares du delta et oasis du désert */
 const PONDS = [];
-{ const r2 = mulberry(77); for (let n = 0; n < 10; n++) PONDS.push({ x: REG.delta.x + (r2() - .5) * 70, z: REG.delta.z + (r2() - .5) * 70, r: 4 + r2() * 5 }); }
+{ const r2 = mulberry(77); for (let n = 0; n < 10; n++) PONDS.push({ x: REG.delta.x + (r2() - .5) * 70, z: REG.delta.z + (r2() - .5) * 70, r: 4 + r2() * 5 });
+  for (let n = 0; n < 12; n++) PONDS.push({ x: REG.bog.x + (r2() - .5) * 70, z: REG.bog.z + (r2() - .5) * 70, r: 2.5 + r2() * 3.5 }); }
 const OASIS = { x: REG.desert.x + 8, z: REG.desert.z - 6, r: 9, oasis: true }; PONDS.push(OASIS);
 PONDS.forEach(pd => {
   const h0 = heightAt(pd.x, pd.z); if (!pd.oasis && (h0 > 7 || h0 < .6)) { pd.skip = true; return; }
@@ -279,25 +292,38 @@ const waterAt = (x, z) => nearest(WATER, x, z);
 
 /* ───────────────────────── Biomes ───────────────────────── */
 await stage("Répartition des biomes…");
-const B = { OCEAN: 0, BEACH: 1, MARSH: 2, MEADOW: 3, FOREST: 4, TAIGA: 5, ALPINE: 6, SNOW: 7, SAVANNA: 8, JUNGLE: 9, DESERT: 10, CANYON: 11, VOLCANO: 12, AUTUMN: 13, BAMBOO: 14, TUNDRA: 15, MANGROVE: 16, LAGOON: 17 };
+const B = { OCEAN: 0, BEACH: 1, MARSH: 2, MEADOW: 3, FOREST: 4, TAIGA: 5, ALPINE: 6, SNOW: 7, SAVANNA: 8, JUNGLE: 9, DESERT: 10, CANYON: 11, VOLCANO: 12, AUTUMN: 13, BAMBOO: 14, TUNDRA: 15, MANGROVE: 16, LAGOON: 17,
+  STEPPE: 18, GARRIGUE: 19, DRYTROP: 20, SEQUOIA: 21, CLOUD: 22, PARAMO: 23, GLACIER: 24, COLDDESERT: 25, SALAR: 26, BOG: 27, KELP: 28, PACKICE: 29, TROPCONIF: 30 };
 const BIOMES = [
   { name: "Océan", ground: "#D8C792" }, { name: "Plage", ground: "#E9DAA8" }, { name: "Marais", ground: "#6F8A48" }, { name: "Prairie", ground: "#8DC25A" },
   { name: "Forêt tempérée", ground: "#4F8C3D" }, { name: "Taïga", ground: "#4A7448" }, { name: "Alpages et rochers", ground: "#8F8C82" }, { name: "Sommets enneigés", ground: "#EEF1F2" },
   { name: "Savane", ground: "#CDB560" }, { name: "Jungle", ground: "#2F874A" }, { name: "Désert", ground: "#E6CC8E" }, { name: "Canyon", ground: "#C8643A" },
   { name: "Volcan", ground: "#4A4440" }, { name: "Forêt d'automne", ground: "#B07A3E" }, { name: "Bambouseraie", ground: "#76A84E" }, { name: "Toundra", ground: "#A3AE92" },
-  { name: "Mangrove", ground: "#6E6A48" }, { name: "Lagon", ground: "#F2E6C0" },
+  { name: "Mangrove", ground: "#6E6A48" }, { name: "Lagon et récif corallien", ground: "#F2E6C0" },
+  { name: "Steppe", ground: "#BDB06A" }, { name: "Maquis méditerranéen", ground: "#A8A36A" }, { name: "Forêt tropicale sèche", ground: "#B89A58" }, { name: "Forêt de séquoias", ground: "#4E5E36" },
+  { name: "Forêt de nuages", ground: "#3E7A56" }, { name: "Páramo", ground: "#A3A26E" }, { name: "Glacier", ground: "#E4F0F6" }, { name: "Désert froid", ground: "#B8A88A" },
+  { name: "Désert de sel", ground: "#F4F2EC" }, { name: "Tourbière", ground: "#7A7A4A" }, { name: "Forêt de kelp", ground: "#5E7060" }, { name: "Banquise", ground: "#DDE9F0" },
+  { name: "Pinède tropicale", ground: "#8A8A4E" },
 ];
 function classify(x, z, h, rd) {
-  if (h < -.25) return regW(REG.lagoon, x, z) > .2 && h > -4.5 ? B.LAGOON : B.OCEAN;
+  if (h < -.25) { if (regW(REG.lagoon, x, z) > .2 && h > -4.5) return B.LAGOON; if (regW(REG.kelp, x, z) > .2 && h > -11) return B.KELP; if (regW(REG.packice, x, z) > .15) return B.PACKICE; return B.OCEAN; }
+  if (regW(REG.glacier, x, z) > .3 && h > 1.5) return B.GLACIER;
+  if (sstep(.2, .55, regW(REG.salar, x, z)) > .6) return B.SALAR;
   if (regW(REG.volc, x, z) > .45 && h > 2) return B.VOLCANO;
+  const cmw = regW(REG.cloudmt, x, z);
+  if (cmw > .25 && h > 34) return B.PARAMO;
+  if (cmw > .25 && h > 13) return B.CLOUD;
   const n1 = fbm(x * .05, z * .05, 2);
   if (h > 66 + n1 * 6) return B.SNOW;
   if (h > 46 + n1 * 5) return B.ALPINE;
   if (sstep(.12, .45, regW(REG.canyon, x, z)) > .55 && h > 1.6) return B.CANYON;
+
   if (h < 1.7) { if (regW(REG.mangrove, x, z) > .3) return B.MANGROVE; if (regW(REG.delta, x, z) > .25) return B.MARSH; return B.BEACH; }
   if (h > 30) return regW(REG.tundra, x, z) > .2 ? B.TUNDRA : B.TAIGA;
   const W = [[B.MANGROVE, regW(REG.mangrove, x, z) * (h < 5 ? 1.2 : 0)], [B.MARSH, regW(REG.delta, x, z) * (h < 7 ? 1.3 : 0)], [B.DESERT, regW(REG.desert, x, z)], [B.SAVANNA, regW(REG.savanna, x, z)],
-    [B.JUNGLE, regW(REG.jungle, x, z)], [B.BAMBOO, regW(REG.bamboo, x, z)], [B.AUTUMN, regW(REG.autumn, x, z)], [B.TUNDRA, regW(REG.tundra, x, z)]];
+    [B.JUNGLE, regW(REG.jungle, x, z)], [B.BAMBOO, regW(REG.bamboo, x, z)], [B.AUTUMN, regW(REG.autumn, x, z)], [B.TUNDRA, regW(REG.tundra, x, z)],
+    [B.STEPPE, regW(REG.steppe, x, z)], [B.GARRIGUE, regW(REG.garrigue, x, z)], [B.DRYTROP, regW(REG.drytrop, x, z)], [B.SEQUOIA, regW(REG.sequoia, x, z)],
+    [B.COLDDESERT, regW(REG.colddesert, x, z)], [B.BOG, regW(REG.bog, x, z) * 1.2], [B.TROPCONIF, regW(REG.tropconif, x, z)]];
   let best = -1, bw = .32; for (const [b, w] of W) if (w > bw) { bw = w; best = b; }
   if (best >= 0) return best;
   const T0 = .5 + (z / R) * .5 + fbm(x * .008 + 40, z * .008, 3) * .16 - Math.max(0, h - 10) / 60;
@@ -334,8 +360,9 @@ function findCave(spec) {
   return null;
 }
 const CAVES = [
-  { key: "crystal", name: "Grotte aux cristaux", desc: "Un tunnel qui s'ouvre sur une salle hérissée de cristaux bleus.", x: -110, z: -130, r: 75, len: 30, seed: 11, rock: "#4A4A52", floor: "#5A5660", light: "#6FE0FF" },
+  { key: "crystal", name: "Grotte aux cristaux", desc: "Un tunnel qui s'ouvre sur une salle hérissée de cristaux bleus.", x: -150, z: -170, r: 80, len: 30, seed: 11, rock: "#4A4A52", floor: "#5A5660", light: "#6FE0FF" },
   { key: "lava", name: "Tunnel de lave", desc: "Un ancien tube de lave, encore tiède, où rougeoie un bassin de magma.", x: VOLC.x, z: VOLC.z, rmin: 18, r: 75, len: 20, seed: 23, rock: "#2E2A28", minRock: 6, roomRock: 10, floor: "#3A3431", light: "#FF7A30" },
+  { key: "ice", name: "Grotte de glace", desc: "Un couloir bleu creusé dans le glacier, qui mène à une salle de glace translucide.", x: REG.glacier.x, z: REG.glacier.z, r: 95, len: 18, seed: 51, minRock: 5.5, roomRock: 8, rock: "#8FC4E0", floor: "#D8EAF4", light: "#A8ECFF" },
   { key: "sand", name: "Grotte du canyon", desc: "Une cavité de grès rouge, fraîche, avec une source souterraine.", x: REG.canyon.x, z: REG.canyon.z, r: 80, len: 24, seed: 37, rock: "#9A5436", floor: "#B8784E", light: "#FFD9A0" },
 ].map(findCave).filter(Boolean);
 function caveAt(x, z, y) {
@@ -378,7 +405,7 @@ const CANYON_BANDS = ["#E3B07A", "#C8643A", "#D98A4E", "#B5502E", "#E8C08A", "#A
 function groundColor(i, j) {
   const k = gi(i, j), x = gx(i), z = gx(j), h = H[k], b = BIOME[k];
   let c;
-  if (h < -.25) c = b === B.LAGOON ? mixCol(col("#F6ECC8"), col("#9FD0C0"), sstep(0, 5, -h)) : mixCol(col("#D9C68E"), col("#3F7C86"), sstep(0, 14, -h));
+  if (h < -.25) c = b === B.LAGOON ? mixCol(col("#F6ECC8"), col("#9FD0C0"), sstep(0, 5, -h)) : b === B.KELP ? mixCol(col("#6E7A62"), col("#3A5048"), sstep(3, 11, -h)) : mixCol(col("#D9C68E"), col("#3F7C86"), sstep(0, 14, -h));
   else {
     c = col(BIOMES[b].ground);
     if (b === B.CANYON) c = CANYON_BANDS[Math.abs(Math.floor(h / 2.6)) % CANYON_BANDS.length].clone();
@@ -386,8 +413,14 @@ function groundColor(i, j) {
     if (b === B.VOLCANO) { const vd = Math.hypot(x - VOLC.x, z - VOLC.z); c = mixCol(col("#5A534C"), col("#26221F"), sstep(70, 25, vd)); if (vd < VOLC.cr + 5) c = mixCol(c, col("#7A3A22"), sstep(VOLC.cr + 5, VOLC.cr - 3, vd)); }
     if (b === B.TUNDRA && noise(x * .09, z * .09) > .45) c = col("#EEF2F2");
     if (b === B.AUTUMN) c = mixCol(c, col("#9A8A3E"), sstep(-.3, .6, noise(x * .05, z * .05)) * .5);
+    if (b === B.GLACIER) { const cr = Math.abs(noise(x * .06, z * .02)); c = mixCol(c, col("#8FBEDB"), sstep(.08, 0, cr)); }                       // crevasses bleues
+    if (b === B.SALAR) { const cx = x * .35, cz = z * .35, e = Math.min(Math.abs(Math.sin(cx) + Math.sin(cx * .5 + cz * .866)), Math.abs(Math.sin(cz * .9 - cx * .45))); c = mixCol(c, col("#CFCBC0"), sstep(.12, 0, e) * .8); }   // croûte de sel en polygones
+    if (b === B.GARRIGUE && noise(x * .12, z * .12) > .5) c = mixCol(c, col("#9A7AB8"), .45);                                                     // lavande
+    if (b === B.BOG && noise(x * .1, z * .1) > .3) c = mixCol(c, col("#9A4A3A"), .55);                                                              // sphaignes rouges
+    if (b === B.SEQUOIA) c = mixCol(c, col("#6A4E34"), sstep(0, .8, noise(x * .07, z * .07)) * .5);
+    if (b === B.PARAMO) c = mixCol(c, col("#7E8A5A"), sstep(-.2, .6, noise(x * .08, z * .08)) * .5);
     const sl = slopeAt(x, z);
-    if (b !== B.SNOW && b !== B.CANYON && sl > .85) c = mixCol(c, col(h > 30 ? "#7D7A72" : b === B.VOLCANO ? "#2E2A28" : "#8A7658"), sstep(.85, 1.5, sl));
+    if (b !== B.SNOW && b !== B.CANYON && sl > .85) c = mixCol(c, col(b === B.GLACIER ? "#9EC8E0" : h > 30 ? "#7D7A72" : b === B.VOLCANO ? "#2E2A28" : "#8A7658"), sstep(.85, 1.5, sl));
     if (INL[k] || RIVD[k] < 4) c = mixCol(c, col("#8E7E58"), .35);
     if (b === B.BEACH) c = mixCol(c, col("#F2E6BE"), sstep(.3, 1.4, h));
   }
@@ -396,7 +429,7 @@ function groundColor(i, j) {
 }
 const HOLES = CAVES.map(cv => ({ x: cv.mouth.x, z: cv.mouth.z, f: cv.mouth.f }));
 {
-  const TILES = 4, per = (N - 1) / TILES;
+  const TILES = 5, per = (N - 1) / TILES;
   const COLS = new Float32Array(N * N * 3); for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) { const c = groundColor(i, j), k = gi(i, j) * 3; COLS[k] = c.r; COLS[k + 1] = c.g; COLS[k + 2] = c.b; }
   for (let tj = 0; tj < TILES; tj++) for (let ti = 0; ti < TILES; ti++) {
     const i0 = ti * per, j0 = tj * per, P = [], C = [], I = [], W = per + 1;
@@ -473,7 +506,7 @@ function waterMat(o) {
 const seaMat = waterMat({ shallow: "#5FD6D0", deep: "#1B5E8C", opacity: .9, wave: .28 });
 const inlandMat = waterMat({ shallow: "#6FCBD2", deep: "#1F6F8C", opacity: .9, river: true, wave: .08 });
 { // Mer : grille dont chaque sommet connaît la profondeur, puis un grand anneau au large
-  const SR = 460, g = new T.PlaneGeometry(SR * 2, SR * 2, 210, 210); g.rotateX(-Math.PI / 2);
+  const SR = 560, g = new T.PlaneGeometry(SR * 2, SR * 2, 250, 250); g.rotateX(-Math.PI / 2);
   const p = g.attributes.position, dep = new Float32Array(p.count), fl = new Float32Array(p.count * 2);
   for (let k = 0; k < p.count; k++) { const x = p.getX(k), z = p.getZ(k); dep[k] = Math.abs(x) < HALF && Math.abs(z) < HALF ? clamp(-heightAt(x, z), -2, 30) : 30; }
   const idx = g.index.array, keep = [];   // disque détaillé, puis un anneau au large sans trou ni recouvrement
@@ -594,11 +627,30 @@ const GEO = {
   reed: merge([[blades(4, .05, 1.7, .08), "#8FA255"], [at(Cyl(.06, .06, .35, 5), .02, 1.45, 0), "#6A4428"]]),
   mushroom: merge([[at(Cyl(.07, .09, .3, 5), 0, .15, 0), "#EFE8DA"], [at(Cone(.26, .2, 6), 0, .38, 0), "#C8322A"]]),
   log: merge([[at(tilt(Cyl(.3, .32, 3.2, 7), Math.PI / 2), 0, .28, 0), "#6B4A2E"]]),
+  sequoia: merge([[at(Cyl(.9, 1.5, 12, 8), 0, 6, 0), "#8A4A2E"], [at(Cone(3.2, 6, 8), 0, 11, 0), "#2E5A36"], [at(Cone(2.5, 5, 8), 0, 14.5, 0), "#35663E"], [at(Cone(1.6, 4, 8), 0, 17.8, 0), "#2E5A36"]]),
+  olive: merge([[at(tilt(Cyl(.2, .34, 1.8, 6), .25), .2, .9, 0), "#6E5E48"], [at(tilt(Cyl(.14, .2, 1.4, 5), -.5), -.3, 1.6, 0), "#6E5E48"], [at(Ico(1.3), 0, 2.6, 0).scale(1, .7, 1), "#8E9A6A"], [at(Ico(.9), .8, 2.3, .3), "#A0AA7A"]]),
+  holmoak: merge([[at(Cyl(.2, .3, 1.8, 6), 0, .9, 0), "#5E4A38"], [at(Ico(1.6), 0, 2.8, 0), "#3E5E34"], [at(Ico(1.1), .9, 2.4, .3), "#46663A"]]),
+  lavender: merge([...[[0, 0], [.35, .2], [-.3, .25], [.1, -.35], [-.2, -.2]].map(([x, z]) => [at(Cone(.12, .7, 4), x, .35, z), "#8E6AC0"]), [at(Ico(.35), 0, .15, 0), "#7E8E62"]]),
+  droptree: merge([[at(Cyl(.2, .32, 3.4, 6), 0, 1.7, 0), "#7A6A52"], [at(tilt(Cyl(.08, .12, 1.8, 4), .7), .6, 3.2, 0), "#7A6A52"], [at(tilt(Cyl(.08, .12, 1.6, 4), -.8, 1.2), -.5, 3, .2), "#7A6A52"], [at(Ico(1.2), .9, 4, 0).scale(1, .5, 1), "#A09A4A"], [at(Ico(.9), -.8, 3.7, .3).scale(1, .5, 1), "#B8A050"]]),
+  termite: merge([[at(Cone(1.1, 3.6, 7), 0, 1.8, 0), "#B07A4E"], [at(Cone(.5, 2, 6), .6, 1.9, .2), "#A06A40"], [at(Cone(.45, 1.6, 6), -.5, 1.4, -.3), "#B8845A"]]),
+  treefern: merge([[at(Cyl(.16, .22, 3.2, 6), 0, 1.6, 0), "#4A3A2A"], ...[0, 1, 2, 3, 4, 5, 6, 7].map(k => { const l = Cone(.35, 2.6, 3); l.scale(1, 1, .18); l.rotateZ(-1.15); l.translate(1.1, 3.4, 0); l.rotateY(k * .785); return [l, k % 2 ? "#3E9A4A" : "#4AAA56"]; })]),
+  cloudtree: merge([[at(Cyl(.3, .45, 5, 6), 0, 2.5, 0), "#4E6A3A"], [at(Ico(2.2), 0, 5.6, 0), "#2E6E3E"], [at(Ico(1.4), 1.3, 5, .5), "#3E7E48"], [at(Ico(1.3), -1.2, 5.2, -.4), "#2A6038"], [at(tilt(Cyl(.03, .03, 2, 3), .1), .8, 3.6, .5), "#6A8A4A"], [at(tilt(Cyl(.03, .03, 1.6, 3), -.1), -.7, 3.8, -.3), "#6A8A4A"]]),
+  frailejon: merge([[at(Cyl(.16, .2, 1.3, 6), 0, .65, 0), "#6E6A5A"], ...[0, 1, 2, 3, 4, 5, 6].map(k => { const l = Cone(.14, .9, 3); l.scale(1, 1, .3); l.rotateZ(-.7); l.translate(.35, 1.45, 0); l.rotateY(k * .9); return [l, "#B8BCA0"]; }), [at(Cyl(.02, .02, .7, 3), 0, 1.9, 0), "#C8A83A"]]),
+  tussock: merge([[blades(9, .14, 1, .35), "#C8B870"]]),
+  serac: merge([[at(Cone(1.1, 3.4, 5), 0, 1.5, 0), "#CFE8F4"], [at(Cone(.7, 2.4, 5), .9, 1, .3), "#B8DCEE"], [at(Cone(.6, 1.8, 5), -.8, .8, -.2), "#E0F2FA"]]),
+  sagebrush: merge([[at(Ico(.7), 0, .45, 0).scale(1, .7, 1), "#9AA28A"], [at(Ico(.5), .45, .3, .2), "#A8B098"]]),
+  saltcrystal: merge([[at(Cone(.18, .5, 4), 0, .2, 0), "#FFFFFF"], [at(Cone(.14, .38, 4), .2, .15, .1), "#F4F4F0"], [at(Cone(.12, .3, 4), -.15, .12, -.12), "#FAFAF6"]]),
+  feathergrass: merge([[blades(8, .12, 1.3, .45), "#D8CC8A"]]),
+  sphagnum: merge([[at(Ico(.55, 0), 0, .1, 0).scale(1, .45, 1), "#A84A3A"], [at(Ico(.4, 0), .5, .08, .2).scale(1, .45, 1), "#7A9A4A"]]),
+  cottongrass: merge([[blades(3, .03, .7, .05), "#8E9A5A"], [at(Ico(.1, 0), 0, .72, 0), "#FFFFFF"], [at(Ico(.09, 0), .06, .64, .04), "#FFFFFF"]]),
+  kelp: merge([...[[0, 0, 6], [.5, .3, 5], [-.4, .4, 5.5]].flatMap(([x, z, h]) => [[at(Cyl(.05, .07, h, 3), x, h / 2, z), "#6A7A2E"], [at(tilt(Cone(.35, 1.6, 3), .2), x + .2, h * .6, z).scale(1, 1, .2), "#7E8A34"], [at(tilt(Cone(.3, 1.4, 3), -.2), x - .2, h * .85, z).scale(1, 1, .2), "#8A9A3A"]])]),
+  tpine: merge([[at(Cyl(.22, .3, 7, 6), 0, 3.5, 0), "#8A5A3A"], [at(Ico(1.6), 0, 7.4, 0).scale(1, .55, 1), "#6E8E3E"], [at(Ico(1.2), .9, 6.6, .3).scale(1, .5, 1), "#7E9A48"], [at(Ico(1.1), -.8, 6.9, -.3).scale(1, .5, 1), "#627E36"]]),
+  dwarfpine: merge([[at(Cyl(.08, .12, .8, 5), 0, .4, 0), "#5A3A22"], [at(Cone(.7, 1.3, 6), 0, 1.2, 0), "#3E6A40"]]),
 };
 const inst = {}; Object.keys(GEO).forEach(k => inst[k] = []);
 const ckey = (x, z) => (Math.floor(x / 8) + 200) * 1000 + Math.floor(z / 8) + 200;
 const COLLIDE = [], CANOPY = new Map();
-const CROWN = { oak: [2.4, 5.6, 2.2], maple: [2.5, 5.9, 2.2], birch: [1.4, 5, 3], pine: [1.8, 5.4, 1], snowpine: [1.6, 4.9, .9], palm: [3.2, 6.6, 5], acacia: [3, 4.4, 3.3], baobab: [2, 7.6, 5.5], jtree: [3, 9.6, 4.5], mangrove: [2.2, 6.3, 3.2], bamboo: [1.3, 7.6, 3.5] };
+const CROWN = { sequoia: [3.4, 19.5, 7], cloudtree: [2.6, 7.6, 3.4], tpine: [1.8, 8.3, 6.2], olive: [1.4, 3.4, 1.8], holmoak: [1.7, 4.3, 1.4], droptree: [1.4, 4.6, 3.2], oak: [2.4, 5.6, 2.2], maple: [2.5, 5.9, 2.2], birch: [1.4, 5, 3], pine: [1.8, 5.4, 1], snowpine: [1.6, 4.9, .9], palm: [3.2, 6.6, 5], acacia: [3, 4.4, 3.3], baobab: [2, 7.6, 5.5], jtree: [3, 9.6, 4.5], mangrove: [2.2, 6.3, 3.2], bamboo: [1.3, 7.6, 3.5] };
 function place(kind, x, z, s, o = {}) {
   const y = heightAt(x, z) - (o.sink || .05), m = new T.Matrix4(), q = new T.Quaternion().setFromEuler(new T.Euler(o.tilt || 0, o.rot ?? rng() * 6.283, 0));
   m.compose(new T.Vector3(x, y, z), q, new T.Vector3(s * (o.sx || 1), s * (o.sy || 1), s * (o.sz || 1)));
@@ -625,10 +677,22 @@ const DENS = {   // [type, probabilité par essai, échelle, rayon de collision]
   [B.TUNDRA]: [["shrub", .05, 1], ["rock", .02, 1.2, .9], ["deadtree", .004, .9, .25], ["snowpine", .004, .8, .4]],
   [B.MANGROVE]: [["mangrove", .1, 1, .35], ["reed", .05, 1]],
   [B.LAGOON]: [["coral", .06, 1.2], ["rock", .01, 1, 0]],
+  [B.STEPPE]: [["feathergrass", .12, 1], ["rock", .006, 1, .8], ["sagebrush", .01, .9]],
+  [B.GARRIGUE]: [["olive", .03, 1, .35], ["holmoak", .04, 1, .35], ["lavender", .09, 1], ["drybush", .03, .9], ["rock", .015, 1, .8]],
+  [B.DRYTROP]: [["droptree", .07, 1.1, .35], ["termite", .006, 1, .8], ["drybush", .04, 1], ["baobab", .002, 1, 1.4], ["rock", .008, 1, .8]],
+  [B.SEQUOIA]: [["sequoia", .05, 1, 1.3], ["treefern", .04, .8, .25], ["bush", .05, 1], ["log", .012, 1.4], ["mushroom", .03, 1]],
+  [B.CLOUD]: [["cloudtree", .14, 1, .5], ["treefern", .1, 1, .25], ["jplant", .08, 1], ["mushroom", .02, 1]],
+  [B.PARAMO]: [["frailejon", .09, 1.1, .2], ["tussock", .1, 1], ["rock", .02, 1.2, .9]],
+  [B.GLACIER]: [["serac", .02, 1.2, .9], ["rock", .004, 1.2, .9]],
+  [B.COLDDESERT]: [["sagebrush", .06, 1], ["rock", .03, 1.3, 1], ["boulder", .008, 1.5, 1.3]],
+  [B.SALAR]: [["saltcrystal", .02, 1.2], ["rock", .002, 1.2, .9]],
+  [B.BOG]: [["sphagnum", .12, 1.1], ["cottongrass", .12, 1], ["dwarfpine", .02, 1.1, .2], ["birch", .006, .8, .3]],
+  [B.KELP]: [["kelp", .12, 1.1], ["rock", .015, 1.4, 0]],
+  [B.TROPCONIF]: [["tpine", .1, 1.1, .4], ["drybush", .04, 1], ["feathergrass", .04, .9]],
 };
-const UNDERWATER = { coral: [-4.5, -.4], mangrove: [-1.2, 1.5], rock: [-4.5, 99] };
+const UNDERWATER = { coral: [-4.5, -.4], mangrove: [-1.2, 1.5], rock: [-11, 99], kelp: [-12, -2.5] };
 {
-  const tries = LIGHT ? 60000 : 110000;
+  const tries = LIGHT ? 95000 : 175000;
   for (let n = 0; n < tries; n++) {
     const a = rng() * 6.283, r = Math.sqrt(rng()) * (R + 40), x = Math.cos(a) * r, z = Math.sin(a) * r;
     const b = biomeAt(x, z), list = DENS[b]; if (!list) continue;
@@ -639,8 +703,8 @@ const UNDERWATER = { coral: [-4.5, -.4], mangrove: [-1.2, 1.5], rock: [-4.5, 99]
       if (roll < p) {
         const uw = UNDERWATER[kind];
         if (wet && !(uw && h > uw[0] && h < uw[1])) break;
-        if (!wet && (kind === "coral")) break;
-        if (sl > (kind === "rock" || kind === "boulder" || kind === "lavarock" ? 2 : .75)) break;
+        if (!wet && (kind === "coral" || kind === "kelp")) break;
+        if (sl > (kind === "rock" || kind === "boulder" || kind === "lavarock" || kind === "serac" ? 2 : .75)) break;
         const s = sc * (.75 + rng() * .55), o = { r: rad };
         if (kind === "rock" || kind === "boulder" || kind === "lavarock") { o.sx = .8 + rng() * .8; o.sy = .5 + rng() * .5; o.sz = .8 + rng() * .6; o.tilt = (rng() - .5) * .4; o.sink = .3 * s; }
         if (kind === "maple") o.c = lc(MAPLE[rng() * MAPLE.length | 0]);
@@ -652,11 +716,12 @@ const UNDERWATER = { coral: [-4.5, -.4], mangrove: [-1.2, 1.5], rock: [-4.5, 99]
     }
   }
   const TUFT = { [B.MEADOW]: "#9ACB5E", [B.FOREST]: "#5E9A45", [B.SAVANNA]: "#E0C878", [B.JUNGLE]: "#4AA85A", [B.MARSH]: "#8FA85A", [B.TAIGA]: "#6E9A5A", [B.ALPINE]: "#9AA07A", [B.BEACH]: "#C9C58A",
-    [B.DESERT]: "#D8C27A", [B.AUTUMN]: "#C99A4A", [B.BAMBOO]: "#6FAE50", [B.TUNDRA]: "#A8B08A", [B.CANYON]: "#C8A860" };
-  for (let n = 0; n < (LIGHT ? 16000 : 40000); n++) {
+    [B.DESERT]: "#D8C27A", [B.AUTUMN]: "#C99A4A", [B.BAMBOO]: "#6FAE50", [B.TUNDRA]: "#A8B08A", [B.CANYON]: "#C8A860",
+    [B.STEPPE]: "#CDBE7A", [B.GARRIGUE]: "#9AA06A", [B.DRYTROP]: "#C8AE6A", [B.SEQUOIA]: "#4E7A42", [B.CLOUD]: "#3E8E52", [B.PARAMO]: "#B8B070", [B.COLDDESERT]: "#A8A08A", [B.BOG]: "#8A9A5A", [B.TROPCONIF]: "#A0A060" };
+  for (let n = 0; n < (LIGHT ? 22000 : 60000); n++) {
     const a = rng() * 6.283, r = Math.sqrt(rng()) * R, x = Math.cos(a) * r, z = Math.sin(a) * r, b = biomeAt(x, z);
     if (!TUFT[b] || waterAt(x, z) > heightAt(x, z) - .1) continue;
-    if ((b === B.BEACH || b === B.DESERT || b === B.CANYON) && rng() < .8) continue;
+    if ((b === B.BEACH || b === B.DESERT || b === B.CANYON || b === B.COLDDESERT) && rng() < .8) continue;
     if (b === B.ALPINE && rng() < .6) continue;
     place("grass", x, z, .7 + rng() * .8, { c: col(TUFT[b]).offsetHSL(0, 0, (rng() - .5) * .08).convertSRGBToLinear() });
     if ((b === B.MEADOW && rng() < .28) || (b === B.FOREST && rng() < .05) || (b === B.SAVANNA && rng() < .03) || (b === B.TUNDRA && rng() < .06))
@@ -671,9 +736,24 @@ Object.entries(inst).forEach(([kind, list]) => {
   list.forEach((it, i) => { im.setMatrixAt(i, it.m); im.setColorAt(i, it.c || new T.Color(1, 1, 1).multiplyScalar(.9 + rng() * .2)); });
   im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
   im.frustumCulled = false;
-  im.castShadow = !LIGHT && !["grass", "flower", "reed", "mushroom", "coral"].includes(kind); im.receiveShadow = true;
+  im.castShadow = !LIGHT && !["grass", "flower", "reed", "mushroom", "coral", "kelp", "lavender", "cottongrass", "sphagnum", "saltcrystal", "tussock", "feathergrass"].includes(kind); im.receiveShadow = true;
   scene.add(im);
 });
+const FLOES = [];
+{ const r2 = mulberry(61), iceM = paper({ color: lc("#EEF6FA") }), bergM = paper({ color: lc("#D6ECF6") });
+  for (let n = 0; n < 900 && FLOES.length < (LIGHT ? 90 : 170); n++) {
+    const x = REG.packice.x + (r2() - .5) * 360, z = REG.packice.z + (r2() - .5) * 240;
+    if (regW(REG.packice, x, z) < .15 || heightAt(x, z) > -1.5 || FLOES.some(f => Math.hypot(f.x - x, f.z - z) < f.r + 4)) continue;
+    const r = 3 + r2() * 6, m = new T.Mesh(new T.CylinderGeometry(r, r * .92, .7, 6 + (r2() * 3 | 0)), iceM); m.position.set(x, 0, z); m.rotation.y = r2() * 6; m.receiveShadow = true; scene.add(m);
+    FLOES.push({ x, z, r: r * .9 });
+  }
+  for (let n = 0; n < 16; n++) { const a = r2() * 6.283, x = REG.packice.x + Math.cos(a) * (40 + r2() * 110), z = REG.packice.z + 30 + Math.sin(a) * 70; if (heightAt(x, z) > -3) continue;
+    const b = new T.Mesh(new T.IcosahedronGeometry(6 + r2() * 8, 0), bergM); b.scale.set(1, .8 + r2() * .8, 1); b.position.set(x, 1.5, z); b.castShadow = true; scene.add(b); COLLIDE.push([x, z, 7]); } }
+const floeAt = (x, z) => { for (const f of FLOES) if (Math.hypot(x - f.x, z - f.z) < f.r) return .35; return -999; };
+const mist = (() => { const P = []; let n = 0, guard = 0; while (n < 240 && guard++ < 60000) { const a = rng() * 6.283, r = Math.sqrt(rng()) * R, x = Math.cos(a) * r, z = Math.sin(a) * r; if (biomeAt(x, z) !== B.CLOUD) continue; P.push(x, heightAt(x, z) + 3 + rng() * 8, z); n++; }
+  const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d"), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, "rgba(255,255,255,.9)"); gr.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  const pts = new T.Points(new T.BufferGeometry().setAttribute("position", new T.Float32BufferAttribute(P, 3)), new T.PointsMaterial({ map: new T.CanvasTexture(c), size: 26, transparent: true, opacity: .35, depthWrite: false, color: 0xffffff }));
+  pts.frustumCulled = false; scene.add(pts); return pts; })();
 const CG = new Map();
 COLLIDE.forEach(c => { if (!c[2]) return; const k = ckey(c[0], c[1]); if (!CG.has(k)) CG.set(k, []); CG.get(k).push(c); });
 
@@ -708,9 +788,9 @@ CAVES.forEach((cv, ci) => {
   const rockM = paper({ color: lc(cv.rock) });
   for (let k = 0; k < 14; k++) { const a = r2() * 6.283, d = 2 + r2() * (rm.r - 3), st = new T.Mesh(Cone(.25 + r2() * .35, 1.2 + r2() * 2, 5), rockM); st.rotation.x = Math.PI; st.position.set(Math.cos(a) * d, rm.r * .72 - .6 - r2() * .8, Math.sin(a) * d); g.add(st); }   // stalactites
   for (let k = 0; k < 8; k++) { const a = r2() * 6.283, d = 4 + r2() * (rm.r - 5), st = new T.Mesh(Cone(.3 + r2() * .3, .8 + r2() * 1.4, 5), rockM); st.position.set(Math.cos(a) * d, .5, Math.sin(a) * d); g.add(st); }                     // stalagmites
-  if (cv.key === "crystal" || cv.key === "sand") for (let k = 0; k < (cv.key === "crystal" ? 16 : 5); k++) {
+  if (cv.key === "crystal" || cv.key === "sand" || cv.key === "ice") for (let k = 0; k < (cv.key === "sand" ? 5 : 16); k++) {
     const a = r2() * 6.283, d = rm.r - 2 - r2() * 2, cl = new T.Group(); cl.position.set(Math.cos(a) * d, 0, Math.sin(a) * d);
-    for (let q = 0; q < 4; q++) { const cm = new T.Mesh(Cyl(.12, .22, 1 + r2() * 1.6, 6), new T.MeshStandardMaterial({ color: lc(cv.key === "crystal" ? "#7FE6FF" : "#FFE0A0"), emissive: lc(cv.key === "crystal" ? "#2AA8D8" : "#C88A30"), emissiveIntensity: 1.2, roughness: .2, flatShading: true })); cm.position.y = .5; cm.rotation.set((r2() - .5) * .9, r2() * 6, (r2() - .5) * .9); cl.add(cm); }
+    for (let q = 0; q < 4; q++) { const cm = new T.Mesh(Cyl(.12, .22, 1 + r2() * 1.6, 6), new T.MeshStandardMaterial({ color: lc(cv.key === "sand" ? "#FFE0A0" : cv.key === "ice" ? "#E8FAFF" : "#7FE6FF"), emissive: lc(cv.key === "sand" ? "#C88A30" : cv.key === "ice" ? "#5AB8E0" : "#2AA8D8"), emissiveIntensity: 1.2, roughness: .2, flatShading: true })); cm.position.y = .5; cm.rotation.set((r2() - .5) * .9, r2() * 6, (r2() - .5) * .9); cl.add(cm); }
     g.add(cl);
   }
   if (cv.key === "lava") { const lv = new T.Mesh(new T.CircleGeometry(3.2, 16), lavaMat); lv.rotation.x = -Math.PI / 2; lv.position.set(0, .12, 0); g.add(lv); cv.hazard = 3.2; }
@@ -773,7 +853,7 @@ const SPOTS = [
       [[-3, 0, 2.6], [3, 0, 3.4], [-3, 3.5, 1.2], [3.2, 3.8, .9]].forEach(([x, z, hh]) => { const c = new T.Mesh(Cyl(.55, .6, hh, 7), st); c.position.set(x, hh / 2, z - 1.5); c.castShadow = true; g.add(c); });
       const lintel = new T.Mesh(new T.BoxGeometry(7.4, .7, 1.2), st); lintel.position.set(0, 3.7, 1.9); lintel.rotation.z = .06; g.add(lintel);
       for (let k = 0; k < 6; k++) { const b2 = new T.Mesh(new T.BoxGeometry(1.2, .8, 1), st); b2.position.set((k - 2.5) * 1.5, .4, -3.5 + (k % 2)); b2.rotation.y = k * .4; g.add(b2); } } },
-  { name: "Crique aux épaves", desc: "Une anse abritée où dort une vieille barque.", pref: [-40, 285], test: (b, h) => b === B.BEACH && h < 1.4,
+  { name: "Crique aux épaves", desc: "Une anse abritée où dort une vieille barque.", pref: [-80, 385], test: (b, h) => b === B.BEACH && h < 1.4,
     build(g) { const w = paper({ color: lc("#7A5A3A") }); const hull = new T.Mesh(new T.CylinderGeometry(1.2, .6, 5, 8, 1, false, 0, Math.PI), w); hull.rotation.set(Math.PI / 2, 0, Math.PI + .5); hull.position.y = .7; g.add(hull); } },
   { name: "Tanière du baobab", desc: "Un baobab géant dont le tronc creux sert d'abri.", pref: [REG.savanna.x, REG.savanna.z], test: b => b === B.SAVANNA,
     build(g) { const t = new T.Mesh(GEO.baobab, vcMat); t.scale.setScalar(2.2); t.castShadow = true; g.add(t); const hole = darkHole(1, 1, 1.5); hole.position.set(0, 1.6, 3.55); g.add(hole); } },
@@ -792,6 +872,30 @@ const SPOTS = [
     build(g) { const rm = paper({ color: lc("#8E8E86") }); for (let k = 0; k < 11; k++) { const a = k / 11 * Math.PI * 1.6 + 1.2, r = new T.Mesh(Ico(1.1, 0), rm); r.scale.set(1.2, .6, 1); r.position.set(Math.cos(a) * 2.2, .4 + (k % 2) * .8, Math.sin(a) * 2.2); g.add(r); }
       const roof = new T.Mesh(Ico(2.4, 0), rm); roof.scale.set(1, .35, 1); roof.position.y = 2; g.add(roof); } },
 ];
+SPOTS.push(
+  { name: "Yourte des steppes", desc: "Une yourte de feutre blanc, plantée dans les hautes herbes.", pref: [REG.steppe.x, REG.steppe.z], test: b => b === B.STEPPE,
+    build(g) { const felt = paper({ color: lc("#EDE4D2") }), band = paper({ color: lc("#B8483A") }); const w = new T.Mesh(Cyl(2.4, 2.4, 1.8, 10), felt); w.position.y = .9; g.add(w); const r = new T.Mesh(Cone(2.6, 1.3, 10), felt); r.position.y = 2.45; g.add(r); const b2 = new T.Mesh(Cyl(2.45, 2.45, .2, 10), band); b2.position.y = 1.5; g.add(b2); const d = darkHole(.6, 1, 1.6); d.position.set(0, .8, 2.42); g.add(d); g.traverse(o => { if (o.isMesh) o.castShadow = true; }); } },
+  { name: "Borie du maquis", desc: "Une cabane ronde en pierres sèches, parfumée de lavande.", pref: [REG.garrigue.x, REG.garrigue.z], test: b => b === B.GARRIGUE,
+    build(g) { const st = paper({ color: lc("#C8BCA0") }); for (let k = 0; k < 4; k++) { const ring = new T.Mesh(Cyl(2.2 - k * .45, 2.3 - k * .45, .7, 9), st); ring.position.y = .35 + k * .65; g.add(ring); } const d = darkHole(.55, 1, 1.4); d.position.set(0, .7, 2.1); g.add(d); } },
+  { name: "Termitière géante", desc: "Une tour de terre plus haute qu'un homme, percée de galeries.", pref: [REG.drytrop.x, REG.drytrop.z], test: b => b === B.DRYTROP,
+    build(g) { const t = new T.Mesh(GEO.termite, vcMat); t.scale.setScalar(2.2); t.castShadow = true; g.add(t); const d = darkHole(.5, 1, 1.3); d.position.set(0, .7, 2.3); g.add(d); } },
+  { name: "Séquoia creux", desc: "Le tronc brûlé d'un séquoia millénaire, assez large pour y entrer.", pref: [REG.sequoia.x, REG.sequoia.z], test: b => b === B.SEQUOIA,
+    build(g) { const t = new T.Mesh(GEO.sequoia, vcMat); t.scale.setScalar(1.6); t.castShadow = true; g.add(t); const d = darkHole(1.1, 1, 2); d.position.set(0, 2, 2.2); g.add(d); } },
+  { name: "Refuge dans la brume", desc: "Une plateforme de bois accrochée aux arbres, au-dessus des nuages.", pref: [REG.cloudmt.x, REG.cloudmt.z], test: b => b === B.CLOUD,
+    build(g) { const w = paper({ color: lc("#7A5A3A") }); const pl = new T.Mesh(new T.BoxGeometry(4, .25, 4), w); pl.position.y = 4; g.add(pl); [[-1.8, -1.8], [1.8, -1.8], [-1.8, 1.8], [1.8, 1.8]].forEach(([x, z]) => { const p = new T.Mesh(Cyl(.16, .2, 4, 5), w); p.position.set(x, 2, z); g.add(p); }); const r = new T.Mesh(Cone(3, 1.6, 4), paper({ color: lc("#4E7A3A") })); r.rotation.y = .785; r.position.y = 6; g.add(r); } },
+  { name: "Rocher du condor", desc: "Un piton rocheux du páramo où nichent les grands rapaces.", pref: [REG.cloudmt.x, REG.cloudmt.z], test: b => b === B.PARAMO,
+    build(g) { const rm = paper({ color: lc("#7E7A70") }); const sp = new T.Mesh(Cyl(1.2, 2.6, 6, 6), rm); sp.position.y = 3; g.add(sp); const n = new T.Mesh(new T.TorusGeometry(1, .35, 5, 9), paper({ color: lc("#7A5A36") })); n.rotation.x = Math.PI / 2; n.position.y = 6.1; g.add(n); } },
+  { name: "Îlot du salar", desc: "Un îlot rocheux couvert de cactus, perdu au milieu du sel.", pref: [REG.salar.x, REG.salar.z], test: b => b === B.SALAR,
+    build(g) { const rm = paper({ color: lc("#8A7A64") }); const hill = new T.Mesh(Ico(4, 1), rm); hill.scale.y = .45; g.add(hill); for (let k = 0; k < 6; k++) { const c = new T.Mesh(GEO.saguaro, vcMat); c.position.set(Math.cos(k) * 2.2, 1.2, Math.sin(k) * 2.2); c.scale.setScalar(.6); g.add(c); } } },
+  { name: "Passerelle de la tourbière", desc: "Un caillebotis de bois qui mène à un affût au bord des mares.", pref: [REG.bog.x, REG.bog.z], test: b => b === B.BOG,
+    build(g) { const w = paper({ color: lc("#8A6440") }); for (let k = -6; k <= 6; k++) { const pl = new T.Mesh(new T.BoxGeometry(1.6, .12, .45), w); pl.position.set(0, .3, k * .6); g.add(pl); } const hut = new T.Mesh(new T.BoxGeometry(2.4, 1.8, 2), w); hut.position.set(0, 1.2, -4.6); g.add(hut); const d = darkHole(.7, 1.4, .3); d.position.set(0, 1.5, -3.58); g.add(d); } },
+  { name: "Abri sous roche", desc: "Un surplomb de roche qui protège du vent du désert froid.", pref: [REG.colddesert.x, REG.colddesert.z], test: b => b === B.COLDDESERT,
+    build(g) { const rm = paper({ color: lc("#8E806A") }); const back = new T.Mesh(Ico(3.2, 0), rm); back.scale.set(1.4, 1, .8); back.position.set(0, 2, -1.8); g.add(back); const roof = new T.Mesh(Ico(2.6, 0), rm); roof.scale.set(1.5, .45, 1.1); roof.position.set(0, 3.4, .4); g.add(roof); const d = darkHole(1.4, 1.4, .8); d.position.set(0, 1.2, -.2); g.add(d); } },
+  { name: "Cabane perchée des pins", desc: "Une cabane de planches perchée dans un grand pin tropical.", pref: [REG.tropconif.x, REG.tropconif.z], test: b => b === B.TROPCONIF,
+    build(g) { const t = new T.Mesh(GEO.tpine, vcMat); t.scale.setScalar(1.4); g.add(t); const w = paper({ color: lc("#8A6440") }); const hut = new T.Mesh(new T.BoxGeometry(2.2, 1.6, 2.2), w); hut.position.set(0, 5.4, 0); g.add(hut); const r = new T.Mesh(Cone(1.9, 1, 4), paper({ color: lc("#6E5030") })); r.rotation.y = .785; r.position.y = 6.7; g.add(r); } },
+  { name: "Iceberg de la banquise", desc: "Un bloc de glace échoué au bord de la banquise, creusé par la mer.", pref: [REG.packice.x, REG.packice.z + 90], test: (b, h) => b === B.GLACIER || b === B.TUNDRA || b === B.BEACH, spread: 260,
+    build(g) { const ice = paper({ color: lc("#D6ECF6") }); const b2 = new T.Mesh(Ico(3.6, 0), ice); b2.scale.set(1.3, 1, 1); b2.position.y = 2; g.add(b2); const d = darkHole(1.2, 1, 1.2); d.position.set(0, 1.4, 3.3); g.add(d); } },
+);
 SPOTS.forEach(sp => {
   if (sp.cave) { const rm = sp.cave.room; sp.pos = [rm.x, rm.z]; sp.y = rm.f; sp.go = [sp.cave.mouth.x + sp.cave.mouth.out[0] * 5, sp.cave.mouth.z + sp.cave.mouth.out[1] * 5]; }
   else {
@@ -812,7 +916,7 @@ SPOTS.forEach(sp => {
 document.getElementById("spottotal").textContent = SPOTS.length;
 
 /* Lucioles (nuit) */
-const flies = (() => { const P = []; let n = 0, guard = 0; while (n < 520 && guard++ < 50000) { const a = rng() * 6.283, r = Math.sqrt(rng()) * R, x = Math.cos(a) * r, z = Math.sin(a) * r, b = biomeAt(x, z); if (![B.MARSH, B.FOREST, B.JUNGLE, B.BAMBOO, B.MANGROVE, B.AUTUMN].includes(b)) continue; P.push(x, heightAt(x, z) + .6 + rng() * 2.5, z); n++; }
+const flies = (() => { const P = []; let n = 0, guard = 0; while (n < 520 && guard++ < 50000) { const a = rng() * 6.283, r = Math.sqrt(rng()) * R, x = Math.cos(a) * r, z = Math.sin(a) * r, b = biomeAt(x, z); if (![B.MARSH, B.FOREST, B.JUNGLE, B.BAMBOO, B.MANGROVE, B.AUTUMN, B.BOG, B.CLOUD, B.SEQUOIA].includes(b)) continue; P.push(x, heightAt(x, z) + .6 + rng() * 2.5, z); n++; }
   const pts = new T.Points(new T.BufferGeometry().setAttribute("position", new T.Float32BufferAttribute(P, 3)), new T.PointsMaterial({ color: lc("#E8FF8A"), size: .28, transparent: true, opacity: .95, depthWrite: false, blending: T.AdditiveBlending }));
   pts.userData.base = Float32Array.from(P); pts.visible = false; pts.frustumCulled = false; scene.add(pts); return pts; })();
 
@@ -886,7 +990,7 @@ function applyTime() {
   const t = TIMES[timeIdx], sd = new T.Vector3(...t.sun).normalize();
   sun.userData.dir = sd; sun.color.copy(lc(t.sunC)); base = { sun: t.sunI, hemi: t.hemiI };
   hemi.color.copy(lc(timeIdx === 3 ? "#4A5A8A" : "#CFE6FF"));
-  paintSky(...t.sky); scene.fog = new T.Fog(lc(t.fog), 160, 900); renderer.toneMappingExposure = t.exp;
+  paintSky(...t.sky); scene.fog = new T.Fog(lc(t.fog), 180, 1150); renderer.toneMappingExposure = t.exp;
   sunDisc.material.color.copy(lc(timeIdx === 3 ? "#E8EEFF" : t.sunC)); sunDisc.scale.setScalar(timeIdx === 3 ? .55 : 1);
   stars.visible = timeIdx === 3; flies.visible = timeIdx === 3;
   clouds.children.forEach(c => c.children.forEach(m => m.material.color.copy(lc(timeIdx === 3 ? "#3A4668" : timeIdx === 2 ? "#FFD8C0" : timeIdx === 0 ? "#FFE8DA" : "#FFFFFF"))));
@@ -900,7 +1004,7 @@ const skyBtn = document.getElementById("skybtn");
 skyBtn.addEventListener("click", () => { cam.sky = !cam.sky; skyBtn.classList.toggle("on", cam.sky); });
 
 /* ───────────────────────── Cartes, carnet, voyage rapide ───────────────────────── */
-const MAPRES = 220, mapImg = document.createElement("canvas"); mapImg.width = mapImg.height = MAPRES;
+const MAPRES = 260, mapImg = document.createElement("canvas"); mapImg.width = mapImg.height = MAPRES;
 { const g = mapImg.getContext("2d"), img = g.createImageData(MAPRES, MAPRES);
   for (let j = 0; j < MAPRES; j++) for (let i = 0; i < MAPRES; i++) {
     const x = -HALF + (i + .5) * SIZE / MAPRES, z = -HALF + (j + .5) * SIZE / MAPRES, h = heightAt(x, z), w = waterAt(x, z), b = biomeAt(x, z);
@@ -924,7 +1028,7 @@ function drawMap(cv, zoom, cx, cz) {
 const mini = document.getElementById("mini"), big = document.getElementById("bigmap");
 document.getElementById("legend").innerHTML = BIOMES.slice(1).map(b => `<span><i style="background:${b.ground}"></i>${b.name}</span>`).join("") + `<span><i style="background:#4FA6D0"></i>Rivières et lacs</span>`;
 const sheets = { map: document.getElementById("mapsheet"), spots: document.getElementById("spotsheet") };
-function openSheet(k) { sheets[k].hidden = false; if (k === "map") drawMap(big, 1.15, 0, 0); if (k === "spots") renderSpots(); }
+function openSheet(k) { sheets[k].hidden = false; if (k === "map") drawMap(big, 1.1, 0, 0); if (k === "spots") renderSpots(); }
 document.getElementById("mapbtn").addEventListener("click", () => openSheet("map"));
 mini.addEventListener("click", () => openSheet("map")); mini.addEventListener("keydown", e => { if (e.key === "Enter") openSheet("map"); });
 document.getElementById("spotsbtn").addEventListener("click", () => openSheet("spots"));
@@ -950,7 +1054,7 @@ function discover(sp) {
 }
 
 /* ───────────────────────── Déplacements : pentes, glissement, grottes, nage ───────────────────────── */
-function terrainGround(x, z) { return Math.max(heightAt(x, z), bridgeAt(x, z)); }
+function terrainGround(x, z) { return Math.max(heightAt(x, z), bridgeAt(x, z), floeAt(x, z)); }
 function groundAt(x, z, y) { const c = caveAt(x, z, y); return c ? c.f : terrainGround(x, z); }
 function blocked(x, z) {
   if (Math.hypot(x, z) > R + 45) return true;
@@ -1024,8 +1128,8 @@ function step(now) {
   if (nearCave) { caveLight.color.copy(lc(nearCave.light)); caveLight.position.set(nearCave.room.x, nearCave.room.f + 3.5, nearCave.room.z); caveLight.intensity = 1.8 * Math.max(caveT, .3); } else caveLight.intensity = 0;
   // Caméra
   if (cam.sky) {
-    cam.skyT += dt * .04; const r = 520;
-    camera.position.lerp(tmpV.set(Math.cos(cam.skyT) * r, 380, Math.sin(cam.skyT) * r), .03); camera.lookAt(0, 0, 0);
+    cam.skyT += dt * .035; const r = 640;
+    camera.position.lerp(tmpV.set(Math.cos(cam.skyT) * r, 470, Math.sin(cam.skyT) * r), .03); camera.lookAt(0, 0, 0);
   } else if (P.cave) {
     // Dans la grotte : caméra courte, qui reste entre les parois
     if (mag > .05 && !drags.size) { const d = ((P.yaw + Math.PI - cam.yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI; cam.yaw += d * Math.min(1, dt * 2); }
@@ -1057,7 +1161,7 @@ function step(now) {
   sky.position.copy(camera.position); stars.position.copy(camera.position);
   // Animations d'ambiance
   WATER_MATS.forEach(m => { m.uniforms.time.value = t; }); lavaMat.uniforms.time.value = t; fallTex.offset.y += dt * 1.6;
-  clouds.rotation.y += dt * .004;
+  clouds.rotation.y += dt * .004; mist.rotation.y = Math.sin(t * .05) * .01;
   { const p = smoke.geometry.attributes.position, sd2 = smoke.userData.seed; for (let k = 0; k < p.count; k++) { const life = (t * 4 + sd2[k]) % 40; p.setXYZ(k, VOLC.x + Math.sin(k * 1.7 + life * .1) * (2 + life * .3), VOLC.lava + 4 + life * 1.3, VOLC.z + Math.cos(k * 2.3 + life * .1) * (2 + life * .3)); } p.needsUpdate = true; }
   if (flies.visible) { const p = flies.geometry.attributes.position, b0 = flies.userData.base; for (let k = 0; k < p.count; k++) p.setXYZ(k, b0[k * 3] + Math.sin(t * .7 + k) * .6, b0[k * 3 + 1] + Math.sin(t * 1.3 + k * 1.7) * .4, b0[k * 3 + 2] + Math.cos(t * .6 + k * .5) * .6); p.needsUpdate = true; flies.material.opacity = .6 + Math.sin(t * 3) * .35; }
   FALLS.forEach(f => f.foam && f.foam.scale.setScalar(1 + Math.sin(t * 4) * .05));
@@ -1069,12 +1173,12 @@ function step(now) {
   if (toastT > 0) { toastT -= dt; if (toastT <= 0) document.getElementById("toast").classList.remove("show"); }
   hudT -= dt;
   if (hudT <= 0) { hudT = .2;
-    const b = P.cave ? P.cave.cv.name : P.swim ? (wnow === LAKE.level ? "Lac du Col" : wnow === 0 ? (biomeAt(P.x, P.z) === B.LAGOON ? "Lagon" : "En mer") : "Rivière") : BIOMES[biomeAt(P.x, P.z)].name;
+    const bh = biomeAt(P.x, P.z), b = P.cave ? P.cave.cv.name : floeAt(P.x, P.z) > -1 ? "Banquise" : P.swim ? (wnow === LAKE.level ? "Lac du Col" : wnow === 0 ? ([B.LAGOON, B.KELP, B.PACKICE].includes(bh) ? BIOMES[bh].name : "En mer") : "Rivière") : BIOMES[bh].name;
     if (b !== biomeShown) { document.getElementById("biome").textContent = b; biomeShown = b; }
     const n = SPOTS.filter(s => s.found).length;
     document.getElementById("alt").textContent = `Altitude ${Math.max(0, Math.round(P.y * 12))} m · ${n} cachette${n > 1 ? "s" : ""} trouvée${n > 1 ? "s" : ""}`;
-    drawMap(mini, 4.2, P.x, P.z);
-    if (!sheets.map.hidden) drawMap(big, 1.15, 0, 0);
+    drawMap(mini, 5.2, P.x, P.z);
+    if (!sheets.map.hidden) drawMap(big, 1.1, 0, 0);
   }
   renderer.render(scene, camera);
 }
