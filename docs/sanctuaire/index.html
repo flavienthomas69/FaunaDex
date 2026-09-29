@@ -176,7 +176,7 @@ const mixCol = (a, b, t) => a.clone().lerp(b, t);
 
 /* ───────────────────────── Géographie : une grande île, des régions ───────────────────────── */
 await stage("Soulèvement des montagnes et du volcan…");
-const R = 380, SIZE = 1000, N = 501, STEP = SIZE / (N - 1), HALF = SIZE / 2;
+const R = 380, SIZE = 1200, N = 601, STEP = SIZE / (N - 1), HALF = SIZE / 2;
 // Nord = froid, sud = chaud ; ouest = sec, est = humide
 const REG = {
   mount: { x: -170, z: -190, r: 175 }, cloudmt: { x: 205, z: 40, r: 100 }, volc: { x: -300, z: 40, r: 90 }, canyon: { x: -165, z: 255, r: 100 },
@@ -184,10 +184,22 @@ const REG = {
   garrigue: { x: -30, z: 170, r: 82 }, drytrop: { x: 75, z: 225, r: 85 }, savanna: { x: 175, z: 290, r: 90 }, jungle: { x: 295, z: 135, r: 85 },
   mangrove: { x: 322, z: 235, r: 60 }, lagoon: { x: 385, z: 285, r: 115 }, bamboo: { x: 325, z: -45, r: 72 }, tropconif: { x: 265, z: -135, r: 62 },
   autumn: { x: 170, z: -255, r: 90 }, sequoia: { x: 35, z: -225, r: 85 }, bog: { x: 110, z: -140, r: 55 }, tundra: { x: -5, z: -345, r: 90 },
-  glacier: { x: -150, z: -345, r: 95 }, kelp: { x: -330, z: -290, r: 110 }, packice: { x: -120, z: -440, r: 150 }, delta: { x: 345, z: 30, r: 45 },
+  glacier: { x: -150, z: -345, r: 95 }, kelp: { x: -470, z: -110, r: 105 }, packice: { x: -150, z: -455, r: 130 }, delta: { x: 345, z: 30, r: 45 },
 };
 const VOLC = { x: REG.volc.x, z: REG.volc.z, cr: 15 };
 const regW = (g, x, z) => { const d = Math.hypot(x - g.x, z - g.z) / g.r + fbm(x * .009 + g.x * .01, z * .009 + g.z * .01, 2) * .22; return Math.max(0, 1 - d * d); };
+// Distance « de côte » (1 = pied du talus sous-marin), anneau du récif barrière, secteur nord de la banquise
+const coastD = (x, z) => Math.hypot(x, z) / R + fbm(x * .0032 + 7, z * .0032 - 3, 3) * .26 + fbm(x * .011, z * .011, 2) * .05;
+const reefC = (x, z) => 1 + regW(REG.lagoon, x, z) * .16 + fbm(x * .006 + 31, z * .006, 2) * .04;
+const ICE_A = Math.atan2(-1, -.3), ICE_HALF = .78;
+function iceSector(x, z) { let da = Math.atan2(z, x) - ICE_A; da = Math.abs(Math.atan2(Math.sin(da), Math.cos(da))); return 1 - sstep(ICE_HALF * .75, ICE_HALF, da + fbm(x * .01 + 3, z * .01, 2) * .12); }
+function iceMask(x, z) {                        // > 0 : banquise continue (chenaux d'eau libre et bord découpé)
+  const sec = iceSector(x, z); if (sec <= 0) return -1;
+  const r = Math.hypot(x, z), edge = sstep(1.15, 1.22, coastD(x, z) + fbm(x * .03, z * .03, 2) * .06);
+  let m = Math.min(sec, edge) - .5;
+  if (r < 560) { const lead = Math.abs(noise(x * .009 + 17, z * .026 - 4)); m = Math.min(m, (lead - .035) * 12); }   // chenaux
+  return m;
+}
 function baseHeight(x, z) {
   const d = Math.hypot(x, z) / R, warp = fbm(x * .0032 + 7, z * .0032 - 3, 3) * .26 + fbm(x * .011, z * .011, 2) * .05;
   const coast = 1 - sstep(.62, 1.0, d + warp);
@@ -207,7 +219,15 @@ function baseHeight(x, z) {
   const gcoast = regW(REG.glacier, x, z) > .15 ? sstep(.2, .45, coast) : sstep(0, 1, coast);   // la glace tombe en falaise sur la mer
   let out = lerp(-16, h, gcoast) - (1 - coast) * 3;
   const kw = regW(REG.kelp, x, z); if (out < 0) out = lerp(out, -7 + fbm(x * .05, z * .05, 2) * 2.5, sstep(0, .5, kw));   // plateau rocheux des forêts de kelp
-  const lw = regW(REG.lagoon, x, z); if (out < 0) out = lerp(out, -1.9 + fbm(x * .04, z * .04, 2) * .8, sstep(0, .55, lw));
+  // Barrière de corail tout autour : lagon peu profond derrière, crête juste sous la surface, passes et motus
+  const cd = d + warp, RC = reefC(x, z);
+  if (out < 0 && cd > .7) {
+    const lagW = sstep(.74, .86, cd) * (1 - sstep(RC - .012, RC + .01, cd));
+    out = Math.max(out, lerp(out, -2.7 + fbm(x * .04, z * .04, 2) * 1.3, lagW));
+    const t = (cd - RC) / .016, bump = Math.exp(-t * t);
+    const pass = sstep(.32, .5, noise(x * .012 + 5, z * .012 - 9)), motu = sstep(.42, .68, noise(x * .02 - 13, z * .02 + 7)) * (1 - pass);
+    out = Math.max(out, lerp(out, -.5 + fbm(x * .09, z * .09, 2) * .3 - pass * 5 + motu * 2.3, bump));
+  }
   return out;
 }
 const H = new Float32Array(N * N), WATER = new Float32Array(N * N).fill(-999), INL = new Uint8Array(N * N), RIVD = new Float32Array(N * N).fill(1e9);
@@ -293,7 +313,7 @@ const waterAt = (x, z) => nearest(WATER, x, z);
 /* ───────────────────────── Biomes ───────────────────────── */
 await stage("Répartition des biomes…");
 const B = { OCEAN: 0, BEACH: 1, MARSH: 2, MEADOW: 3, FOREST: 4, TAIGA: 5, ALPINE: 6, SNOW: 7, SAVANNA: 8, JUNGLE: 9, DESERT: 10, CANYON: 11, VOLCANO: 12, AUTUMN: 13, BAMBOO: 14, TUNDRA: 15, MANGROVE: 16, LAGOON: 17,
-  STEPPE: 18, GARRIGUE: 19, DRYTROP: 20, SEQUOIA: 21, CLOUD: 22, PARAMO: 23, GLACIER: 24, COLDDESERT: 25, SALAR: 26, BOG: 27, KELP: 28, PACKICE: 29, TROPCONIF: 30 };
+  STEPPE: 18, GARRIGUE: 19, DRYTROP: 20, SEQUOIA: 21, CLOUD: 22, PARAMO: 23, GLACIER: 24, COLDDESERT: 25, SALAR: 26, BOG: 27, KELP: 28, PACKICE: 29, TROPCONIF: 30, REEF: 31 };
 const BIOMES = [
   { name: "Océan", ground: "#D8C792" }, { name: "Plage", ground: "#E9DAA8" }, { name: "Marais", ground: "#6F8A48" }, { name: "Prairie", ground: "#8DC25A" },
   { name: "Forêt tempérée", ground: "#4F8C3D" }, { name: "Taïga", ground: "#4A7448" }, { name: "Alpages et rochers", ground: "#8F8C82" }, { name: "Sommets enneigés", ground: "#EEF1F2" },
@@ -303,10 +323,15 @@ const BIOMES = [
   { name: "Steppe", ground: "#BDB06A" }, { name: "Maquis méditerranéen", ground: "#A8A36A" }, { name: "Forêt tropicale sèche", ground: "#B89A58" }, { name: "Forêt de séquoias", ground: "#4E5E36" },
   { name: "Forêt de nuages", ground: "#3E7A56" }, { name: "Páramo", ground: "#A3A26E" }, { name: "Glacier", ground: "#E4F0F6" }, { name: "Désert froid", ground: "#B8A88A" },
   { name: "Désert de sel", ground: "#F4F2EC" }, { name: "Tourbière", ground: "#7A7A4A" }, { name: "Forêt de kelp", ground: "#5E7060" }, { name: "Banquise", ground: "#DDE9F0" },
-  { name: "Pinède tropicale", ground: "#8A8A4E" },
+  { name: "Pinède tropicale", ground: "#8A8A4E" }, { name: "Barrière de corail", ground: "#EAD8BE" },
 ];
 function classify(x, z, h, rd) {
-  if (h < -.25) { if (regW(REG.lagoon, x, z) > .2 && h > -4.5) return B.LAGOON; if (regW(REG.kelp, x, z) > .2 && h > -11) return B.KELP; if (regW(REG.packice, x, z) > .15) return B.PACKICE; return B.OCEAN; }
+  if (h < -.25) {
+    if (iceMask(x, z) > 0) return B.PACKICE;
+    const cd = coastD(x, z), rc = reefC(x, z);
+    if (Math.abs(cd - rc) < .028 && h > -7) return B.REEF;
+    if (cd > .7 && cd < rc && h > -4.8) return B.LAGOON;
+    if (regW(REG.kelp, x, z) > .2 && h > -11) return B.KELP; if (regW(REG.packice, x, z) > .15) return B.PACKICE; return B.OCEAN; }
   if (regW(REG.glacier, x, z) > .3 && h > 1.5) return B.GLACIER;
   if (sstep(.2, .55, regW(REG.salar, x, z)) > .6) return B.SALAR;
   if (regW(REG.volc, x, z) > .45 && h > 2) return B.VOLCANO;
@@ -405,7 +430,8 @@ const CANYON_BANDS = ["#E3B07A", "#C8643A", "#D98A4E", "#B5502E", "#E8C08A", "#A
 function groundColor(i, j) {
   const k = gi(i, j), x = gx(i), z = gx(j), h = H[k], b = BIOME[k];
   let c;
-  if (h < -.25) c = b === B.LAGOON ? mixCol(col("#F6ECC8"), col("#9FD0C0"), sstep(0, 5, -h)) : b === B.KELP ? mixCol(col("#6E7A62"), col("#3A5048"), sstep(3, 11, -h)) : mixCol(col("#D9C68E"), col("#3F7C86"), sstep(0, 14, -h));
+  if (h < -.25 && b === B.REEF) c = mixCol(mixCol(col("#EAD8BE"), col(iceSector(x, z) > .5 ? "#D8D4CC" : "#D89A8A"), sstep(-.2, .6, noise(x * .15, z * .15)) * .6), col("#4F8C94"), sstep(1, 8, -h));
+  else if (h < -.25) c = b === B.LAGOON ? mixCol(col("#F6ECC8"), col("#9FD0C0"), sstep(0, 5, -h)) : b === B.KELP ? mixCol(col("#6E7A62"), col("#3A5048"), sstep(3, 11, -h)) : mixCol(col("#D9C68E"), col("#3F7C86"), sstep(0, 14, -h));
   else {
     c = col(BIOMES[b].ground);
     if (b === B.CANYON) c = CANYON_BANDS[Math.abs(Math.floor(h / 2.6)) % CANYON_BANDS.length].clone();
@@ -506,7 +532,7 @@ function waterMat(o) {
 const seaMat = waterMat({ shallow: "#5FD6D0", deep: "#1B5E8C", opacity: .9, wave: .28 });
 const inlandMat = waterMat({ shallow: "#6FCBD2", deep: "#1F6F8C", opacity: .9, river: true, wave: .08 });
 { // Mer : grille dont chaque sommet connaît la profondeur, puis un grand anneau au large
-  const SR = 560, g = new T.PlaneGeometry(SR * 2, SR * 2, 250, 250); g.rotateX(-Math.PI / 2);
+  const SR = 640, g = new T.PlaneGeometry(SR * 2, SR * 2, 300, 300); g.rotateX(-Math.PI / 2);
   const p = g.attributes.position, dep = new Float32Array(p.count), fl = new Float32Array(p.count * 2);
   for (let k = 0; k < p.count; k++) { const x = p.getX(k), z = p.getZ(k); dep[k] = Math.abs(x) < HALF && Math.abs(z) < HALF ? clamp(-heightAt(x, z), -2, 30) : 30; }
   const idx = g.index.array, keep = [];   // disque détaillé, puis un anneau au large sans trou ni recouvrement
@@ -615,6 +641,8 @@ const GEO = {
   mangrove: merge([...[0, 1, 2, 3, 4, 5].map(k => { const g = Cyl(.07, .1, 2.2, 4); g.rotateZ(.55); g.translate(.6, .9, 0); g.rotateY(k * 1.05); return [g, "#5E4A34"]; }), [at(Cyl(.2, .26, 2.6, 5), 0, 2.6, 0), "#6A5238"], [at(Ico(1.9), 0, 4.4, 0), "#3E7A3A"], [at(Ico(1.3), 1.1, 4, .3), "#4A8A42"]]),
   deadtree: merge([[at(Cyl(.14, .24, 3.4, 5), 0, 1.7, 0), "#7A6A5A"], [at(tilt(Cyl(.06, .1, 1.6, 4), .8), .5, 3, 0), "#7A6A5A"], [at(tilt(Cyl(.05, .09, 1.3, 4), -.9, 1.5), -.4, 2.6, .2), "#7A6A5A"]]),
   saguaro: merge([[at(Cyl(.32, .36, 4.2, 7), 0, 2.1, 0), "#4E8A4A"], [at(Cyl(.18, .2, 1.6, 6), .75, 2.6, 0), "#4E8A4A"], [at(tilt(Cyl(.18, .18, .75, 6), Math.PI / 2), .45, 1.9, 0), "#4E8A4A"], [at(Cyl(.16, .18, 1.2, 6), -.7, 2.2, 0), "#4E8A4A"], [at(tilt(Cyl(.16, .16, .6, 6), Math.PI / 2), -.4, 1.6, 0), "#4E8A4A"]]),
+  brain: merge([[at(Ico(.8, 1), 0, .25, 0).scale(1, .6, 1), "#FFFFFF"], [at(Ico(.45, 0), .7, .15, .3).scale(1, .6, 1), "#EFEFEF"]]),
+  seafan: merge([[at(Cyl(.05, .07, .5, 3), 0, .25, 0), "#DDDDDD"], [at(Ico(.9, 0), 0, 1.25, 0).scale(1, 1.1, .1), "#FFFFFF"], [at(Ico(.6, 0), .6, .9, .1).scale(1, 1, .1), "#F2F2F2"]]),
   coral: merge([[at(Cone(.35, 1.1, 5), 0, .5, 0), "#FFFFFF"], [at(Cone(.25, .8, 5), .45, .35, .2), "#F4F4F4"], [at(Ico(.35), -.4, .3, -.2), "#EDEDED"], [at(tilt(Cone(.18, .9, 4), .6), .1, .5, -.4), "#FFFFFF"]]),
   shrub: merge([[at(Ico(.7), 0, .3, 0).scale(1, .55, 1), "#7E8E6A"], [at(Ico(.45), .5, .2, .2), "#8E9A74"]]),
   bush: merge([[at(Ico(.9), 0, .6, 0), "#4F7F3A"], [at(Ico(.62), .6, .45, .3), "#5E8F42"], [at(Ico(.55), -.5, .4, -.3), "#46763A"]]),
@@ -658,7 +686,7 @@ function place(kind, x, z, s, o = {}) {
   if (CROWN[kind]) { const k = ckey(x, z); if (!CANOPY.has(k)) CANOPY.set(k, []); CANOPY.get(k).push([x, z, CROWN[kind][0] * s, y + CROWN[kind][1] * s, y + CROWN[kind][2] * s]); }
   if (o.r) COLLIDE.push([x, z, o.r * s]);
 }
-const MAPLE = ["#D9482B", "#E8792E", "#F2B33A", "#C23A2A", "#E0A040"], CORAL = ["#F07A8A", "#F2A65A", "#B58BD6", "#FF9F80", "#EDE0C8", "#6FD0C0"];
+const MAPLE = ["#D9482B", "#E8792E", "#F2B33A", "#C23A2A", "#E0A040"], CORAL = ["#F07A8A", "#F2A65A", "#B58BD6", "#FF9F80", "#EDE0C8", "#6FD0C0", "#F2D25A", "#E85A7A"], CORAL_COLD = ["#F4EEE6", "#E8C8C0", "#F0A898", "#DCD6E8"];
 const DENS = {   // [type, probabilité par essai, échelle, rayon de collision]
   [B.FOREST]: [["oak", .16, 1.1, .5], ["birch", .05, 1, .3], ["pine", .03, 1, .4], ["bush", .07, 1], ["mushroom", .03, 1], ["log", .008, 1], ["rock", .01, .8]],
   [B.TAIGA]: [["pine", .24, 1.1, .45], ["snowpine", .03, 1, .4], ["rock", .03, 1.2, .9], ["bush", .02, .9], ["boulder", .008, 1.4, 1.3]],
@@ -676,7 +704,8 @@ const DENS = {   // [type, probabilité par essai, échelle, rayon de collision]
   [B.BAMBOO]: [["bamboo", .16, 1, .6], ["jplant", .05, 1], ["bush", .03, 1], ["rock", .005, 1, .8]],
   [B.TUNDRA]: [["shrub", .05, 1], ["rock", .02, 1.2, .9], ["deadtree", .004, .9, .25], ["snowpine", .004, .8, .4]],
   [B.MANGROVE]: [["mangrove", .1, 1, .35], ["reed", .05, 1]],
-  [B.LAGOON]: [["coral", .06, 1.2], ["rock", .01, 1, 0]],
+  [B.LAGOON]: [["coral", .06, 1.2], ["brain", .03, 1], ["rock", .01, 1, 0]],
+  [B.REEF]: [["coral", .2, 1.3], ["brain", .12, 1.1], ["seafan", .08, 1.1], ["rock", .02, 1.2, 0]],
   [B.STEPPE]: [["feathergrass", .12, 1], ["rock", .006, 1, .8], ["sagebrush", .01, .9]],
   [B.GARRIGUE]: [["olive", .03, 1, .35], ["holmoak", .04, 1, .35], ["lavender", .09, 1], ["drybush", .03, .9], ["rock", .015, 1, .8]],
   [B.DRYTROP]: [["droptree", .07, 1.1, .35], ["termite", .006, 1, .8], ["drybush", .04, 1], ["baobab", .002, 1, 1.4], ["rock", .008, 1, .8]],
@@ -690,12 +719,13 @@ const DENS = {   // [type, probabilité par essai, échelle, rayon de collision]
   [B.KELP]: [["kelp", .12, 1.1], ["rock", .015, 1.4, 0]],
   [B.TROPCONIF]: [["tpine", .1, 1.1, .4], ["drybush", .04, 1], ["feathergrass", .04, .9]],
 };
-const UNDERWATER = { coral: [-4.5, -.4], mangrove: [-1.2, 1.5], rock: [-11, 99], kelp: [-12, -2.5] };
+const UNDERWATER = { coral: [-7, -.3], brain: [-7, -.3], seafan: [-8, -.6], mangrove: [-1.2, 1.5], rock: [-11, 99], kelp: [-12, -2.5] };
 {
   const tries = LIGHT ? 95000 : 175000;
   for (let n = 0; n < tries; n++) {
-    const a = rng() * 6.283, r = Math.sqrt(rng()) * (R + 40), x = Math.cos(a) * r, z = Math.sin(a) * r;
+    const a = rng() * 6.283, r = n % 3 ? Math.sqrt(rng()) * (R + 40) : Math.sqrt(.3 + rng() * .8) * R * 1.3, x = Math.cos(a) * r, z = Math.sin(a) * r;   // 1 essai sur 3 vers le récif
     const b = biomeAt(x, z), list = DENS[b]; if (!list) continue;
+    if (b === B.BEACH && coastD(x, z) > .93) { if (rng() < .05 && waterAt(x, z) < heightAt(x, z) - .3) place("palm", x, z, .8 + rng() * .4, { r: .3 }); continue; }   // cocotiers des motus
     const h = heightAt(x, z), wet = waterAt(x, z) > h - .15, sl = slopeAt(x, z);
     if (caveAt(x, z, h) || HOLES.some(hl => Math.hypot(x - hl.x, z - hl.z) < 6)) continue;
     let roll = rng();
@@ -703,12 +733,12 @@ const UNDERWATER = { coral: [-4.5, -.4], mangrove: [-1.2, 1.5], rock: [-11, 99],
       if (roll < p) {
         const uw = UNDERWATER[kind];
         if (wet && !(uw && h > uw[0] && h < uw[1])) break;
-        if (!wet && (kind === "coral" || kind === "kelp")) break;
+        if (!wet && (kind === "coral" || kind === "kelp" || kind === "brain" || kind === "seafan")) break;
         if (sl > (kind === "rock" || kind === "boulder" || kind === "lavarock" || kind === "serac" ? 2 : .75)) break;
         const s = sc * (.75 + rng() * .55), o = { r: rad };
         if (kind === "rock" || kind === "boulder" || kind === "lavarock") { o.sx = .8 + rng() * .8; o.sy = .5 + rng() * .5; o.sz = .8 + rng() * .6; o.tilt = (rng() - .5) * .4; o.sink = .3 * s; }
         if (kind === "maple") o.c = lc(MAPLE[rng() * MAPLE.length | 0]);
-        if (kind === "coral") o.c = lc(CORAL[rng() * CORAL.length | 0]);
+        if (kind === "coral" || kind === "brain" || kind === "seafan") o.c = lc((iceSector(x, z) > .5 ? CORAL_COLD : CORAL)[rng() * (iceSector(x, z) > .5 ? CORAL_COLD.length : CORAL.length) | 0]);
         if (kind === "mangrove") o.sink = -.2;
         place(kind, x, z, s, o); break;
       }
@@ -736,20 +766,49 @@ Object.entries(inst).forEach(([kind, list]) => {
   list.forEach((it, i) => { im.setMatrixAt(i, it.m); im.setColorAt(i, it.c || new T.Color(1, 1, 1).multiplyScalar(.9 + rng() * .2)); });
   im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
   im.frustumCulled = false;
-  im.castShadow = !LIGHT && !["grass", "flower", "reed", "mushroom", "coral", "kelp", "lavender", "cottongrass", "sphagnum", "saltcrystal", "tussock", "feathergrass"].includes(kind); im.receiveShadow = true;
+  im.castShadow = !LIGHT && !["grass", "flower", "reed", "mushroom", "coral", "brain", "seafan", "kelp", "lavender", "cottongrass", "sphagnum", "saltcrystal", "tussock", "feathergrass"].includes(kind); im.receiveShadow = true;
   scene.add(im);
 });
 const FLOES = [];
 { const r2 = mulberry(61), iceM = paper({ color: lc("#EEF6FA") }), bergM = paper({ color: lc("#D6ECF6") });
   for (let n = 0; n < 900 && FLOES.length < (LIGHT ? 90 : 170); n++) {
     const x = REG.packice.x + (r2() - .5) * 360, z = REG.packice.z + (r2() - .5) * 240;
-    if (regW(REG.packice, x, z) < .15 || heightAt(x, z) > -1.5 || FLOES.some(f => Math.hypot(f.x - x, f.z - z) < f.r + 4)) continue;
+    if (regW(REG.packice, x, z) < .15 || heightAt(x, z) > -1.5 || iceMask(x, z) > -.15 || FLOES.some(f => Math.hypot(f.x - x, f.z - z) < f.r + 4)) continue;
     const r = 3 + r2() * 6, m = new T.Mesh(new T.CylinderGeometry(r, r * .92, .7, 6 + (r2() * 3 | 0)), iceM); m.position.set(x, 0, z); m.rotation.y = r2() * 6; m.receiveShadow = true; scene.add(m);
     FLOES.push({ x, z, r: r * .9 });
   }
   for (let n = 0; n < 16; n++) { const a = r2() * 6.283, x = REG.packice.x + Math.cos(a) * (40 + r2() * 110), z = REG.packice.z + 30 + Math.sin(a) * 70; if (heightAt(x, z) > -3) continue;
     const b = new T.Mesh(new T.IcosahedronGeometry(6 + r2() * 8, 0), bergM); b.scale.set(1, .8 + r2() * .8, 1); b.position.set(x, 1.5, z); b.castShadow = true; scene.add(b); COLLIDE.push([x, z, 7]); } }
 const floeAt = (x, z) => { for (const f of FLOES) if (Math.hypot(x - f.x, z - f.z) < f.r) return .35; return -999; };
+const IS = 4, IX0 = -HALF, IZ0 = -HALF, INX = SIZE / IS + 1, INZ = HALF / IS + 1, ICEH = new Float32Array(INX * INZ);
+{ const g = (i, j) => i + j * INX, P = [], C = [], I = [], vid = new Int32Array(INX * INZ).fill(-1), M = new Float32Array(INX * INZ);
+  for (let j = 0; j < INZ; j++) for (let i = 0; i < INX; i++) {
+    const x = IX0 + i * IS, z = IZ0 + j * IS, m = iceMask(x, z); M[g(i, j)] = m;
+    const ridge = Math.max(0, .09 - Math.abs(noise(x * .015 + 40, z * .015))) * 16, drift = fbm(x * .05, z * .05, 2) * .25;
+    ICEH[g(i, j)] = m > 0 ? .55 + ridge + drift + Math.min(m, .3) : -1.3;
+  }
+  const vtx = (i, j) => { const k = g(i, j); if (vid[k] >= 0) return vid[k]; vid[k] = P.length / 3; const x = IX0 + i * IS, z = IZ0 + j * IS, h = ICEH[k];
+    P.push(x, h, z); const c = mixCol(col("#F4F8FA"), col("#A9CFE2"), sstep(.9, 1.8, h) * .7 + sstep(.1, -.8, h)); c.offsetHSL(0, 0, noise(x * .3, z * .3) * .02); c.convertSRGBToLinear(); C.push(c.r, c.g, c.b); return vid[k]; };
+  for (let j = 0; j < INZ - 1; j++) for (let i = 0; i < INX - 1; i++) {
+    if (Math.max(M[g(i, j)], M[g(i + 1, j)], M[g(i, j + 1)], M[g(i + 1, j + 1)]) <= 0) continue;
+    const a = vtx(i, j), b = vtx(i + 1, j), c = vtx(i, j + 1), d = vtx(i + 1, j + 1); I.push(a, c, b, b, c, d);
+  }
+  const geo = new T.BufferGeometry(); geo.setAttribute("position", new T.Float32BufferAttribute(P, 3)); geo.setAttribute("color", new T.Float32BufferAttribute(C, 3)); geo.setIndex(I); geo.computeVertexNormals();
+  const sheet = new T.Mesh(geo, vcMat); sheet.receiveShadow = true; scene.add(sheet);
+  // au-delà de la carte, la banquise continue jusqu'à l'horizon
+  const ring = new T.RingGeometry(HALF - 2, 2100, 48, 1, -(ICE_A + ICE_HALF * .8), ICE_HALF * 1.6); ring.rotateX(-Math.PI / 2);
+  const far = new T.Mesh(ring, paper({ color: lc("#EEF4F8") })); far.position.y = .45; scene.add(far);
+  // trous de respiration des phoques et crêtes de glace
+  const r3 = mulberry(313), holeM = new T.MeshBasicMaterial({ color: lc("#1E4A66") });
+  for (let n = 0, k = 0; n < 400 && k < 22; n++) { const x = IX0 + r3() * SIZE, z = IZ0 + r3() * HALF; if (iceMask(x, z) < .2 || Math.hypot(x, z) > 560) continue;
+    const h = new T.Mesh(new T.CircleGeometry(.9 + r3() * .5, 9), holeM); h.rotation.x = -Math.PI / 2; h.position.set(x, iceAt(x, z) + .03, z); scene.add(h); k++; }
+}
+function iceAt(x, z) {
+  const fx = (x - IX0) / IS, fz = (z - IZ0) / IS; if (fx < 0 || fz < 0 || fx >= INX - 1 || fz >= INZ - 1) return -999;
+  const i = fx | 0, j = fz | 0, u = fx - i, v = fz - j, a = ICEH[i + j * INX], b = ICEH[i + 1 + j * INX], c = ICEH[i + (j + 1) * INX], d = ICEH[i + 1 + (j + 1) * INX];
+  const h = u + v <= 1 ? a + (b - a) * u + (c - a) * v : d + (c - d) * (1 - u) + (b - d) * (1 - v);
+  return h > -.2 ? h : -999;
+}
 const mist = (() => { const P = []; let n = 0, guard = 0; while (n < 240 && guard++ < 60000) { const a = rng() * 6.283, r = Math.sqrt(rng()) * R, x = Math.cos(a) * r, z = Math.sin(a) * r; if (biomeAt(x, z) !== B.CLOUD) continue; P.push(x, heightAt(x, z) + 3 + rng() * 8, z); n++; }
   const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d"), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, "rgba(255,255,255,.9)"); gr.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
   const pts = new T.Points(new T.BufferGeometry().setAttribute("position", new T.Float32BufferAttribute(P, 3)), new T.PointsMaterial({ map: new T.CanvasTexture(c), size: 26, transparent: true, opacity: .35, depthWrite: false, color: 0xffffff }));
@@ -896,13 +955,24 @@ SPOTS.push(
   { name: "Iceberg de la banquise", desc: "Un bloc de glace échoué au bord de la banquise, creusé par la mer.", pref: [REG.packice.x, REG.packice.z + 90], test: (b, h) => b === B.GLACIER || b === B.TUNDRA || b === B.BEACH, spread: 260,
     build(g) { const ice = paper({ color: lc("#D6ECF6") }); const b2 = new T.Mesh(Ico(3.6, 0), ice); b2.scale.set(1.3, 1, 1); b2.position.y = 2; g.add(b2); const d = darkHole(1.2, 1, 1.2); d.position.set(0, 1.4, 3.3); g.add(d); } },
 );
+SPOTS.push(
+  { name: "Motu du récif", desc: "Un îlot de sable posé sur la barrière de corail, à l'ombre de trois cocotiers.",
+    at() { const r2 = mulberry(909); let best = null, bd = 1e9; for (let n = 0; n < 20000; n++) { const a = r2() * 6.283, rr = R * (.85 + r2() * .5), x = Math.cos(a) * rr, z = Math.sin(a) * rr, h = heightAt(x, z);
+      if (h < .5 || coastD(x, z) < .95 || biomeAt(x, z) !== B.BEACH) continue; const d = Math.hypot(x - 330, z - 330); if (d < bd) { bd = d; best = [x, z]; } } return best || [0, 0]; },
+    build(g) { const t = paper({ color: lc("#D8C090") }); const hut = new T.Mesh(Cone(2, 2.2, 6), t); hut.position.y = 1.1; g.add(hut); [[-4, -2.5, .2], [3.5, -3, -.3], [-1, -5, .1]].forEach(([x, z, t2]) => { const pm = new T.Mesh(GEO.palm, vcMat); pm.position.set(x, 0, z); pm.rotation.set(t2, x, 0); pm.castShadow = true; g.add(pm); }); const d = darkHole(.55, 1, 1.4); d.position.set(0, .6, 1.25); d.rotation.x = -.45; g.add(d); } },
+  { name: "Igloo de la banquise", desc: "Un igloo de blocs de neige, au milieu de la glace de mer.",
+    at() { const r2 = mulberry(4242); for (let n = 0; n < 20000; n++) { const a = ICE_A + (r2() - .5) * .5, rr = 470 + r2() * 60, x = Math.cos(a) * rr, z = Math.sin(a) * rr; if (iceMask(x, z) > .25 && iceAt(x, z) < 1) return [x, z]; } return [Math.cos(ICE_A) * 500, Math.sin(ICE_A) * 500]; },
+    build(g) { const snow = paper({ color: lc("#F6FAFC") }); const dome = new T.Mesh(new T.SphereGeometry(2.3, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), snow); g.add(dome);
+      const tun = new T.Mesh(new T.CylinderGeometry(.9, .9, 1.8, 8, 1, false, 0, Math.PI), snow); tun.rotation.z = Math.PI / 2; tun.rotation.y = Math.PI / 2; tun.position.set(0, 0, 2.3); g.add(tun);
+      const d = darkHole(.7, 1, 1); d.position.set(0, .35, 3.21); g.add(d); g.traverse(o => { if (o.isMesh) o.castShadow = true; }); } },
+);
 SPOTS.forEach(sp => {
   if (sp.cave) { const rm = sp.cave.room; sp.pos = [rm.x, rm.z]; sp.y = rm.f; sp.go = [sp.cave.mouth.x + sp.cave.mouth.out[0] * 5, sp.cave.mouth.z + sp.cave.mouth.out[1] * 5]; }
   else {
     let x, z;
     if (sp.fall && !MAINFALL) { sp.fall = false; sp.pref = [rivers[1].pts[20].x + 8, rivers[1].pts[20].z]; sp.test = () => true; }
     if (sp.fall) { x = MAINFALL.x - MAINFALL.tx * 1.2; z = MAINFALL.z - MAINFALL.tz * 1.2; sp.y = MAINFALL.bottom; }
-    else { [x, z] = findSpot(sp.pref, sp.test, sp.spread); sp.y = heightAt(x, z); }
+    else { [x, z] = sp.at ? sp.at() : findSpot(sp.pref, sp.test, sp.spread); sp.y = terrainGround(x, z); }
     sp.pos = [x, z];
     const g = new T.Group(); g.position.set(x, sp.y - .1, z); g.rotation.y = sp.fall ? Math.atan2(-MAINFALL.tx, -MAINFALL.tz) : Math.atan2(-x, -z);
     sp.build(g); scene.add(g);
@@ -1004,11 +1074,11 @@ const skyBtn = document.getElementById("skybtn");
 skyBtn.addEventListener("click", () => { cam.sky = !cam.sky; skyBtn.classList.toggle("on", cam.sky); });
 
 /* ───────────────────────── Cartes, carnet, voyage rapide ───────────────────────── */
-const MAPRES = 260, mapImg = document.createElement("canvas"); mapImg.width = mapImg.height = MAPRES;
+const MAPRES = 300, mapImg = document.createElement("canvas"); mapImg.width = mapImg.height = MAPRES;
 { const g = mapImg.getContext("2d"), img = g.createImageData(MAPRES, MAPRES);
   for (let j = 0; j < MAPRES; j++) for (let i = 0; i < MAPRES; i++) {
     const x = -HALF + (i + .5) * SIZE / MAPRES, z = -HALF + (j + .5) * SIZE / MAPRES, h = heightAt(x, z), w = waterAt(x, z), b = biomeAt(x, z);
-    let c = w > h + .05 ? (h < -.25 ? (b === B.LAGOON ? col("#7FD8D2") : mixCol(col("#5FB3D6"), col("#2A6F9A"), sstep(0, 12, -h))) : col("#4FA6D0")) : col(BIOMES[b].ground);
+    let c = w > h + .05 ? (h < -.25 ? (iceMask(x, z) > 0 ? col("#F2F7FA") : b === B.REEF ? col(heightAt(x, z) > -2 ? "#CFF3E6" : "#8ADCD2") : b === B.LAGOON ? col("#7FD8D2") : mixCol(col("#5FB3D6"), col("#2A6F9A"), sstep(0, 12, -h))) : col("#4FA6D0")) : col(BIOMES[b].ground);
     if (b === B.VOLCANO && Math.hypot(x - VOLC.x, z - VOLC.z) < VOLC.lavaR) c = col("#FF7A30");
     if (w <= h + .05) { const e = 2, sh = (heightAt(x - e, z - e) - heightAt(x + e, z + e)) * .035; c.offsetHSL(0, 0, clamp(sh, -.12, .12)); }
     const k = (i + j * MAPRES) * 4; img.data[k] = c.r * 255; img.data[k + 1] = c.g * 255; img.data[k + 2] = c.b * 255; img.data[k + 3] = 255;
@@ -1054,10 +1124,10 @@ function discover(sp) {
 }
 
 /* ───────────────────────── Déplacements : pentes, glissement, grottes, nage ───────────────────────── */
-function terrainGround(x, z) { return Math.max(heightAt(x, z), bridgeAt(x, z), floeAt(x, z)); }
+function terrainGround(x, z) { return Math.max(heightAt(x, z), bridgeAt(x, z), floeAt(x, z), iceAt(x, z)); }
 function groundAt(x, z, y) { const c = caveAt(x, z, y); return c ? c.f : terrainGround(x, z); }
 function blocked(x, z) {
-  if (Math.hypot(x, z) > R + 45) return true;
+  if (Math.hypot(x, z) > 575) return true;
   for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { const l = CG.get(ckey(x + a * 8, z + b * 8)); if (l) for (const c of l) if (Math.hypot(x - c[0], z - c[1]) < c[2] + .35) return true; }
   return false;
 }
@@ -1128,8 +1198,8 @@ function step(now) {
   if (nearCave) { caveLight.color.copy(lc(nearCave.light)); caveLight.position.set(nearCave.room.x, nearCave.room.f + 3.5, nearCave.room.z); caveLight.intensity = 1.8 * Math.max(caveT, .3); } else caveLight.intensity = 0;
   // Caméra
   if (cam.sky) {
-    cam.skyT += dt * .035; const r = 640;
-    camera.position.lerp(tmpV.set(Math.cos(cam.skyT) * r, 470, Math.sin(cam.skyT) * r), .03); camera.lookAt(0, 0, 0);
+    cam.skyT += dt * .035; const r = 760;
+    camera.position.lerp(tmpV.set(Math.cos(cam.skyT) * r, 560, Math.sin(cam.skyT) * r), .03); camera.lookAt(0, 0, 0);
   } else if (P.cave) {
     // Dans la grotte : caméra courte, qui reste entre les parois
     if (mag > .05 && !drags.size) { const d = ((P.yaw + Math.PI - cam.yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI; cam.yaw += d * Math.min(1, dt * 2); }
@@ -1173,11 +1243,11 @@ function step(now) {
   if (toastT > 0) { toastT -= dt; if (toastT <= 0) document.getElementById("toast").classList.remove("show"); }
   hudT -= dt;
   if (hudT <= 0) { hudT = .2;
-    const bh = biomeAt(P.x, P.z), b = P.cave ? P.cave.cv.name : floeAt(P.x, P.z) > -1 ? "Banquise" : P.swim ? (wnow === LAKE.level ? "Lac du Col" : wnow === 0 ? ([B.LAGOON, B.KELP, B.PACKICE].includes(bh) ? BIOMES[bh].name : "En mer") : "Rivière") : BIOMES[bh].name;
+    const bh = biomeAt(P.x, P.z), b = P.cave ? P.cave.cv.name : floeAt(P.x, P.z) > -1 || iceAt(P.x, P.z) > -1 ? "Banquise" : P.swim ? (wnow === LAKE.level ? "Lac du Col" : wnow === 0 ? ([B.LAGOON, B.KELP, B.PACKICE, B.REEF].includes(bh) ? BIOMES[bh].name : "En mer") : "Rivière") : BIOMES[bh].name;
     if (b !== biomeShown) { document.getElementById("biome").textContent = b; biomeShown = b; }
     const n = SPOTS.filter(s => s.found).length;
     document.getElementById("alt").textContent = `Altitude ${Math.max(0, Math.round(P.y * 12))} m · ${n} cachette${n > 1 ? "s" : ""} trouvée${n > 1 ? "s" : ""}`;
-    drawMap(mini, 5.2, P.x, P.z);
+    drawMap(mini, 6.2, P.x, P.z);
     if (!sheets.map.hidden) drawMap(big, 1.1, 0, 0);
   }
   renderer.render(scene, camera);
