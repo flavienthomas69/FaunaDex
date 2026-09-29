@@ -139,10 +139,15 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
-(() => {
+// L'écran de chargement s'affiche d'abord ; l'île est générée juste après, et toute erreur est montrée au lieu d'une page vide.
+function islandFail(msg) { const m = document.getElementById("loadmsg"); if (m) m.textContent = msg; const l = document.getElementById("loading"); if (l) l.hidden = false; }
+requestAnimationFrame(() => setTimeout(() => { try { buildIsland(); } catch (err) { console.error(err); islandFail("L'île n'a pas pu être générée sur cet appareil (" + (err && err.message || err) + "). Rechargez la page pour réessayer."); } }, 60));
+function buildIsland() {
 "use strict";
-if (!window.THREE) { document.getElementById("loadmsg").textContent = "Le moteur 3D n'a pas pu être chargé. Vérifiez la connexion puis rechargez la page."; return; }
+if (!window.THREE) { islandFail("Le moteur 3D n'a pas pu être chargé. Vérifiez la connexion puis rechargez la page."); return; }
 const T = THREE;
+const LIGHT = matchMedia("(pointer: coarse)").matches || Math.min(innerWidth, innerHeight) < 700;   // téléphone : rendu allégé
+if (matchMedia("(pointer: coarse)").matches) document.body.classList.add("touch");
 
 /* ───────────────────────── Outils : hasard reproductible, bruit, couleurs ───────────────────────── */
 function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -289,8 +294,10 @@ const waterAt = (x, z) => { const w = nearest(WATER, x, z); return w; };
 
 /* ───────────────────────── Rendu ───────────────────────── */
 const app = document.getElementById("app");
-const renderer = new T.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+let renderer;
+try { renderer = new T.WebGLRenderer({ antialias: !LIGHT, powerPreference: "high-performance" }); }
+catch (e) { islandFail("La 3D (WebGL) n'est pas disponible dans ce navigateur. Essayez un autre navigateur ou activez l'accélération matérielle."); return; }
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, LIGHT ? 1.3 : 1.75));
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFSoftShadowMap;
 renderer.outputEncoding = T.sRGBEncoding; renderer.toneMapping = T.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
 app.appendChild(renderer.domElement);
@@ -299,7 +306,7 @@ const scene = new T.Scene();
 const camera = new T.PerspectiveCamera(55, 1, .3, 2200);
 const hemi = new T.HemisphereLight(0xcfe6ff, 0x6a5a3a, .75); scene.add(hemi);
 const sun = new T.DirectionalLight(0xfff0d6, 1.15); sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -70, right: 70, top: 70, bottom: -70, near: 1, far: 400 }); sun.shadow.bias = -.0006; sun.shadow.normalBias = .4;
+sun.shadow.mapSize.set(LIGHT ? 1024 : 2048, LIGHT ? 1024 : 2048); Object.assign(sun.shadow.camera, { left: -70, right: 70, top: 70, bottom: -70, near: 1, far: 400 }); sun.shadow.bias = -.0006; sun.shadow.normalBias = .4;
 scene.add(sun, sun.target);
 const paper = (o = {}) => new T.MeshStandardMaterial({ roughness: .9, metalness: 0, flatShading: true, ...o });
 const vcMat = paper({ vertexColors: true });
@@ -448,7 +455,7 @@ const DENS = {
   [B.MARSH]: [["reed", .45, 1], ["bush", .05, .9], ["birch", .02, 1, .3]],
 };
 {
-  const tries = 38000;
+  const tries = LIGHT ? 26000 : 38000;
   for (let n = 0; n < tries; n++) {
     const a = rng() * 6.283, r = Math.sqrt(rng()) * (R + 10), x = Math.cos(a) * r, z = Math.sin(a) * r;
     const b = biomeAt(x, z), list = DENS[b]; if (!list) continue;
@@ -470,7 +477,7 @@ const DENS = {
   }
   // Herbes et fleurs
   const TUFT = { [B.MEADOW]: "#9ACB5E", [B.FOREST]: "#5E9A45", [B.SAVANNA]: "#E0C878", [B.JUNGLE]: "#4AA85A", [B.MARSH]: "#8FA85A", [B.TAIGA]: "#6E9A5A", [B.ALPINE]: "#9AA07A", [B.BEACH]: "#C9C58A" };
-  for (let n = 0; n < 16000; n++) {
+  for (let n = 0; n < (LIGHT ? 7000 : 16000); n++) {
     const a = rng() * 6.283, r = Math.sqrt(rng()) * R, x = Math.cos(a) * r, z = Math.sin(a) * r, b = biomeAt(x, z);
     if (!TUFT[b] || waterAt(x, z) > heightAt(x, z) - .1) continue;
     if (b === B.BEACH && rng() < .8) continue;
@@ -789,8 +796,8 @@ function step(now) {
   }
   renderer.render(scene, camera);
 }
-document.getElementById("loading").remove();
+document.getElementById("loading").hidden = true;
 requestAnimationFrame(step);
 window.__island = { P, SPOTS, cam, setTime: i => { timeIdx = i; applyTime(); } };
-})();
+}
 </script>
