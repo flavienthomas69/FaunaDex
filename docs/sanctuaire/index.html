@@ -89,6 +89,9 @@
   }
   #uw { inset: 0; z-index: 1; opacity: 0; transition: opacity .3s; background: radial-gradient(ellipse at 50% 40%, rgba(40, 150, 170, .05) 30%, rgba(4, 40, 60, .55) 100%); }
   #uw.on { opacity: 1; }
+  #fauna { left: max(12px, env(safe-area-inset-left)); top: calc(104px + env(safe-area-inset-top, 0px)); padding: 8px 12px; max-width: min(300px, calc(100vw - 190px)); font-size: 12.5px; }
+  #fauna[hidden] { display: none; }
+  #fauna b { font: 700 13.5px/1.2 var(--body); } #fauna i { color: var(--muted); font-size: 11.5px; } #fauna span { display: block; color: var(--amber); margin-top: 2px; }
   #air { left: 50%; bottom: calc(96px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); padding: 8px 14px; display: flex; align-items: center; gap: 10px; font: 700 12px var(--body); }
   #air[hidden] { display: none; }
   #air i { display: block; width: 140px; height: 8px; border-radius: 4px; background: rgba(255, 255, 255, .15); overflow: hidden; }
@@ -110,6 +113,7 @@
 <div class="hud card" id="mapbox">
   <canvas id="mini" width="264" height="264" aria-label="Mini-carte, toucher pour agrandir" tabindex="0"></canvas>
   <button type="button" class="pill" id="spotsbtn">Cachettes <b id="spotcount">0</b> / <span id="spottotal">16</span></button>
+  <button type="button" class="pill" id="faunabtn">Espèces <b id="faunacount">0</b> / <span id="faunatotal">0</span></button>
 </div>
 
 <div class="hud" id="tools">
@@ -120,6 +124,7 @@
 
 <div class="hud card" id="hint"><kbd>Z Q S D</kbd> ou flèches pour marcher · <kbd>Maj</kbd> courir · <kbd>Espace</kbd> sauter / remonter · <kbd>C</kbd> plonger · glisser pour tourner la caméra · molette pour zoomer</div>
 
+<div class="hud card" id="fauna" hidden></div>
 <div class="hud card" id="toast" role="status" aria-live="polite"><div class="kicker">Cachette découverte</div><b id="toastname"></b><span id="toastdesc"></span></div>
 
 <div class="hud" id="joy"></div>
@@ -138,6 +143,14 @@
   </div>
 </div>
 
+<div class="sheet" id="faunasheet" hidden>
+  <div class="card">
+    <button type="button" class="pill close" data-close>Fermer</button>
+    <h2>FaunaDex de l'île</h2>
+    <p>Approchez-vous d'un animal pour l'ajouter. Les poissons, requins et tortues s'observent en plongée.</p>
+    <ul class="spots" id="faunalist"></ul>
+  </div>
+</div>
 <div class="sheet" id="spotsheet" hidden>
   <div class="card">
     <button type="button" class="pill close" data-close>Fermer</button>
@@ -1218,6 +1231,7 @@ function openSheet(k) { sheets[k].hidden = false; if (k === "map") drawMap(big, 
 document.getElementById("mapbtn").addEventListener("click", () => openSheet("map"));
 mini.addEventListener("click", () => openSheet("map")); mini.addEventListener("keydown", e => { if (e.key === "Enter") openSheet("map"); });
 document.getElementById("spotsbtn").addEventListener("click", () => openSheet("spots"));
+{ const fs = document.getElementById("faunasheet"); document.getElementById("faunabtn").addEventListener("click", () => { renderFauna(); fs.hidden = false; }); fs.addEventListener("click", e => { if (e.target === fs) fs.hidden = true; }); }
 document.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", () => b.closest(".sheet").hidden = true));
 Object.values(sheets).forEach(s => s.addEventListener("click", e => { if (e.target === s) s.hidden = true; }));
 function renderSpots() {
@@ -1237,6 +1251,524 @@ function discover(sp) {
   sp.found = true; sp.sparkle.material.color.copy(lc("#FFFFFF"));
   showToast("Cachette découverte", sp.name, sp.desc);
   document.getElementById("spotcount").textContent = SPOTS.filter(s => s.found).length;
+}
+
+/* ───────────────────────── Faune : modèles low-poly, comportements, prédation ───────────────────────── */
+await stage("Arrivée des animaux…");
+const rnd = Math.random, rr = (a, b) => a + rnd() * (b - a), pickOne = a => a[rnd() * a.length | 0];
+const angDiff = (a, b) => Math.atan2(Math.sin(b - a), Math.cos(b - a));
+function tube(a, b, r0, r1, s = 6) {        // cylindre effilé de a (rayon r0) vers b (rayon r1)
+  const d = new T.Vector3().subVectors(b, a), L = d.length() || 1e-3, g = Cyl(r1, r0, L, s);
+  g.applyMatrix4(new T.Matrix4().makeRotationFromQuaternion(new T.Quaternion().setFromUnitVectors(new T.Vector3(0, 1, 0), d.normalize())));
+  return at(g, (a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2);
+}
+function paintGeo(g, fn) {                   // motif par facette (rayures, taches, ventre clair)
+  if (!fn) return g; const p = g.attributes.position, c = g.attributes.color, k = new T.Color();
+  for (let i = 0; i < p.count; i += 3) {
+    const cx = (p.getX(i) + p.getX(i + 1) + p.getX(i + 2)) / 3, cy = (p.getY(i) + p.getY(i + 1) + p.getY(i + 2)) / 3, cz = (p.getZ(i) + p.getZ(i + 1) + p.getZ(i + 2)) / 3;
+    const hx = fn(cx, cy, cz); if (!hx) continue; k.set(hx).convertSRGBToLinear(); for (let j = 0; j < 3; j++) c.setXYZ(i + j, k.r, k.g, k.b);
+  }
+  c.needsUpdate = true; return g;
+}
+const mk = (parts, paint, shadow = true) => { const m = new T.Mesh(paintGeo(merge(parts), paint), vcMat); m.castShadow = shadow && !LIGHT; return m; };
+const EYE = "#15120E";
+
+/* Espèces : dimensions (1 unité ≈ 0,67 m), couleurs, comportement */
+const SPECIES = {
+  zebra: { name: "Zèbre des plaines", sci: "Equus quagga", fact: "Ses rayures brouillent la vue des lions et des mouches.", kind: "quad",
+    L: 2.3, H: 1.35, W: .72, D: .95, neck: [1.05, .95, .3, .22], head: [.85, .55, .24, .6], c: "#F2F0EA", cl: "#F2F0EA", hoof: "#2A2622", tail: [.9, .07, "#1A1A1A"], ears: .3,
+    paint: (x, y, z) => Math.sin(z * 8 + y * 3 + Math.abs(x) * 2) > .15 ? "#1E1C1A" : null, legPaint: (x, y) => Math.sin(y * 9) > .2 ? "#1E1C1A" : null, mane: "#1E1C1A",
+    diet: "herb", walk: 1.8, run: 14, sta: 30, sense: 38, flee: 11, fear: ["lion"], herd: [4, 7], groups: 3, biomes: ["SAVANNA", "DRYTROP"], maxSlope: .8, wade: .7 },
+  gazelle: { name: "Gazelle de Thomson", sci: "Eudorcas thomsonii", fact: "Elle bondit en « stotting » pour montrer aux lions qu'elle est en forme.", kind: "quad",
+    L: 1.45, H: 1.05, W: .42, D: .6, neck: [.65, 1.0, .16, .12], head: [.5, .5, .15, .55], c: "#C99A5E", cl: "#D8B888", belly: "#F4EEE2", hoof: "#2A2622", tail: [.3, .05, "#2A2420"], ears: .22,
+    paint: (x, y, z) => Math.abs(y + .08) < .07 && Math.abs(x) > .15 ? "#3A2A1E" : null, horns: "ringed",
+    diet: "herb", walk: 1.6, run: 17, sta: 22, sense: 40, flee: 12, fear: ["lion"], herd: [4, 7], groups: 2, biomes: ["SAVANNA", "DRYTROP", "STEPPE"], maxSlope: .8, wade: .5 },
+  giraffe: { name: "Girafe", sci: "Giraffa camelopardalis", fact: "Son cœur pèse 11 kg pour envoyer le sang jusqu'à la tête.", kind: "quad",
+    L: 2.2, H: 2.7, W: .8, D: 1.05, rump: .82, neck: [3.3, 1.15, .28, .16], head: [.85, .45, .2, .55], c: "#E8C890", cl: "#E8C890", hoof: "#3A2A1E", tail: [1.3, .05, "#2A1E14"], ears: .25,
+    paint: (x, y, z) => noise(z * 2.6 + x * 1.5, y * 2.6 + 40) > -.2 ? "#9A5A2A" : null, legPaint: (x, y) => y > -1.2 && noise(y * 3, x * 3 + 7) > 0 ? "#9A5A2A" : null, neckPaint: true, ossicones: true, manColor: "#9A5A2A",
+    diet: "herb", walk: 1.5, run: 11, sta: 25, sense: 50, flee: 10, fear: ["lion"], herd: [2, 4], groups: 2, biomes: ["SAVANNA", "DRYTROP"], maxSlope: .6, wade: .8 },
+  elephant: { name: "Éléphant d'Afrique", sci: "Loxodonta africana", fact: "Les troupeaux sont menés par la plus vieille femelle, la matriarche.", kind: "quad",
+    L: 3.4, H: 2.2, W: 1.9, D: 2.2, neck: [.45, .3, .8, .75], head: [1.2, .2, .75, .6], c: "#8E8C86", cl: "#86847E", hoof: "#6E6C66", tail: [1.1, .06, "#2A2A2A"], trunk: true, bigEars: true, tusks: true, leg: .42,
+    paint: (x, y, z) => noise(x * 4 + z * 3, y * 4) > .55 ? "#7E7C76" : null,
+    diet: "herb", walk: 1.5, run: 7, sta: 25, sense: 30, flee: 8, fear: [], herd: [3, 5], groups: 1, biomes: ["SAVANNA", "DRYTROP", "JUNGLE"], maxSlope: .6, wade: 1.6, big: true },
+  lion: { name: "Lion", sci: "Panthera leo", fact: "Les lionnes chassent en groupe, souvent au crépuscule.", kind: "quad", carn: true,
+    L: 2.1, H: 1.0, W: .66, D: .82, neck: [.55, .55, .3, .26], head: [.62, .1, .3, .7], c: "#C8A060", cl: "#C09858", belly: "#E0C898", hoof: "#8A6A40", tail: [1.25, .06, "#C8A060"], tuft: "#3A2A1A", ears: .14, round: true, maneK: .5,
+    diet: "carn", walk: 1.5, run: 16.5, sta: 8, sense: 70, flee: 5, fear: [], prey: ["zebra", "gazelle", "giraffe"], hungerT: [90, 170], herd: [3, 4], groups: 1, biomes: ["SAVANNA", "DRYTROP"], maxSlope: .9, wade: .5 },
+  deer: { name: "Cerf élaphe", sci: "Cervus elaphus", fact: "Les bois du cerf tombent et repoussent chaque année.", kind: "quad",
+    L: 2.0, H: 1.4, W: .55, D: .8, neck: [.95, 1.0, .2, .14], head: [.62, .55, .17, .55], c: "#8A5A36", cl: "#7A4E30", belly: "#C8A882", hoof: "#2A2018", tail: [.25, .06, "#F2EEE6"], ears: .3, antlers: .5,
+    paint: (x, y, z) => z < -.85 && y > -.2 ? "#EDE3D0" : null,
+    diet: "herb", walk: 1.6, run: 13, sta: 28, sense: 40, flee: 13, fear: ["wolf"], herd: [3, 6], groups: 3, biomes: ["FOREST", "AUTUMN", "MEADOW", "SEQUOIA", "BOG"], maxSlope: .9, wade: .7 },
+  rabbit: { name: "Lapin de garenne", sci: "Oryctolagus cuniculus", fact: "Il vit en colonie dans des terriers reliés par des galeries.", kind: "quad", hop: true,
+    L: .5, H: .2, W: .28, D: .3, neck: [.12, .7, .1, .1], head: [.26, .3, .11, .7], c: "#9A8A70", cl: "#8A7A60", belly: "#E8E0D0", hoof: "#8A7A60", tail: [.08, .06, "#F4F2EE"], tuft: "#F4F2EE", ears: .32, longEars: true,
+    diet: "herb", walk: 1.2, run: 11, sta: 12, sense: 22, flee: 7, fear: ["fox"], herd: [1, 3], groups: 7, biomes: ["MEADOW", "STEPPE", "GARRIGUE", "FOREST"], maxSlope: .9, wade: .1, small: true },
+  fox: { name: "Renard roux", sci: "Vulpes vulpes", fact: "Il entend un mulot gratter sous la neige à plusieurs mètres.", kind: "quad", carn: true,
+    L: .95, H: .45, W: .3, D: .38, neck: [.3, .6, .12, .1], head: [.42, .1, .14, .35], c: "#D8702A", cl: "#3A2A22", belly: "#F2ECE2", hoof: "#2A2018", tail: [.8, .14, "#D8702A"], tuft: "#F4F2EE", bushy: true, ears: .2,
+    diet: "carn", walk: 1.6, run: 12.5, sta: 7, sense: 45, flee: 9, fear: ["wolf"], prey: ["rabbit"], hungerT: [60, 120], herd: [1, 1], groups: 3, biomes: ["MEADOW", "FOREST", "STEPPE", "GARRIGUE", "AUTUMN"], maxSlope: .9, wade: .3 },
+  wolf: { name: "Loup gris", sci: "Canis lupus", fact: "La meute se relaie pour épuiser sa proie sur de longues distances.", kind: "quad", carn: true,
+    L: 1.55, H: .85, W: .44, D: .6, neck: [.5, .6, .2, .16], head: [.6, .1, .2, .4], c: "#8E8C86", cl: "#9A968E", belly: "#D8D4CC", hoof: "#3A3630", tail: [.8, .11, "#7E7C76"], bushy: true, ears: .22,
+    paint: (x, y, z) => y > .2 ? "#6E6C68" : null,
+    diet: "carn", walk: 1.8, run: 14.5, sta: 14, sense: 75, flee: 7, fear: [], prey: ["deer", "reindeer"], hungerT: [100, 180], herd: [3, 5], groups: 1, biomes: ["TAIGA", "FOREST", "TUNDRA", "AUTUMN", "SEQUOIA"], maxSlope: 1, wade: .6 },
+  reindeer: { name: "Renne", sci: "Rangifer tarandus", fact: "Chez le renne, mâles et femelles portent des bois.", kind: "quad",
+    L: 1.9, H: 1.2, W: .6, D: .85, neck: [.8, .85, .22, .17], head: [.6, .5, .18, .6], c: "#7E6E5E", cl: "#6E5E50", belly: "#E8E2D8", hoof: "#2A2018", tail: [.2, .07, "#F2EEE6"], ears: .22, antlers: .75, neckColor: "#E8E2D8",
+    diet: "herb", walk: 1.7, run: 13, sta: 32, sense: 42, flee: 12, fear: ["wolf", "polarbear"], herd: [4, 7], groups: 2, biomes: ["TUNDRA", "TAIGA", "GLACIER", "BOG"], maxSlope: .9, wade: .8 },
+  ibex: { name: "Bouquetin des Alpes", sci: "Capra ibex", fact: "Il grimpe sur des parois presque verticales grâce à ses sabots souples.", kind: "quad",
+    L: 1.45, H: .9, W: .5, D: .7, neck: [.5, .8, .2, .15], head: [.48, .5, .15, .6], c: "#8A7458", cl: "#6E5A44", belly: "#D8CCB8", hoof: "#2A2018", tail: [.15, .05, "#3A2E22"], ears: .15, ibexHorns: true,
+    diet: "herb", walk: 1.3, run: 9, sta: 25, sense: 35, flee: 10, fear: ["wolf"], herd: [3, 5], groups: 2, biomes: ["ALPINE", "SNOW", "PARAMO", "COLDDESERT"], maxSlope: 1.9, wade: .3 },
+  camel: { name: "Dromadaire", sci: "Camelus dromedarius", fact: "Sa bosse stocke de la graisse, pas de l'eau.", kind: "quad",
+    L: 2.6, H: 2.0, W: .8, D: 1.0, neck: [1.6, .35, .26, .18], head: [.75, .1, .22, .6], c: "#C8A070", cl: "#C09868", hoof: "#8A7050", tail: [.7, .05, "#8A6A40"], ears: .12, hump: true,
+    diet: "herb", walk: 1.3, run: 9, sta: 40, sense: 30, flee: 9, fear: [], herd: [3, 5], groups: 1, biomes: ["DESERT", "SALAR", "CANYON", "COLDDESERT"], maxSlope: .7, wade: .5 },
+  polarbear: { name: "Ours polaire", sci: "Ursus maritimus", fact: "Il guette les phoques près des trous de respiration dans la glace.", kind: "quad", carn: true,
+    L: 2.5, H: 1.1, W: 1.0, D: 1.15, rump: 1.05, neck: [.75, .3, .44, .36], head: [.72, .1, .32, .5], c: "#F0ECE0", cl: "#E8E2D4", hoof: "#2A2622", tail: [.15, .1, "#F0ECE0"], ears: .12, round: true, leg: .26,
+    diet: "carn", walk: 1.5, run: 10.5, sta: 10, sense: 60, flee: 6, fear: [], prey: ["seal"], hungerT: [90, 160], herd: [1, 1], groups: 2, biomes: ["PACKICE", "TUNDRA", "GLACIER", "SNOW"], maxSlope: 1, wade: 99, swim: 2.6 },
+  seal: { name: "Phoque annelé", sci: "Pusa hispida", fact: "Il entretient ses trous de respiration en grattant la glace avec ses griffes.", kind: "seal",
+    L: 1.5, H: .0, W: .55, D: .5, c: "#8A8E90", belly: "#C8CCCC",
+    diet: "herb", walk: 1.1, run: 2.8, sta: 60, sense: 34, flee: 8, fear: ["polarbear"], herd: [2, 4], groups: 3, biomes: ["PACKICE", "TUNDRA", "GLACIER", "BEACH", "OCEAN"], maxSlope: .8, wade: 99, swim: 8 },
+  flamingo: { name: "Flamant rose", sci: "Phoenicopterus roseus", fact: "Sa couleur rose vient des crevettes et des algues qu'il filtre.", kind: "bird2",
+    L: .9, H: 1.3, W: .45, D: .5, c: "#F2A0A8", cl: "#E87A8A", bill: "#2A2420",
+    diet: "herb", walk: 1.2, run: 8, sta: 20, sense: 30, flee: 10, fear: ["fox"], herd: [5, 9], groups: 2, biomes: ["MARSH", "MANGROVE", "SALAR", "LAGOON", "BOG", "BEACH"], maxSlope: .5, wade: 1.1 },
+};
+Object.entries(SPECIES).forEach(([k, s]) => { s.key = k; s.biomes = s.biomes.map(n => B[n]); s.size = Math.max(s.W, s.L * .45); s.stride = Math.max(.35, (s.H || .5) * 1.25); s.prey = s.prey || []; });
+
+/* Modèles */
+function buildQuad(s) {
+  const root = new T.Group(), body = new T.Group(); root.add(body); root.rotation.order = "YXZ";
+  const { L, H, W, D } = s, ty = H + D * .42, sx = W / D; body.position.y = ty;
+  const prof = u => (.72 + .28 * Math.sin(Math.PI * (.08 + u * .84))) * lerp(s.rump || .95, 1, u), K = s.paint ? 12 : 7, parts = [];
+  for (let k = 0; k < K; k++) { const u0 = k / K, u1 = (k + 1) / K; parts.push([tube(V3(0, 0, -L / 2 + u0 * L), V3(0, 0, -L / 2 + u1 * L), D / 2 * prof(u0), D / 2 * prof(u1), 8), s.c]); }
+  parts.push([at(Ico(D / 2 * prof(0), 1).scale(1, 1, .7), 0, 0, -L / 2), s.c], [at(Ico(D / 2 * prof(1), 1).scale(1, 1, .7), 0, 0, L / 2), s.c]);
+  if (s.hump) parts.push([at(Ico(D * .42, 1).scale(1, 1.1, 1.3), 0, D * .45, 0), s.c]);
+  if (s.round) parts.push([at(Ico(D * .5, 1).scale(1, .9, 1.2), 0, D * .05, L * .3), s.c]);
+  const torso = mk(parts, (x, y, z) => (s.belly && y < -D * .3 ? s.belly : null) || (s.paint ? s.paint(x, y, z) : null));
+  torso.geometry.scale(sx, 1, 1); body.add(torso);
+  // cou et tête
+  const neck = new T.Group(), [nl, na, nr0, nr1] = s.neck, dir = V3(0, Math.sin(na), Math.cos(na)), E = dir.clone().multiplyScalar(nl);
+  neck.position.set(0, D * .22, L * .42); body.add(neck);
+  const np = [[tube(V3(0, 0, 0).addScaledVector(dir, -.15), E, nr0 * sx * 1.05, nr1, 7), s.neckColor || s.c]];
+  if (s.mane) for (let k = 0; k < 7; k++) { const p = dir.clone().multiplyScalar(nl * (k + .5) / 7); np.push([at(new T.BoxGeometry(.05, .16, nl / 7), p.x, p.y + nr1 * 1.1 + .02, p.z).rotateX(0), s.mane]); }
+  if (s.maneK) np.push([at(Ico(nr0 * 2.1, 1).scale(1.05, 1.1, .9), 0, nr0 * .3, nl * .35), "#7A4A22"]);
+  const neckMesh = mk(np, s.ossicones ? (x, y, z) => noise(z * 3 + 5, y * 3) > -.1 ? "#9A5A2A" : null : null); neck.add(neckMesh);
+  const head = new T.Group(); head.position.copy(E); neck.add(head);
+  const [hl, hd, hr, sn] = s.head, hdir = V3(0, -Math.sin(hd), Math.cos(hd)), tip = hdir.clone().multiplyScalar(hl), hp = [];
+  hp.push([tube(hdir.clone().multiplyScalar(-hl * .15), tip, hr, hr * sn, 7), s.headC || s.c]);
+  hp.push([at(Ico(hr * sn * 1.05, 0), tip.x, tip.y, tip.z), s.nose || (s.carn ? "#2A2220" : "#3A302A")]);
+  const eyeP = hdir.clone().multiplyScalar(hl * .22);
+  [-1, 1].forEach(k => {
+    hp.push([at(Ico(Math.max(.035, hr * .2), 1), eyeP.x + k * hr * .86, eyeP.y + hr * .38, eyeP.z), EYE]);
+    hp.push([at(Ico(Math.max(.012, hr * .07), 0), eyeP.x + k * hr * .98, eyeP.y + hr * .46, eyeP.z + hr * .06), "#FFFFFF"]);
+    const eh = s.ears || .2, ex = k * hr * .62, ey = hr * .8, ez = -hl * .06;
+    if (s.bigEars) hp.push([at(Ico(.75, 1).scale(.14, 1, .8).rotateY(k * .35), k * hr * 1.05, -.05, -hl * .12), "#7E7C76"]);
+    else if (s.longEars) hp.push([at(Cone(.06, eh, 4).rotateZ(-k * .15).rotateX(-.4), ex, ey + eh * .45, ez), s.c]);
+    else hp.push([at(Cone(hr * (s.round ? .38 : .3), eh, 4).rotateZ(-k * (s.round ? .6 : .35)), ex * (s.round ? 1.15 : 1), ey + eh * .3, ez), s.carn ? "#3A2A22" : s.c]);
+    if (s.horns === "ringed") hp.push([tube(V3(k * hr * .35, hr * .7, 0), V3(k * hr * .5, hr * .7 + .45, -.25), .035, .01, 4), "#2A2420"]);
+    if (s.ossicones) { hp.push([tube(V3(k * hr * .4, hr * .7, -hl * .05), V3(k * hr * .5, hr * .7 + .28, -hl * .08), .04, .035, 4), "#6A4A2A"], [at(Ico(.055, 0), k * hr * .5, hr * .7 + .3, -hl * .08), "#2A1E14"]); }
+    if (s.ibexHorns) { let a = V3(k * hr * .3, hr * .7, 0); for (let n = 0; n < 5; n++) { const b = V3(k * (hr * .35 + n * .03), hr * .7 + Math.sin((n + 1) * .45) * .55, -Math.sin((n + 1) * .3) * .55 - n * .06); hp.push([tube(a, b, .07 - n * .011, .06 - n * .011, 5), "#6E5E48"]); a = b; } }
+    if (s.antlers) { const A = s.antlers, b0 = V3(k * hr * .45, hr * .7, -.02), b1 = V3(k * (hr * .45 + A * .5), hr * .7 + A * .9, -A * .35), b2 = V3(k * (hr * .45 + A * .8), hr * .7 + A * 1.5, -A * .15);
+      hp.push([tube(b0, b1, .045, .035, 4), "#D8C8A8"], [tube(b1, b2, .035, .02, 4), "#D8C8A8"], [tube(b1, V3(b1.x + k * .05, b1.y + A * .35, b1.z + A * .4), .03, .015, 4), "#D8C8A8"], [tube(b0.clone().lerp(b1, .35), V3(k * (hr * .45 + A * .15), hr * .7 + A * .45, A * .35), .03, .015, 4), "#D8C8A8"]); }
+    if (s.tusks) hp.push([tube(V3(k * hr * .45, -hr * .45, hl * .55), V3(k * hr * .55, -hr * .5, hl * 1.25), .08, .03, 5), "#F2ECDC"]);
+  });
+  const headMesh = mk(hp); head.add(headMesh);
+  let trunk = null;
+  if (s.trunk) { trunk = []; let par = head, p0 = V3(0, -hr * .2, hl * .7); for (let k = 0; k < 4; k++) { const seg = new T.Group(); seg.position.copy(p0); par.add(seg); const len = .55 - k * .05, m = mk([[tube(V3(0, 0, 0), V3(0, -len, .05), .26 - k * .045, .22 - k * .045, 6), s.c]], null, false); seg.add(m); trunk.push(seg); par = seg; p0 = V3(0, -len, .05); } }
+  // pattes : cuisse, genou, canon, sabot
+  const legs = [], LL = H + D * .2, lr = s.leg || Math.max(.035, W * .14);
+  [[1, 1], [-1, 1], [1, -1], [-1, -1]].forEach(([side, fr]) => {
+    const hip = new T.Group(); hip.position.set(side * W * .3, -D * .2, fr * L * .34); body.add(hip);
+    const up = mk([[tube(V3(0, .15, 0), V3(0, -LL * .5, 0), lr * (fr > 0 ? 1.25 : 1.6), lr * .85, 6), s.cl || s.c]], s.legPaint);
+    hip.add(up);
+    const knee = new T.Group(); knee.position.y = -LL * .5; hip.add(knee);
+    const hh = Math.min(.14, LL * .1), low = mk([[tube(V3(0, 0, 0), V3(0, -LL * .5 + hh, 0), lr * .8, lr * .62, 6), s.cl || s.c], [tube(V3(0, -LL * .5 + hh, 0), V3(0, -LL * .5, .02), lr * .7, lr * .82, 6), s.hoof]], s.legPaint);
+    knee.add(low); legs.push({ hip, knee, fr, side });
+  });
+  const tail = new T.Group(); tail.position.set(0, D * .22, -L * .5); body.add(tail);
+  const [tl, tr, tc] = s.tail, tend = s.bushy ? V3(0, -tl * .55, -tl * .8) : V3(0, -tl * .92, -tl * .3), tp = [[tube(V3(0, 0, 0), tend, tr * (s.bushy ? .8 : 1), tr * (s.bushy ? 1.3 : .6), 6), tc]];
+  if (s.tuft) tp.push([at(Ico(Math.max(tr * 1.4, .06), 0), tend.x, tend.y, tend.z), s.tuft]);
+  if (s.bushy) tp.push([at(Ico(tr * 1.35, 0), tend.x, tend.y, tend.z), s.tuft || tc]);
+  tail.add(mk(tp, null, false));
+  return { root, body, neck, head, legs, tail, trunk, ty, dir, nl, E };
+}
+function buildSeal(s) {
+  const root = new T.Group(), body = new T.Group(); root.add(body); root.rotation.order = "YXZ"; body.position.y = s.D * .45;
+  const L = s.L, D = s.D, parts = [], K = 8, prof = u => Math.sin(Math.PI * (.12 + u * .8)) * lerp(.5, 1, Math.min(1, u * 1.6));
+  for (let k = 0; k < K; k++) { const u0 = k / K, u1 = (k + 1) / K; parts.push([tube(V3(0, 0, -L / 2 + u0 * L), V3(0, 0, -L / 2 + u1 * L), D / 2 * prof(u0) + .03, D / 2 * prof(u1) + .03, 8), s.c]); }
+  parts.push([at(Ico(D * .3, 1), 0, D * .08, L * .52), s.c], [at(Ico(D * .12, 0), 0, D * .02, L * .68), "#6A6E70"]);
+  [-1, 1].forEach(k => { parts.push([at(Ico(.045, 1), k * D * .2, D * .2, L * .64), EYE], [at(new T.BoxGeometry(.28, .05, .4).rotateY(k * .5), k * D * .42, -D * .3, L * .2), "#6E7274"], [at(new T.BoxGeometry(.22, .05, .38).rotateY(k * .3), k * .14, -D * .05, -L * .58), "#6E7274"]); });
+  const m = mk(parts, (x, y, z) => y < -D * .25 ? s.belly : noise(x * 6 + z * 5, y * 6) > .5 ? "#6E7274" : null); m.geometry.scale(s.W / D, 1, 1); body.add(m);
+  return { root, body, legs: [], seal: true, ty: D * .45 };
+}
+function buildBird2(s) {
+  const root = new T.Group(), body = new T.Group(); root.add(body); root.rotation.order = "YXZ"; const H = s.H, ty = H + .2; body.position.y = ty;
+  body.add(mk([[at(Ico(.32, 1).scale(1, .85, 1.5), 0, 0, 0), s.c], [at(Cone(.2, .45, 5).rotateX(-2.1), 0, .02, -.52), "#1A1A1A"], [at(new T.BoxGeometry(.06, .22, .55).rotateX(.2), .3, .04, -.05), s.cl], [at(new T.BoxGeometry(.06, .22, .55).rotateX(.2), -.3, .04, -.05), s.cl]]));
+  const neck = new T.Group(); neck.position.set(0, .12, .4); body.add(neck);
+  const n1 = V3(0, .45, .12), n2 = V3(0, .85, -.05), n3 = V3(0, 1.0, .12);
+  neck.add(mk([[tube(V3(0, 0, 0), n1, .07, .05, 5), s.c], [tube(n1, n2, .05, .045, 5), s.c], [tube(n2, n3, .045, .045, 5), s.c]], null, false));
+  const head = new T.Group(); head.position.copy(n3); neck.add(head);
+  head.add(mk([[at(Ico(.1, 1), 0, 0, 0), s.c], [tube(V3(0, 0, .06), V3(0, -.1, .24), .045, .03, 5), "#F2E8E0"], [tube(V3(0, -.1, .24), V3(0, -.2, .2), .03, .015, 4), s.bill], [at(Ico(.022, 0), .08, .03, .03), EYE], [at(Ico(.022, 0), -.08, .03, .03), EYE]], null, false));
+  const legs = [];
+  [-1, 1].forEach(k => { const hip = new T.Group(); hip.position.set(k * .09, -.15, 0); body.add(hip);
+    hip.add(mk([[tube(V3(0, 0, 0), V3(0, -(ty - .15) * .5, 0), .03, .025, 4), s.cl]], null, false));
+    const knee = new T.Group(); knee.position.y = -(ty - .15) * .5; hip.add(knee);
+    knee.add(mk([[tube(V3(0, 0, 0), V3(0, -(ty - .15) * .5, 0), .025, .022, 4), s.cl], [at(new T.BoxGeometry(.14, .02, .16), 0, -(ty - .15) * .5, .05), s.cl]], null, false));
+    legs.push({ hip, knee, fr: 1, side: k }); });
+  return { root, body, neck, head, legs, bird: true, ty, grazeA: 1.9 };
+}
+// angle de cou qui amène la bouche au sol (brouter, boire, manger)
+function grazeAngle(s, rig) {
+  if (rig.grazeA) return rig.grazeA; if (!rig.neck) return 0;
+  const base = rig.body.position.y + rig.neck.position.y, [hl, hd] = s.head;
+  for (let a = 0; a < 2.4; a += .04) { const c = Math.cos(a), sn = Math.sin(a), ey = rig.E.y * c - rig.E.z * sn, hy = -Math.sin(hd) * hl, hz = Math.cos(hd) * hl; if (base + ey + hy * c - hz * sn < .15) return a; }
+  return 1.2;
+}
+
+/* Population */
+const HOME = {}; { const tries = 26000; for (let n = 0; n < tries; n++) { const a = rnd() * 6.283, r = Math.sqrt(rnd()) * (R + 70), x = Math.cos(a) * r, z = Math.sin(a) * r, b = biomeAt(x, z); (HOME[b] = HOME[b] || []).push([x, z]); } }
+const FAUNA_LOG = [], ANIMALS = [], HERDS = [], SEEN = new Set(), DENSITY = LIGHT ? .6 : 1;
+function okSpot(s, x, z) { const g = terrainGround(x, z), w = waterAt(x, z); return s.biomes.includes(biomeAt(x, z)) && (w - g < Math.min(s.wade, .4) || (s.kind === "seal" && iceAt(x, z) > -1)) && slopeAt(x, z) < s.maxSlope * .8; }
+function homePoint(s) { const pool = s.biomes.flatMap(b => HOME[b] || []); for (let k = 0; k < 60; k++) { const p = pickOne(pool); if (p && okSpot(s, p[0], p[1])) return p; } return null; }
+function spawnHerd(s) {
+  const c = homePoint(s); if (!c) return; const n = Math.max(1, Math.round(rr(s.herd[0], s.herd[1] + .99) * (s.herd[1] > 1 ? DENSITY + (1 - DENSITY) * .5 : 1)));
+  const herd = { s, members: [], x: c[0], z: c[1] }; HERDS.push(herd);
+  for (let k = 0; k < n; k++) {
+    let x = c[0], z = c[1]; for (let t2 = 0; t2 < 20; t2++) { const px = c[0] + rr(-8, 8), pz = c[1] + rr(-8, 8); if (okSpot(s, px, pz)) { x = px; z = pz; break; } }
+    const rig = s.kind === "seal" ? buildSeal(s) : s.kind === "bird2" ? buildBird2(s) : buildQuad(s);
+    const scale = rr(.88, 1.1) * (k === 0 && s.herd[1] > 2 ? 1.06 : 1); rig.root.scale.setScalar(scale);
+    const a = { s, rig, herd, x, z, y: terrainGround(x, z), h: rnd() * 6.283, v: 0, tv: 0, st: "graze", stT: rr(2, 10), tx: x, tz: z, sta: 1, hunger: rr(0, .45), thirst: rr(0, .8),
+      pers: rr(.88, 1.12), bold: rnd(), seed: rnd() * 100, phase: rnd() * 6, lie: 0, dead: 0, neckA: 0, look: 0, lookT: 0, alive: true, slot: [rr(-9, 9), rr(-9, 9)], far: 0, scale, id: ANIMALS.length };
+    a.grazeA = grazeAngle(s, rig); a.male = k === 0;
+    scene.add(rig.root); herd.members.push(a); ANIMALS.push(a);
+  }
+}
+// les lionnes et les biches n'ont ni crinière ni bois : on reconstruit leur tête sans ces attributs
+const FEMALE = { lion: s => ({ ...s, maneK: 0 }), deer: s => ({ ...s, antlers: 0 }) };
+Object.values(SPECIES).forEach(s => { for (let g = 0; g < Math.max(1, Math.round(s.groups * (s.herd[1] > 1 ? 1 : DENSITY))); g++) spawnHerd(s); });
+ANIMALS.forEach(a => { if (FEMALE[a.s.key] && !a.male) { const f = FEMALE[a.s.key](a.s), rig = buildQuad(f); rig.root.scale.setScalar(a.scale * .92); scene.remove(a.rig.root); scene.add(rig.root); a.rig = rig; a.grazeA = grazeAngle(f, rig); } });
+
+/* Perception et décisions */
+const walkable = (a, x, z, free) => {
+  const s = a.s; if (Math.hypot(x, z) > 565) return false;
+  const g = terrainGround(x, z), w = waterAt(x, z), dep = w - g;
+  if (dep > s.wade && !s.swim) return false;
+  if (dep < .3 && slopeAt(x, z) > s.maxSlope) return false;
+  if (!free && !s.biomes.includes(biomeAt(x, z)) && s.biomes.includes(biomeAt(a.x, a.z)) && !(s.swim && dep > .5)) return false;
+  for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) { const l = CG.get(ckey(x + i * 8, z + j * 8)); if (l) for (const c of l) if (c[2] && Math.hypot(x - c[0], z - c[1]) < c[2] + s.size * .35) return false; }
+  return true;
+};
+function pickTarget(a, d0 = 15, d1 = 55) {
+  for (let k = 0; k < 14; k++) { const ang = rnd() * 6.283, d = rr(d0, d1), x = a.x + Math.sin(ang) * d, z = a.z + Math.cos(ang) * d; if (walkable(a, x, z) && okSpot(a.s, x, z)) { a.tx = x; a.tz = z; return true; } }
+  const p = homePoint(a.s); if (p) { a.tx = p[0]; a.tz = p[1]; return true; } return false;
+}
+function findWater(a, deep) { for (let k = 0; k < 40; k++) { const ang = rnd() * 6.283, d = rr(deep ? 4 : 8, deep ? 40 : 70), x = a.x + Math.sin(ang) * d, z = a.z + Math.cos(ang) * d; const dep = waterAt(x, z) - terrainGround(x, z); if (dep > .3 && (deep || dep < 3) && waterAt(x, z) > -900) return [x, z]; } return null; }
+const PLAYER = { isPlayer: true, x: 0, z: 0, s: { name: "vous" } };
+function setState(a, st, t) { a.st = st; a.stT = t; }
+function alarm(a, th) {
+  if (a.st === "dead" || a.st === "flee") return;
+  setState(a, "flee", rr(4, 8)); a.threat = th; a.lie = Math.min(a.lie, .6);
+  a.herd.members.forEach(m => { if (m !== a && m.alive && m.st !== "dead" && m.st !== "flee" && Math.hypot(m.x - a.x, m.z - a.z) < 28) { setState(m, "flee", rr(4, 8)); m.threat = th; m.fleeDelay = rr(0, .7); } });
+}
+const STATE_FR = { graze: "broute", idle: "flâne", walk: "se déplace", rest: "se repose", sleep: "dort", alert: "est aux aguets", flee: "s'enfuit", stalk: "traque", chase: "chasse", eat: "mange", drinkgo: "va boire", drink: "boit", swim: "nage", dead: "a été attrapé" };
+function describe(a) {
+  const s = a.s; let st = STATE_FR[a.st] || a.st;
+  if (a.st === "graze" && s.diet === "carn") st = "flâne";
+  if (a.st === "graze" && s.kind === "seal") st = "se prélasse sur la glace";
+  if (a.st === "flee" && a.threat) st = a.threat.isPlayer ? "s'enfuit à votre approche" : `s'enfuit devant ${a.threat.s.key === "lion" ? "un lion" : a.threat.s.key === "wolf" ? "un loup" : a.threat.s.key === "fox" ? "un renard" : "un ours polaire"}`;
+  if ((a.st === "stalk" || a.st === "chase") && a.prey) st += ` ${({ zebra: "un zèbre", gazelle: "une gazelle", giraffe: "une girafe", deer: "un cerf", reindeer: "un renne", rabbit: "un lapin", seal: "un phoque" })[a.prey.s.key]}`;
+  if (a.st === "eat") st = "mange sa proie";
+  if (a.st === "rest" && a.tired) st = "reprend son souffle";
+  if (a.swimming) st = a.st === "flee" ? "plonge pour fuir" : "nage";
+  return st;
+}
+
+function think(a, dt, t) {
+  const s = a.s, night = timeIdx === 3, dusk = timeIdx === 2 || timeIdx === 0;
+  if (a.st === "dead") { a.stT -= dt; a.v = 0; a.tv = 0; if (a.stT <= 0) { a.alive = false; a.rig.root.visible = false; a.respawn = rr(45, 100); } return; }
+  const pd = Math.hypot(P.x - a.x, P.z - a.z), leader = a.herd.members.find(m => m.alive && m.st !== "dead") || a;
+  // Menaces : prédateurs, puis l'explorateur
+  if (a.st !== "flee" && s.fear.length) {
+    for (const o of ANIMALS) { if (!o.alive || o.st === "dead" || !s.fear.includes(o.s.key)) continue; const d = Math.hypot(o.x - a.x, o.z - a.z); if (d > s.sense) continue;
+      const k = 1 - d / s.sense, p = o.st === "chase" ? 99 : o.st === "stalk" ? 1.1 * k * k : (o.st === "eat" || o.st === "rest" || o.st === "sleep") ? (d < 9 ? .6 : 0) : .5 * k;
+      if (rnd() < p * dt) { alarm(a, o); break; }
+      if (a.st !== "alert" && rnd() < k * dt * 1.5 && o.st !== "sleep") { setState(a, "alert", rr(1.5, 3.5)); a.watch = o; }
+    }
+  }
+  const pRun = keys.has("ShiftLeft") || keys.has("ShiftRight") || run, fleeD = s.flee * (pRun ? 1.6 : 1) * (a.bold > .8 ? .7 : 1);
+  if (!cam.sky && !P.under && a.st !== "flee" && a.st !== "chase" && a.st !== "eat" && pd < fleeD * 2.2) {
+    if (pd < fleeD && rnd() < dt * 4) alarm(a, PLAYER);
+    else if (a.st !== "alert" && pd < fleeD * 2.2 && rnd() < dt * .8 && a.st !== "sleep") { setState(a, "alert", rr(1.5, 4)); a.watch = PLAYER; }
+  }
+  a.stT -= dt; a.sta = clamp(a.sta + (a.v > s.walk * 2 ? -dt / s.sta : dt / 12), 0, 1); a.thirst += dt / rr(200, 320);
+  if (s.diet === "carn") a.hunger += dt / rr(s.hungerT[0], s.hungerT[1]) * (night || dusk ? 1.6 : 1);
+  a.goal = null; a.tv = 0; a.neckT = .1; a.lieT = 0; a.lookT = 0;
+  const followSlot = () => { const lx = leader.x + a.slot[0], lz = leader.z + a.slot[1], d = Math.hypot(lx - a.x, lz - a.z); if (d > 3) { a.goal = [lx, lz]; a.tv = s.walk * a.pers * (d > 14 ? 2.2 : 1); a.neckT = .1; return true; } return false; };
+  switch (a.st) {
+    case "graze": case "idle": {
+      a.neckT = s.diet === "carn" ? .25 : a.grazeA; if (rnd() < dt * .2) a.lookT = rr(-1, 1);
+      if (a.nib > 0) { a.nib -= dt; a.tv = s.walk * .35; a.goal = a.nibT; } else if (rnd() < dt * .15) { a.nib = rr(.6, 1.6); const ang = a.h + rr(-1.2, 1.2); a.nibT = [a.x + Math.sin(ang) * 3, a.z + Math.cos(ang) * 3]; }
+      if (a !== leader && Math.hypot(leader.x - a.x, leader.z - a.z) > 16) followSlot();
+      if (rnd() < dt * .12 && s.diet !== "carn" && s.kind !== "seal") { setState(a, "alert", rr(1, 3)); a.watch = null; a.lookT = rr(-1.2, 1.2); break; }
+      if (a.stT <= 0) {
+        if (s.diet === "carn" && a.hunger > .55) { const pr = nearestPrey(a); if (pr) { a.prey = pr; setState(a, "stalk", rr(30, 60)); a.herd.members.forEach(m => { if (m !== a && m.alive && (m.st === "graze" || m.st === "walk" || m.st === "rest")) { m.prey = pr; setState(m, "stalk", rr(30, 60)); m.lie = 0; } }); break; } }
+        const r0 = rnd(), sleepy = s.diet === "carn" ? !night && !dusk && timeIdx === 1 : night;
+        if (a === leader && a.thirst > 1 && s.kind === "quad") { const w = findWater(a); if (w) { a.tx = w[0]; a.tz = w[1]; setState(a, "drinkgo", 40); a.herd.members.forEach(m => { if (m !== a && m.st === "graze") { m.tx = w[0] + rr(-5, 5); m.tz = w[1] + rr(-5, 5); setState(m, "drinkgo", 40); } }); break; } }
+        if (r0 < (sleepy ? .6 : .12)) setState(a, "rest", rr(15, 45) * (sleepy ? 2 : 1));
+        else if (a === leader && r0 < .75) { pickTarget(a); setState(a, "walk", 30); }
+        else setState(a, "graze", rr(4, 14));
+      }
+      break; }
+    case "walk": {
+      if (a === leader) { a.goal = [a.tx, a.tz]; a.tv = s.walk * a.pers; a.neckT = .15; if (Math.hypot(a.tx - a.x, a.tz - a.z) < 3 || a.stT <= 0) setState(a, "graze", rr(5, 15)); }
+      else if (!followSlot() || leader.st !== "walk") setState(a, "graze", rr(3, 10));
+      if (rnd() < dt * .05) a.slot = [rr(-9, 9), rr(-9, 9)];
+      break; }
+    case "rest": case "sleep": a.lieT = 1; a.neckT = a.st === "sleep" || night ? .55 : 0; a.lookT = Math.sin(t * .2 + a.seed) * .6;
+      if (a.stT <= 0) setState(a, "graze", rr(3, 8)), a.tired = false; break;
+    case "alert": a.neckT = -.35; if (a.watch && (a.watch.isPlayer ? true : a.watch.alive)) { const wx = a.watch.isPlayer ? P.x : a.watch.x, wz = a.watch.isPlayer ? P.z : a.watch.z; a.lookT = clamp(angDiff(a.h, Math.atan2(wx - a.x, wz - a.z)), -1.3, 1.3); }
+      if (a.stT <= 0) setState(a, "graze", rr(3, 9)); break;
+    case "flee": {
+      if (a.fleeDelay > 0) { a.fleeDelay -= dt; a.neckT = -.35; break; }
+      const th = a.threat || PLAYER, tx = th.isPlayer ? P.x : th.x, tz = th.isPlayer ? P.z : th.z, d = Math.hypot(tx - a.x, tz - a.z) || 1;
+      let fx = (a.x - tx) / d, fz = (a.z - tz) / d;
+      const cx = a.herd.members.reduce((q, m) => q + m.x, 0) / a.herd.members.length - a.x, cz = a.herd.members.reduce((q, m) => q + m.z, 0) / a.herd.members.length - a.z, cl = Math.hypot(cx, cz);
+      if (cl > 4) { fx += cx / cl * .35; fz += cz / cl * .35; }
+      if (s.kind === "seal" && !a.swimming) { if (!a.wpt || rnd() < dt * .3) a.wpt = findWater(a, true); const w = a.wpt; if (w) { fx = w[0] - a.x; fz = w[1] - a.z; } }
+      const zig = Math.sin(t * (1.5 + a.seed % 1.5) + a.seed) * (s.diet === "herb" ? .55 : .2);
+      const ang = Math.atan2(fx, fz) + zig; a.goal = [a.x + Math.sin(ang) * 20, a.z + Math.cos(ang) * 20];
+      a.tv = (a.swimming ? s.swim : s.run) * a.pers * (a.sta > 0 ? 1 : .5); a.neckT = s.diet === "carn" ? .3 : -.1; a.free = true;
+      if (s.key === "gazelle" && rnd() < dt * .6) a.pronk = .5;
+      if (d > s.sense * 1.1 || th.st === "eat" || th.st === "dead" || (th.alive === false)) { if (a.stT <= 0) { setState(a, "alert", rr(2, 5)); a.watch = th; a.free = false; } }
+      else a.stT = Math.max(a.stT, 1.5);
+      break; }
+    case "stalk": case "chase": {
+      const pr = a.prey; if (!pr || !pr.alive || pr.st === "dead" && pr.killer !== a) { setState(a, "graze", rr(5, 10)); a.prey = null; break; }
+      if (pr.st === "dead") { setState(a, "eat", rr(20, 35)); break; }
+      const d = Math.hypot(pr.x - a.x, pr.z - a.z), lead = a.st === "chase" ? Math.min(1.2, d / 14) : 0;
+      a.goal = [pr.x + Math.sin(pr.h) * pr.v * lead, pr.z + Math.cos(pr.h) * pr.v * lead]; a.free = true;
+      if (a.st === "stalk") { a.tv = s.walk * .75; a.neckT = .45; a.crouch = 1; if (d < (s.key === "wolf" ? 30 : 18) || pr.st === "flee" || a.stT <= 0) { setState(a, "chase", 30); a.herd.members.forEach(m => { if (m !== a && m.st === "stalk") setState(m, "chase", 30); }); } }
+      else { a.crouch = 0; a.neckT = .3; a.tv = (pr.swimming ? (s.swim || 0) : s.run) * a.pers * (a.sta > 0 ? 1 : .45); if (pr.st !== "flee") alarm(pr, a);
+        if (d < s.size * .6 + pr.s.size * .5 + .6 && !pr.swimming) { FAUNA_LOG.push(`${s.key}>${pr.s.key}`); setState(pr, "dead", rr(40, 60)); pr.killer = a; a.hunger = 0; setState(a, "eat", rr(25, 40)); a.herd.members.forEach(m => { if (m !== a && (m.st === "chase" || m.st === "stalk")) { m.hunger *= .3; setState(m, "eat", rr(20, 35)); m.prey = pr; } }); }
+        else if (a.sta <= 0 && d > 3 || d > s.sense * 1.4 || a.stT <= 0 || (a.stuck || 0) > 2) { FAUNA_LOG.push(`${s.key}x${pr.s.key}`); setState(a, "rest", rr(15, 30)); a.tired = true; a.prey = null; } }
+      break; }
+    case "eat": { const pr = a.prey; if (pr && pr.alive) { const d = Math.hypot(pr.x - a.x, pr.z - a.z); if (d > s.size + 1.2) { a.goal = [pr.x, pr.z]; a.tv = s.walk; } else { a.neckT = a.grazeA; a.lookT = Math.sin(t * 2 + a.seed) * .2; } } if (a.stT <= 0) { setState(a, "rest", rr(40, 80)); a.prey = null; } break; }
+    case "drinkgo": { a.goal = [a.tx, a.tz]; a.tv = s.walk * a.pers; const dep = waterAt(a.x + Math.sin(a.h) * 2, a.z + Math.cos(a.h) * 2) - heightAt(a.x + Math.sin(a.h) * 2, a.z + Math.cos(a.h) * 2);
+      if (dep > .1 || Math.hypot(a.tx - a.x, a.tz - a.z) < 3 || a.stuck > 1.5) { setState(a, "drink", rr(6, 11)); a.thirst = 0; } if (a.stT <= 0) setState(a, "graze", 5); break; }
+    case "drink": a.neckT = a.grazeA; a.thirst = 0; if (a.stT <= 0) setState(a, "graze", rr(4, 10)); break;
+  }
+  if (a.st !== "flee" && a.st !== "chase" && a.st !== "stalk") a.free = false;
+}
+function nearestPrey(a) { let best = null, bd = a.s.sense * 1.6; for (const o of ANIMALS) { if (!o.alive || o.st === "dead" || !a.s.prey.includes(o.s.key) || o.swimming) continue; const d = Math.hypot(o.x - a.x, o.z - a.z); if (d < bd) { bd = d; best = o; } } return best; }
+function respawn(a) {
+  const p = homePoint(a.s); if (!p || Math.hypot(p[0] - P.x, p[1] - P.z) < 120) { a.respawn = 10; return; }
+  Object.assign(a, { x: p[0], z: p[1], y: terrainGround(p[0], p[1]), alive: true, st: "graze", stT: 5, dead: 0, lie: 0, v: 0, sta: 1, killer: null, prey: null });
+  a.rig.body.rotation.z = 0; a.rig.root.visible = true; a.herd.members.forEach(m => { if (m !== a && m.alive) { a.x = m.x + rr(-6, 6); a.z = m.z + rr(-6, 6); a.y = terrainGround(a.x, a.z); } });
+}
+
+/* Mouvement : direction voulue, contournement des obstacles, séparation, relief */
+function move(a, dt, t) {
+  const s = a.s;
+  let want = a.h;
+  if (a.goal) want = Math.atan2(a.goal[0] - a.x, a.goal[1] - a.z) + noise(t * .15 + a.seed, a.seed) * (a.st === "flee" ? .25 : .4);
+  const look = 1.5 + a.v * .45;
+  if (a.tv > 0 && !walkable(a, a.x + Math.sin(want) * look, a.z + Math.cos(want) * look, a.free)) {
+    const sgn = rnd() < .5 ? 1 : -1; let ok = false;
+    for (const o of [.45, .9, 1.4, 2, 2.6, Math.PI]) for (const sg of [sgn, -sgn]) { const w2 = want + o * sg; if (!ok && walkable(a, a.x + Math.sin(w2) * look, a.z + Math.cos(w2) * look, a.free)) { want = w2; ok = true; } }
+    if (!ok) a.tv = 0;
+  }
+  const turn = (a.v > s.walk * 2 ? 3.2 : 2.2) * dt; a.h += clamp(angDiff(a.h, want), -turn, turn);
+  const acc = (a.tv > a.v ? s.run * .9 : s.run * 1.4) * dt; a.v += clamp(a.tv - a.v, -acc, acc);
+  if (a.v > .01) { const nx = a.x + Math.sin(a.h) * a.v * dt, nz = a.z + Math.cos(a.h) * a.v * dt;
+    if (walkable(a, nx, nz, true)) { a.x = nx; a.z = nz; a.stuck = 0; } else { a.v *= .3; a.stuck = (a.stuck || 0) + dt; } }
+  // séparation dans le troupeau
+  for (const m of a.herd.members) { if (m === a || !m.alive) continue; const dx = a.x - m.x, dz = a.z - m.z, d = Math.hypot(dx, dz), mn = s.size * 1.1; if (d < mn && d > 1e-3) { a.x += dx / d * (mn - d) * .5; a.z += dz / d * (mn - d) * .5; } }
+  const g = terrainGround(a.x, a.z), w = waterAt(a.x, a.z);
+  a.swimming = !!s.swim && w - g > (s.kind === "seal" ? .4 : 1.2);
+  a.y = a.swimming ? w - (s.kind === "seal" ? .35 : a.rig.ty * .85) : g;
+}
+
+/* Animation : allures (pas, galop, bonds), cou, queue, couché, mort */
+function animate(a, dt, t) {
+  const s = a.s, r = a.rig, sp = a.v, moving = sp > .15;
+  a.lie = lerp(a.lie, a.st === "dead" ? 0 : a.lieT ? 1 : 0, Math.min(1, dt * 2.2));
+  a.dead = lerp(a.dead, a.st === "dead" ? 1 : 0, Math.min(1, dt * 2.5));
+  a.phase += dt * sp / s.stride * Math.PI * (s.hop ? .55 : 1);
+  const gallop = sp > s.walk * 2.2, amp = clamp(sp / (s.walk * 1.4), 0, 1) * (gallop ? .58 : .42), ph = a.phase;
+  let pitch = 0; { const e = (s.L || 1) * .5, hf = terrainGround(a.x + Math.sin(a.h) * e, a.z + Math.cos(a.h) * e), hb = terrainGround(a.x - Math.sin(a.h) * e, a.z - Math.cos(a.h) * e); if (!a.swimming) pitch = clamp(-Math.atan2(hf - hb, 2 * e), -.5, .5); }
+  let bob = 0;
+  if (r.seal) { const k = moving && !a.swimming ? Math.sin(ph * 1.6) : 0; r.body.rotation.x = k * .18; bob = Math.max(0, k) * .12; r.body.rotation.z = a.swimming ? Math.sin(t * 3 + a.seed) * .15 : 0; }
+  else if (s.hop) { const k = moving ? Math.abs(Math.sin(ph)) : 0; bob = k * .35 * clamp(sp / 3, .4, 1.2); r.legs.forEach(L => { L.hip.rotation.x = moving ? (L.fr > 0 ? -1 : 1) * Math.cos(ph) * .7 : 0; L.knee.rotation.x = 0; }); pitch += moving ? -Math.cos(ph) * .25 : 0; }
+  else {
+    const offs = r.bird ? [0, .5] : gallop ? [.55, .65, 0, .1] : [.25, .75, 0, .5];
+    r.legs.forEach((L, i) => { const p = ph + offs[i] * 6.283; L.hip.rotation.x = -Math.sin(p) * amp; L.knee.rotation.x = Math.max(0, Math.cos(p)) * amp * (s.big ? .4 : gallop ? 1.1 : 1.4); });
+    bob = moving ? Math.abs(Math.sin(ph * (gallop ? 1 : 2))) * (gallop ? .09 : .03) * (s.H || 1) : 0;
+    if (gallop) r.body.rotation.x = Math.sin(ph) * .08;
+  }
+  if (a.pronk > 0) { a.pronk -= dt; bob += Math.sin((.5 - a.pronk) / .5 * Math.PI) * .9; r.legs.forEach(L => { L.hip.rotation.x = 0; L.knee.rotation.x = 0; }); }
+  // couché : pattes repliées sous le corps (le flamant se tient sur une patte)
+  if (a.lie > .01 && !r.seal) {
+    if (r.bird) { r.legs[0].knee.rotation.x = lerp(r.legs[0].knee.rotation.x, -2.6, a.lie); r.legs[0].hip.rotation.x = lerp(r.legs[0].hip.rotation.x, 1.2, a.lie); }
+    else r.legs.forEach(L => { L.hip.rotation.x = lerp(L.hip.rotation.x, L.fr > 0 ? -1.45 : 1.35, a.lie); L.knee.rotation.x = lerp(L.knee.rotation.x, L.fr > 0 ? 2.7 : -2.5, a.lie); });
+  }
+  const crouch = a.crouch && a.st === "stalk" ? .25 * (s.H || 1) : 0;
+  r.body.position.y = r.ty + bob - (r.bird ? 0 : a.lie * (s.H || 0) * .82) - crouch;
+  if (a.dead > .01) { r.body.rotation.z = a.dead * 1.45; r.body.position.y = lerp(r.body.position.y, (s.W || .5) * .45, a.dead); r.legs.forEach(L => { L.hip.rotation.x *= 1 - a.dead * .7; L.knee.rotation.x *= 1 - a.dead; }); }
+  else r.body.rotation.z = 0;
+  if (!gallop && !r.seal) r.body.rotation.x = lerp(r.body.rotation.x, 0, Math.min(1, dt * 4));
+  if (r.neck) { a.neckA = lerp(a.neckA, a.dead > .5 ? .3 : (a.neckT ?? .1), Math.min(1, dt * 3)); r.neck.rotation.x = a.neckA * (r.bird ? 1 : 1); }
+  if (r.head) { a.look = lerp(a.look, a.lookT || 0, Math.min(1, dt * 3)); r.head.rotation.y = a.look; }
+  if (r.tail) { r.tail.rotation.z = Math.sin(t * (2 + a.seed % 2) + a.seed) * (a.st === "flee" ? .1 : .3) * (Math.sin(t * .3 + a.seed) > .3 ? 1 : .2); r.tail.rotation.x = a.st === "flee" || a.st === "chase" ? -.6 : 0; }
+  if (r.trunk) r.trunk.forEach((sg, k) => { sg.rotation.x = Math.sin(t * 1.3 + a.seed + k * .7) * .18 + (a.st === "drink" ? .35 : 0); });
+  r.root.position.set(a.x, a.y, a.z); r.root.rotation.y = a.h; r.root.rotation.x = pitch;
+}
+
+/* ───────────────────────── Vie marine : bancs de poissons, requins, tortues ; goélands ───────────────────────── */
+const seaPoint = (test, cx, cz, rad) => { for (let k = 0; k < (cx === undefined ? 400 : 60); k++) { const a = rnd() * 6.283, r = cx === undefined ? R * rr(.8, 1.42) : Math.sqrt(rnd()) * rad, x = (cx ?? 0) + Math.cos(a) * r, z = (cz ?? 0) + Math.sin(a) * r, dep = -heightAt(x, z); if (waterAt(x, z) === 0 && iceMask(x, z) < 0 && test(dep, x, z)) return [x, z]; } return null; };
+const FISH_COLS = ["#F2C94C", "#4FA3E0", "#F07A3A", "#9B7BD6", "#5ED3C0", "#E8E8E8", "#F26A8A"];
+const fishGeo = merge([[Ico(.5, 0).scale(.28, .62, 1), "#FFFFFF"], [Cone(.34, .5, 3).rotateX(-Math.PI / 2).scale(.18, 1, 1).translate(0, 0, -.68), "#FFFFFF"], [at(Ico(.07, 0), .12, .1, .3), "#101010"], [at(Ico(.07, 0), -.12, .1, .3), "#101010"]]);
+const SCHOOLS = [], NS = LIGHT ? 8 : 14, PER = LIGHT ? 9 : 13;
+const fishIM = new T.InstancedMesh(fishGeo, vcMat, NS * PER); fishIM.frustumCulled = false; scene.add(fishIM);
+for (let k = 0; k < NS; k++) {
+  const p = seaPoint(d => d > 2 && d < 16); if (!p) continue; const c = lc(pickOne(FISH_COLS)), sz = rr(.45, .9);
+  const sc = { x: p[0], z: p[1], y: -rr(1, 3), vx: 0, vz: 0, vy: 0, tx: p[0], tz: p[1], ty: -2, spd: rr(1, 2), flee: 0, h: 0, fish: [], i0: SCHOOLS.length * PER };
+  for (let i = 0; i < PER; i++) { sc.fish.push({ ox: rr(-2.2, 2.2), oy: rr(-.8, .8), oz: rr(-2.5, 2.5), ph: rnd() * 6, s: sz * rr(.85, 1.15) }); fishIM.setColorAt(sc.i0 + i, c.clone().offsetHSL(0, 0, rr(-.05, .05))); }
+  SCHOOLS.push(sc);
+}
+fishIM.count = SCHOOLS.length * PER; if (fishIM.instanceColor) fishIM.instanceColor.needsUpdate = true;
+function buildShark() {
+  const g = new T.Group(); g.rotation.order = "YXZ";
+  const body = mk([[tube(V3(0, 0, -1.6), V3(0, 0, 1.2), .12, .42, 7), "#8E9AA2"], [at(Ico(.42, 1).scale(.9, .8, 1.4), 0, 0, 1.25), "#8E9AA2"], [at(Cone(.35, .9, 3).scale(.2, 1, 1), 0, .6, .1), "#8E9AA2"], [at(Ico(.1, 0), 0, .72, .18), "#1A1A1A"],
+    [at(new T.BoxGeometry(1.4, .06, .45).rotateZ(0), 0, -.2, .6), "#7E8A92"], [at(Ico(.05, 0), .28, .12, 1.7), EYE], [at(Ico(.05, 0), -.28, .12, 1.7), EYE]], (x, y) => y < -.2 ? "#E8ECEE" : null);
+  g.add(body); const tail = new T.Group(); tail.position.z = -1.55; g.add(tail);
+  tail.add(mk([[at(Cone(.35, .9, 3).scale(.15, 1, 1).rotateX(-.5), 0, .35, -.3), "#8E9AA2"], [at(Cone(.25, .6, 3).scale(.15, 1, 1).rotateX(-2.6), 0, -.2, -.2), "#8E9AA2"], [at(Ico(.06, 0), 0, .78, -.62), "#1A1A1A"]]));
+  scene.add(g); return { g, tail };
+}
+function buildTurtle() {
+  const g = new T.Group(); g.rotation.order = "YXZ";
+  g.add(mk([[at(Ico(.75, 1).scale(1, .38, 1.2), 0, 0, 0), "#5E6A3A"], [at(Ico(.7, 1).scale(1, .15, 1.15), 0, -.1, 0), "#D8C898"], [at(Ico(.24, 1).scale(1, .9, 1.2), 0, .02, 1.05), "#8A9A5A"], [at(Ico(.04, 0), .13, .1, 1.2), EYE], [at(Ico(.04, 0), -.13, .1, 1.2), EYE]],
+    (x, y, z) => y > .15 && noise(x * 4, z * 4) > .2 ? "#7A6A3A" : null));
+  const fl = []; [[1, 1], [-1, 1], [1, -1], [-1, -1]].forEach(([k, f]) => { const p = new T.Group(); p.position.set(k * .6, -.05, f * .45); g.add(p); p.add(mk([[at(new T.BoxGeometry(f > 0 ? .9 : .45, .06, f > 0 ? .35 : .3), k * (f > 0 ? .4 : .2), 0, 0), "#8A9A5A"]], null, false)); fl.push({ p, k, f }); });
+  scene.add(g); return { g, fl };
+}
+const SHARKS = [], TURTLES = [];
+for (let k = 0; k < 3; k++) { const p = seaPoint(d => d > 5 && d < 18); if (p) SHARKS.push({ ...buildShark(), x: p[0], z: p[1], y: -4, h: rnd() * 6, v: 3, tx: p[0], tz: p[1], ty: -4, hunt: 0, hungry: rr(20, 60), seed: rnd() * 10 }); }
+for (let k = 0; k < 5; k++) { const p = seaPoint(d => d > 1.5 && d < 6); if (p) TURTLES.push({ ...buildTurtle(), x: p[0], z: p[1], y: -1.5, h: rnd() * 6, v: 1, tx: p[0], tz: p[1], ty: -1.5, air: rr(20, 60), breathe: 0, seed: rnd() * 10 }); }
+function swimTo(o, dt, spd, turnK = 1.5) {
+  const want = Math.atan2(o.tx - o.x, o.tz - o.z); o.h += clamp(angDiff(o.h, want), -turnK * dt, turnK * dt); o.v = lerp(o.v, spd, Math.min(1, dt));
+  const nx = o.x + Math.sin(o.h) * o.v * dt, nz = o.z + Math.cos(o.h) * o.v * dt, fl = heightAt(nx, nz);
+  if (waterAt(nx, nz) === 0 && fl < -1.2 && iceMask(nx, nz) < 0) { o.x = nx; o.z = nz; } else { o.h += 2 * dt * 3; o.tx = o.x - Math.sin(o.h) * 10; o.tz = o.z - Math.cos(o.h) * 10; }
+  o.y = clamp(lerp(o.y, o.ty, Math.min(1, dt * .8)), heightAt(o.x, o.z) + .6, -.3);
+}
+const GULLS = [];
+{ const gm = [[at(Ico(.22, 0).scale(.8, .7, 1.8), 0, 0, 0), "#F4F4F2"], [at(Ico(.13, 0), 0, .08, .38), "#F4F4F2"], [at(Cone(.04, .16, 3).rotateX(Math.PI / 2), 0, .06, .55), "#F2B23A"], [at(Cone(.1, .3, 3).rotateX(-Math.PI / 2).scale(1, .3, 1), 0, 0, -.45), "#9AA0A4"]];
+  for (let f = 0; f < 3; f++) { const c = homePoint({ biomes: [B.BEACH, B.REEF, B.LAGOON], wade: 99, maxSlope: 9, kind: "x" }) || [0, 0];
+    for (let k = 0; k < 5; k++) { const g = new T.Group(); g.add(mk(gm, null, false)); const wings = [-1, 1].map(s2 => { const w = new T.Group(); w.position.set(s2 * .12, .05, 0); w.add(mk([[at(new T.BoxGeometry(.75, .03, .28), s2 * .38, 0, 0), "#E8EAEC"], [at(new T.BoxGeometry(.3, .031, .2), s2 * .8, 0, -.03), "#3A3E42"]], null, false)); g.add(w); return w; });
+      scene.add(g); GULLS.push({ g, wings, cx: c[0], cz: c[1], r: rr(12, 30), a: rnd() * 6.28, hgt: rr(12, 26), sp: rr(.25, .45) * (rnd() < .5 ? 1 : -1), flap: 0, seed: rnd() * 10, flock: f }); } } }
+
+/* ───────────────────────── Épaves ───────────────────────── */
+function buildWreck(kind) {
+  const g = new T.Group(), W = "#5E4A36", Wd = "#4A3A2A", rust = "#7A4A30", parts = [];
+  if (kind === "galion") {
+    for (let k = 0; k < 9; k++) { const z = -6 + k * 1.5, w = 2.2 * Math.sin(Math.PI * (.1 + k / 9 * .85)) + .5; if (k === 4) continue;
+      [-1, 1].forEach(s2 => parts.push([at(new T.BoxGeometry(.25, 2.6, 1.4).rotateZ(s2 * .35), s2 * w, 1.1, z), k % 2 ? W : Wd])); parts.push([at(new T.BoxGeometry(w * 2, .25, 1.4), 0, -.1, z), Wd]); }
+    parts.push([tube(V3(0, 0, -6.5), V3(0, .3, 7), .35, .3, 5), Wd], [tube(V3(0, 1, 5.5), V3(0, 3.2, 9), .18, .1, 5), W]);
+    parts.push([tube(V3(.3, .5, -1), V3(3.5, 5.5, 1.5), .22, .16, 6), Wd], [tube(V3(-2, .6, 7), V3(-4.5, .3, 2), .18, .14, 6), Wd]);
+    parts.push([at(new T.BoxGeometry(3.4, 2.4, 2.2), 0, 1.9, -5.8), W], [at(Cyl(.3, .3, 1.4, 8).rotateZ(Math.PI / 2), 2.8, .3, 1.6), "#3A3A3A"], [at(Cyl(.3, .3, 1.4, 8).rotateZ(Math.PI / 2).rotateY(.6), -3.2, .2, -2.5), "#3A3A3A"]);
+    parts.push([at(new T.BoxGeometry(1.1, .8, .8), 1.5, .35, -3.8), "#6E5030"], [at(new T.BoxGeometry(.6, .5, .6).rotateY(.5), 1.1, .9, -3.8), "#D8B040"]);   // coffre et or
+  } else if (kind === "cargo") {
+    for (let k = 0; k < 7; k++) { const z = -9 + k * 3; if (k === 3) continue; parts.push([at(new T.BoxGeometry(5, 3.6, 3), 0, 1.6, z), k % 2 ? rust : "#6A5A4A"]); }
+    parts.push([at(Cone(2.5, 4, 4).rotateX(Math.PI / 2).rotateZ(Math.PI / 4).scale(1, .75, 1), 0, 1.6, 11), rust], [at(new T.BoxGeometry(4, 3, 3.5), 0, 4.8, -7.5), "#8A7A6A"], [at(Cyl(.6, .6, 3, 8), 0, 7.2, -7.5), "#5A3A2A"]);
+    parts.push([at(new T.BoxGeometry(2.4, 2.4, 5.5).rotateY(.4).rotateZ(.2), -5.5, 1.2, 1), "#3A6A8A"], [at(new T.BoxGeometry(2.4, 2.4, 5.5).rotateY(-.2), 5, 1.2, -2), "#A83A2A"]);
+  } else {
+    parts.push([at(Ico(1.6, 1).scale(1, .45, 2.2), 0, .5, 0), "#4A7A9A"], [at(new T.BoxGeometry(2.4, .15, 5.5), 0, .95, 0), W], [tube(V3(0, 1, .8), V3(.8, 3.5, 1.4), .09, .07, 5), Wd]);
+  }
+  const m = mk(parts, (x, y, z) => noise(x * .8 + z * .6, y * .9) > .45 ? "#3E6A4A" : null); g.add(m);    // algues et concrétions
+  const kelp = []; for (let k = 0; k < 10; k++) kelp.push([at(tilt(Cyl(.03, .06, rr(.8, 1.8), 3), rr(-.3, .3)), rr(-4, 4), .6, rr(-8, 8)), "#5E8A4A"]); g.add(mk(kelp, null, false));
+  return g;
+}
+const WRECKS = [];
+[["galion", d => d > 7 && d < 19.5, "Épave du galion", "Un vieux trois-mâts couché sur le sable, un coffre entrouvert dans la cale."],
+ ["cargo", d => d > 11 && d < 19.5, "Cargo englouti", "Un cargo rouillé coupé en deux, ses conteneurs éparpillés sur le fond."],
+ ["barque", d => d > 3 && d < 7, "Barque du lagon", "Une petite barque de pêcheur échouée dans le lagon, colonisée par les coraux."]].forEach(([k, test, name, desc], i) => {
+  const p = seaPoint((d, x, z) => test(d) && slopeAt(x, z) < .4 && (k !== "barque" || biomeAt(x, z) === B.LAGOON)); if (!p) return;
+  const g = buildWreck(k); g.position.set(p[0], heightAt(p[0], p[1]) - .4, p[1]); g.rotation.set(rr(-.08, .08), rnd() * 6.28, rr(-.2, .2)); scene.add(g);
+  WRECKS.push({ name, desc, x: p[0], z: p[1], y: heightAt(p[0], p[1]) });
+});
+WRECKS.forEach(w => {
+  const sp = { name: w.name, desc: w.desc, pos: [w.x, w.z], y: w.y, go: [w.x + 6, w.z], wreck: true };
+  const Pp = []; for (let k = 0; k < 14; k++) Pp.push((rnd() - .5) * 6, 1 + rnd() * 4, (rnd() - .5) * 6);
+  sp.sparkle = new T.Points(new T.BufferGeometry().setAttribute("position", new T.Float32BufferAttribute(Pp, 3)), new T.PointsMaterial({ color: lc("#FFE28A"), size: .35, transparent: true, opacity: .9, depthWrite: false }));
+  sp.sparkle.position.set(w.x, w.y, w.z); scene.add(sp.sparkle); sp.found = false; SPOTS.push(sp);
+});
+document.getElementById("spottotal").textContent = SPOTS.length;
+
+/* ───────────────────────── Boucle de la faune ───────────────────────── */
+const ACT = LIGHT ? 120 : 190, faunaEl = document.getElementById("fauna");
+document.getElementById("faunatotal").textContent = Object.keys(SPECIES).length + 4;
+const SEA_SPECIES = { fish: ["Poissons de récif", "Chaetodontidae, Acanthuridae…", "Les bancs se resserrent et changent de cap d'un seul bloc quand un prédateur approche."], shark: ["Requin à pointes noires", "Carcharhinus melanopterus", "Timide, il patrouille le long du récif et fuit souvent les plongeurs."], turtle: ["Tortue verte", "Chelonia mydas", "Elle remonte respirer à la surface puis peut rester des heures sous l'eau au repos."], gull: ["Goéland argenté", "Larus argentatus", "Il plane longtemps sur les courants d'air sans battre des ailes."] };
+function see(key, name, sci, fact) { if (SEEN.has(key)) return; SEEN.add(key); showToast("Nouvelle espèce observée", name, `${sci} · ${fact}`); document.getElementById("faunacount").textContent = SEEN.size; }
+let nearTxt = "", faunaT = 0;
+function updateFauna(dt, t) {
+  let near = null, nd = 22;
+  for (const a of ANIMALS) {
+    if (!a.alive) { a.respawn -= dt; if (a.respawn <= 0) respawn(a); continue; }
+    const d = Math.hypot(a.x - P.x, a.z - P.z);
+    if (d > ACT) { a.far += dt; if (a.far > .8) { const fd = a.far; a.far = 0; think(a, fd, t); move(a, Math.min(fd, .8), t); } a.rig.root.visible = false; continue; }
+    think(a, dt, t); move(a, dt, t); a.rig.root.visible = true; animate(a, dt, t);
+    if (d < nd && !cam.sky) { nd = d; near = a; }
+    if (d < 20 && !cam.sky) see(a.s.key, a.s.name, a.s.sci, a.s.fact);
+  }
+  // Poissons
+  const m4 = new T.Matrix4(), q = new T.Quaternion(), e = new T.Euler(0, 0, 0, "YXZ"), v3 = new T.Vector3(), s3 = new T.Vector3();
+  SCHOOLS.forEach(sc => {
+    const pd = Math.hypot(sc.x - P.x, sc.z - P.z); if (pd > 150) return;
+    let flee = null; if (P.swim && Math.hypot(pd, sc.y - P.y - 1.5) < 8) flee = [P.x, P.z];
+    for (const sh of SHARKS) if (Math.hypot(sh.x - sc.x, sh.z - sc.z) < (sh.hunt > 0 ? 18 : 9)) flee = [sh.x, sh.z];
+    if (flee) { sc.flee = 2.5; const d = Math.hypot(sc.x - flee[0], sc.z - flee[1]) || 1; sc.tx = sc.x + (sc.x - flee[0]) / d * 25; sc.tz = sc.z + (sc.z - flee[1]) / d * 25; }
+    sc.flee = Math.max(0, sc.flee - dt);
+    if (Math.hypot(sc.tx - sc.x, sc.tz - sc.z) < 3 || rnd() < dt * .05) { const p = seaPoint(dd => dd > 1.8 && dd < 18, sc.x, sc.z, 40); if (p) { sc.tx = p[0]; sc.tz = p[1]; sc.ty = -rr(1, Math.min(8, -heightAt(p[0], p[1]) - 1)); } }
+    swimTo(sc, dt, sc.flee > 0 ? 7 : sc.spd, sc.flee > 0 ? 5 : 1.2);
+    const spread = sc.flee > 0 ? 1.7 : 1 + Math.sin(t * .3 + sc.i0) * .2, ch = Math.cos(sc.h), shh = Math.sin(sc.h);
+    sc.fish.forEach((f, i) => {
+      const ox = f.ox * spread + Math.sin(t * .7 + f.ph) * .6, oz = f.oz * spread + Math.cos(t * .5 + f.ph) * .6, oy = f.oy * spread + Math.sin(t * .9 + f.ph * 2) * .3;
+      const x = sc.x + ox * ch + oz * shh, z = sc.z - ox * shh + oz * ch, y = clamp(sc.y + oy, heightAt(x, z) + .3, -.25);
+      e.set(0, sc.h + Math.sin(t * (sc.flee > 0 ? 16 : 7) + f.ph) * .22, 0); q.setFromEuler(e); m4.compose(v3.set(x, y, z), q, s3.setScalar(f.s)); fishIM.setMatrixAt(sc.i0 + i, m4);
+    });
+    if (pd < 25 && P.under) see("fish", ...SEA_SPECIES.fish);
+  });
+  fishIM.instanceMatrix.needsUpdate = true;
+  SHARKS.forEach(sh => {
+    const pd = Math.hypot(sh.x - P.x, sh.z - P.z); sh.g.visible = pd < 160; if (pd > 200) return;
+    sh.hungry -= dt; if (sh.hungry < 0 && sh.hunt <= 0) { let best = null, bd = 30; SCHOOLS.forEach(sc => { const d = Math.hypot(sc.x - sh.x, sc.z - sh.z); if (d < bd) { bd = d; best = sc; } }); if (best) { sh.hunt = rr(5, 9); sh.target = best; } sh.hungry = rr(25, 60); }
+    if (sh.hunt > 0 && sh.target) { sh.hunt -= dt; sh.tx = sh.target.x; sh.tz = sh.target.z; sh.ty = sh.target.y; }
+    else if (P.swim && pd < 9) { sh.tx = sh.x + (sh.x - P.x) * 3; sh.tz = sh.z + (sh.z - P.z) * 3; }
+    else if (Math.hypot(sh.tx - sh.x, sh.tz - sh.z) < 4) { const p = seaPoint(d => d > 4, sh.x, sh.z, 60); if (p) { sh.tx = p[0]; sh.tz = p[1]; sh.ty = -rr(2.5, Math.min(10, -heightAt(p[0], p[1]) - 1.5)); } }
+    swimTo(sh, dt, sh.hunt > 0 ? 8 : 3, sh.hunt > 0 ? 2.2 : .9);
+    sh.tail.rotation.y = Math.sin(t * (sh.hunt > 0 ? 9 : 4) + sh.seed) * .45; sh.g.position.set(sh.x, sh.y, sh.z); sh.g.rotation.y = sh.h + Math.sin(t * 4 + sh.seed) * .06;
+    if (pd < 22 && P.under) see("shark", ...SEA_SPECIES.shark);
+  });
+  TURTLES.forEach(tu => {
+    const pd = Math.hypot(tu.x - P.x, tu.z - P.z); tu.g.visible = pd < 160; if (pd > 200) return;
+    tu.air -= dt; if (tu.air < 0 && !tu.breathe) { tu.breathe = 1; tu.ty = -.25; }
+    if (tu.breathe && tu.y > -.45) { tu.breathe += dt; if (tu.breathe > 5) { tu.breathe = 0; tu.air = rr(30, 70); tu.ty = -rr(1.5, 4); } }
+    if (Math.hypot(tu.tx - tu.x, tu.tz - tu.z) < 3) { const p = seaPoint(d => d > 1.5 && d < 7, tu.x, tu.z, 40); if (p) { tu.tx = p[0]; tu.tz = p[1]; if (!tu.breathe) tu.ty = -rr(1.2, Math.max(1.3, -heightAt(p[0], p[1]) - .8)); } }
+    if (P.swim && pd < 5) { tu.tx = tu.x + (tu.x - P.x) * 2; tu.tz = tu.z + (tu.z - P.z) * 2; }
+    swimTo(tu, dt, P.swim && pd < 5 ? 2.5 : 1, .7);
+    tu.fl.forEach(f => { f.p.rotation.z = f.k * Math.sin(t * 2.2 + tu.seed + (f.f > 0 ? 0 : 1)) * (f.f > 0 ? .6 : .3); });
+    tu.g.position.set(tu.x, tu.y, tu.z); tu.g.rotation.y = tu.h; tu.g.rotation.x = clamp((tu.y - tu.ty) * .3, -.4, .4);
+    if (pd < 18 && P.swim) see("turtle", ...SEA_SPECIES.turtle);
+  });
+  GULLS.forEach(gu => {
+    const pd = Math.hypot(gu.cx - P.x, gu.cz - P.z); gu.g.visible = pd < 260; if (pd > 300) return;
+    gu.a += gu.sp * dt; if (rnd() < dt * .02 && gu === GULLS.find(o => o.flock === gu.flock)) { const c = homePoint({ biomes: [B.BEACH, B.REEF, B.LAGOON, B.MANGROVE], wade: 99, maxSlope: 9, kind: "x" }); if (c && Math.hypot(c[0] - gu.cx, c[1] - gu.cz) < 150) GULLS.forEach(o => { if (o.flock === gu.flock) { o.ncx = c[0]; o.ncz = c[1]; } }); }
+    if (gu.ncx !== undefined) { gu.cx = lerp(gu.cx, gu.ncx, dt * .08); gu.cz = lerp(gu.cz, gu.ncz, dt * .08); }
+    const x = gu.cx + Math.cos(gu.a) * gu.r, z = gu.cz + Math.sin(gu.a) * gu.r, y = Math.max(heightAt(x, z), 0) + gu.hgt + Math.sin(t * .4 + gu.seed) * 2;
+    gu.g.position.set(x, y, z); gu.g.rotation.y = Math.atan2(-Math.sin(gu.a) * Math.sign(gu.sp), Math.cos(gu.a) * Math.sign(gu.sp)); gu.g.rotation.z = -Math.sign(gu.sp) * .35;
+    gu.flap -= dt; const flapping = gu.flap > 0; if (gu.flap < -rr(2, 4)) gu.flap = rr(.8, 1.8);
+    gu.wings.forEach((w, i) => { w.rotation.z = (i ? -1 : 1) * (flapping ? Math.sin(t * 11 + gu.seed) * .6 : .08); });
+    if (pd < 45) see("gull", ...SEA_SPECIES.gull);
+  });
+  // Bandeau : l'animal le plus proche et ce qu'il fait
+  faunaT -= dt; if (faunaT <= 0) { faunaT = .25; const txt = near ? `<b>${near.s.name}</b> <i>${near.s.sci}</i><span>${describe(near)}</span>` : ""; if (txt !== nearTxt) { nearTxt = txt; faunaEl.innerHTML = txt; faunaEl.hidden = !txt; } }
+}
+function renderFauna() {
+  const all = [...Object.values(SPECIES).map(s => [s.key, s.name, s.sci, s.fact, BIOMES[s.biomes[0]].name]), ...Object.entries(SEA_SPECIES).map(([k, v]) => [k, v[0], v[1], v[2], k === "gull" ? "Plage" : "Lagon et récif corallien"])];
+  document.getElementById("faunalist").innerHTML = all.map(([k, n, sci, f, b]) => SEEN.has(k) ? `<li class="found"><span class="ic">★</span><div><b>${n}</b><small><i>${sci}</i> · ${f}</small></div><span></span></li>` : `<li><span class="ic">?</span><div><b>Espèce inconnue</b><small>À chercher du côté : ${b.toLowerCase()}</small></div><span></span></li>`).join("");
 }
 
 /* ───────────────────────── Déplacements : pentes, glissement, grottes, nage ───────────────────────── */
@@ -1286,7 +1818,7 @@ function rideStep(dt, running) {
     P.x = lerp(L.ax, L.bx, k); P.z = lerp(L.az, L.bz, k); P.y = lerp(L.ay, L.by, k); P.yaw = Math.atan2(L.ux, L.uz); P.phase += dt * 3; P.vy = 0;
     if (r.t >= 1 || r.t <= 0) { const up = r.t >= 1; P.x = up ? L.ex : L.sx; P.z = up ? L.ez : L.sz; P.y = terrainGround(P.x, P.z); P.onGround = true; P.ride = null; P.rideCd = 1.2; if (!up) P.yaw += Math.PI; }
   } else {
-    const Z = r.Z, left = (1 - r.s) * Z.len; r.v = left < 16 ? Math.max(3.5, r.v - 14 * dt) : Math.min(22, r.v + 7 * dt);
+    const Z = r.Z, left = (1 - r.s) * Z.len, brake = r.v * r.v / 44 + 3; r.v = left < brake ? Math.max(4, r.v - 22 * dt) : Math.min(40, r.v + 16 * dt);
     r.s = Math.min(1, r.s + r.v * dt / Z.len); r.blend = Math.min(1, r.blend + dt * 2.5);
     const cx = lerp(Z.ax, Z.bx, r.s), cz = lerp(Z.az, Z.bz, r.s), cy = zipY(Z, r.s);
     P.x = lerp(r.x0, cx, r.blend); P.z = lerp(r.z0, cz, r.blend); P.y = lerp(r.y0, cy - 2.35, r.blend); P.yaw = Z.yaw; P.vy = 0;
@@ -1422,10 +1954,11 @@ function step(now) {
     drawMap(mini, 6.2, P.x, P.z);
     if (!sheets.map.hidden) drawMap(big, 1.1, 0, 0);
   }
+  updateFauna(dt, t);
   renderer.render(scene, camera);
 }
 document.getElementById("loading").hidden = true;
 requestAnimationFrame(step);
-window.__island = { P, SPOTS, cam, CAVES, LADDERS, ZIPS, ROPES, setTime: i => { timeIdx = i; applyTime(); } };
+window.__island = { P, SPOTS, cam, CAVES, LADDERS, ZIPS, ROPES, ANIMALS, SCHOOLS, SHARKS, TURTLES, WRECKS, SEEN, FAUNA_LOG, simFauna: (n, dt) => { for (let i = 0; i < n; i++) updateFauna(dt, performance.now() / 1000 + i * dt); }, setTime: i => { timeIdx = i; applyTime(); } };
 }
 </script>
