@@ -87,6 +87,13 @@
     #tools { top: calc(164px + env(safe-area-inset-top, 0px)); }
     #hint { display: none; }
   }
+  #uw { inset: 0; z-index: 1; opacity: 0; transition: opacity .3s; background: radial-gradient(ellipse at 50% 40%, rgba(40, 150, 170, .05) 30%, rgba(4, 40, 60, .55) 100%); }
+  #uw.on { opacity: 1; }
+  #air { left: 50%; bottom: calc(96px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); padding: 8px 14px; display: flex; align-items: center; gap: 10px; font: 700 12px var(--body); }
+  #air[hidden] { display: none; }
+  #air i { display: block; width: 140px; height: 8px; border-radius: 4px; background: rgba(255, 255, 255, .15); overflow: hidden; }
+  #air b { display: block; height: 100%; width: 100%; background: #6FD0E8; border-radius: 4px; }
+  #air.low b { background: #E86A4A; }
   @media (prefers-reduced-motion: reduce) { #toast { transition: none; } }
 </style>
 
@@ -111,13 +118,15 @@
   <button type="button" class="tool" id="mapbtn" aria-label="Carte de l'île"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15M15 6v15"/></svg><span>Carte</span></button>
 </div>
 
-<div class="hud card" id="hint"><kbd>Z Q S D</kbd> ou flèches pour marcher · <kbd>Maj</kbd> courir · <kbd>Espace</kbd> sauter · glisser pour tourner la caméra · molette pour zoomer</div>
+<div class="hud card" id="hint"><kbd>Z Q S D</kbd> ou flèches pour marcher · <kbd>Maj</kbd> courir · <kbd>Espace</kbd> sauter / remonter · <kbd>C</kbd> plonger · glisser pour tourner la caméra · molette pour zoomer</div>
 
 <div class="hud card" id="toast" role="status" aria-live="polite"><div class="kicker">Cachette découverte</div><b id="toastname"></b><span id="toastdesc"></span></div>
 
 <div class="hud" id="joy"></div>
 <div id="stick"><i></i></div>
-<div class="hud" id="pad"><button type="button" id="runbtn">Courir</button><button type="button" id="jumpbtn">Sauter</button></div>
+<div class="hud" id="pad"><button type="button" id="runbtn">Courir</button><button type="button" id="jumpbtn">Sauter</button><button type="button" id="divebtn">Plonger</button></div>
+<div class="hud" id="uw" aria-hidden="true"></div>
+<div class="hud card" id="air" hidden><span>Oxygène</span><i><b></b></i></div>
 
 <div class="sheet" id="mapsheet" hidden>
   <div class="card">
@@ -431,7 +440,8 @@ function groundColor(i, j) {
   const k = gi(i, j), x = gx(i), z = gx(j), h = H[k], b = BIOME[k];
   let c;
   if (h < -.25 && b === B.REEF) c = mixCol(mixCol(col("#EAD8BE"), col(iceSector(x, z) > .5 ? "#D8D4CC" : "#D89A8A"), sstep(-.2, .6, noise(x * .15, z * .15)) * .6), col("#4F8C94"), sstep(1, 8, -h));
-  else if (h < -.25) c = b === B.LAGOON ? mixCol(col("#F6ECC8"), col("#9FD0C0"), sstep(0, 5, -h)) : b === B.KELP ? mixCol(col("#6E7A62"), col("#3A5048"), sstep(3, 11, -h)) : mixCol(col("#D9C68E"), col("#3F7C86"), sstep(0, 14, -h));
+  else if (h < -.25) c = b === B.LAGOON ? mixCol(col("#F6ECC8"), col("#9FD0C0"), sstep(0, 5, -h)) : b === B.KELP ? mixCol(col("#6E7A62"), col("#3A5048"), sstep(3, 11, -h)) : mixCol(col("#DCCB94"), col("#8E8666"), sstep(0, 18, -h));
+  if (h < -.25 && b === B.OCEAN) { c.offsetHSL(0, 0, Math.sin(x * .7 + z * .25 + noise(x * .03, z * .03) * 4) * .03); if (noise(x * .04 + 9, z * .04) > .45) c = mixCol(c, col("#6E7A5A"), .45); }   // rides de sable, prairies d'herbiers
   else {
     c = col(BIOMES[b].ground);
     if (b === B.CANYON) c = CANYON_BANDS[Math.abs(Math.floor(h / 2.6)) % CANYON_BANDS.length].clone();
@@ -461,7 +471,7 @@ const HOLES = CAVES.map(cv => ({ x: cv.mouth.x, z: cv.mouth.z, f: cv.mouth.f }))
     const i0 = ti * per, j0 = tj * per, P = [], C = [], I = [], W = per + 1;
     for (let j = 0; j <= per; j++) for (let i = 0; i <= per; i++) { const k = gi(i0 + i, j0 + j); P.push(gx(i0 + i), H[k], gx(j0 + j)); C.push(COLS[k * 3], COLS[k * 3 + 1], COLS[k * 3 + 2]); }
     const tri = (a, b, c) => {   // saute les triangles de grand fond et ceux qui bouchent l'entrée des grottes
-      const ys = [P[a * 3 + 1], P[b * 3 + 1], P[c * 3 + 1]]; if (Math.max(...ys) < -9) return;
+      const ys = [P[a * 3 + 1], P[b * 3 + 1], P[c * 3 + 1]];
       const cx = (P[a * 3] + P[b * 3] + P[c * 3]) / 3, cz = (P[a * 3 + 2] + P[b * 3 + 2] + P[c * 3 + 2]) / 3, cy = (ys[0] + ys[1] + ys[2]) / 3;
       for (const hl of HOLES) if (Math.hypot(cx - hl.x, cz - hl.z) < 3.3 && cy > hl.f - 1 && cy < hl.f + 5.5) return;
       I.push(a, b, c);
@@ -473,7 +483,7 @@ const HOLES = CAVES.map(cv => ({ x: cv.mouth.x, z: cv.mouth.z, f: cv.mouth.f }))
     const g = new T.BufferGeometry(); g.setAttribute("position", new T.Float32BufferAttribute(P, 3)); g.setAttribute("color", new T.Float32BufferAttribute(C, 3)); g.setIndex(I); g.computeVertexNormals(); g.computeBoundingSphere();
     const m = new T.Mesh(g, vcMat); m.receiveShadow = true; scene.add(m);
   }
-  const deep = new T.Mesh(new T.CircleGeometry(3000, 32), paper({ color: lc("#3A7482") })); deep.rotation.x = -Math.PI / 2; deep.position.y = -9.6; scene.add(deep);
+  const deep = new T.Mesh(new T.CircleGeometry(3000, 32), paper({ color: lc("#7E7A62") })); deep.rotation.x = -Math.PI / 2; deep.position.y = -19.3; scene.add(deep);
 }
 
 /* ───────────────────────── Eau : couleur selon la profondeur, écume, vagues, reflets, courant ───────────────────────── */
@@ -525,7 +535,7 @@ function waterMat(o) {
   const m = new T.ShaderMaterial({
     uniforms: T.UniformsUtils.merge([T.UniformsLib.fog, { time: { value: 0 }, waveAmp: { value: o.wave ?? .18 }, opacity: { value: o.opacity ?? .88 }, river: { value: o.river ? 1 : 0 },
       shallow: { value: lc(o.shallow) }, deep: { value: lc(o.deep) }, foamCol: { value: lc("#F4FBFF") }, sunDir: { value: new T.Vector3(.4, .8, .3).normalize() }, sunCol: { value: new T.Color(1, 1, 1) }, skyCol: { value: lc("#CFE6F5") } }]),
-    vertexShader: WATER_V, fragmentShader: WATER_F, transparent: true, fog: true, depthWrite: false, extensions: { derivatives: true },
+    vertexShader: WATER_V, fragmentShader: WATER_F, transparent: true, fog: true, depthWrite: false, side: T.DoubleSide, extensions: { derivatives: true },
   });
   WATER_MATS.push(m); return m;
 }
@@ -643,6 +653,9 @@ const GEO = {
   saguaro: merge([[at(Cyl(.32, .36, 4.2, 7), 0, 2.1, 0), "#4E8A4A"], [at(Cyl(.18, .2, 1.6, 6), .75, 2.6, 0), "#4E8A4A"], [at(tilt(Cyl(.18, .18, .75, 6), Math.PI / 2), .45, 1.9, 0), "#4E8A4A"], [at(Cyl(.16, .18, 1.2, 6), -.7, 2.2, 0), "#4E8A4A"], [at(tilt(Cyl(.16, .16, .6, 6), Math.PI / 2), -.4, 1.6, 0), "#4E8A4A"]]),
   brain: merge([[at(Ico(.8, 1), 0, .25, 0).scale(1, .6, 1), "#FFFFFF"], [at(Ico(.45, 0), .7, .15, .3).scale(1, .6, 1), "#EFEFEF"]]),
   seafan: merge([[at(Cyl(.05, .07, .5, 3), 0, .25, 0), "#DDDDDD"], [at(Ico(.9, 0), 0, 1.25, 0).scale(1, 1.1, .1), "#FFFFFF"], [at(Ico(.6, 0), .6, .9, .1).scale(1, 1, .1), "#F2F2F2"]]),
+  seagrass: merge([0, 1, 2, 3, 4, 5].map(k => [at(tilt(Cyl(.02, .07, 1.3 + (k % 3) * .3, 3), (k % 2 ? .18 : -.18), k * 1.05), Math.cos(k) * .15, .65, Math.sin(k) * .15), k % 2 ? "#5E9A4A" : "#6FAE58"])),
+  starfish: merge([0, 1, 2, 3, 4].map(k => { const g = new T.BoxGeometry(.13, .07, .55); g.translate(0, .04, .28); g.rotateY(k * 1.2566); return [g, "#FFFFFF"]; }).concat([[at(Cyl(.14, .14, .08, 5), 0, .04, 0), "#FFFFFF"]])),
+  shell: merge([[at(Cone(.25, .2, 7), 0, .08, 0).scale(1, .7, 1.3), "#FFFFFF"], [at(Ico(.08, 0), 0, .05, .3), "#F2F2F2"]]),
   coral: merge([[at(Cone(.35, 1.1, 5), 0, .5, 0), "#FFFFFF"], [at(Cone(.25, .8, 5), .45, .35, .2), "#F4F4F4"], [at(Ico(.35), -.4, .3, -.2), "#EDEDED"], [at(tilt(Cone(.18, .9, 4), .6), .1, .5, -.4), "#FFFFFF"]]),
   shrub: merge([[at(Ico(.7), 0, .3, 0).scale(1, .55, 1), "#7E8E6A"], [at(Ico(.45), .5, .2, .2), "#8E9A74"]]),
   bush: merge([[at(Ico(.9), 0, .6, 0), "#4F7F3A"], [at(Ico(.62), .6, .45, .3), "#5E8F42"], [at(Ico(.55), -.5, .4, -.3), "#46763A"]]),
@@ -704,7 +717,8 @@ const DENS = {   // [type, probabilité par essai, échelle, rayon de collision]
   [B.BAMBOO]: [["bamboo", .16, 1, .6], ["jplant", .05, 1], ["bush", .03, 1], ["rock", .005, 1, .8]],
   [B.TUNDRA]: [["shrub", .05, 1], ["rock", .02, 1.2, .9], ["deadtree", .004, .9, .25], ["snowpine", .004, .8, .4]],
   [B.MANGROVE]: [["mangrove", .1, 1, .35], ["reed", .05, 1]],
-  [B.LAGOON]: [["coral", .06, 1.2], ["brain", .03, 1], ["rock", .01, 1, 0]],
+  [B.LAGOON]: [["coral", .06, 1.2], ["brain", .03, 1], ["seagrass", .07, 1], ["starfish", .012, 1], ["shell", .01, 1], ["rock", .01, 1, 0]],
+  [B.OCEAN]: [["seagrass", .05, 1.1], ["rock", .012, 1.6, 0], ["starfish", .006, 1], ["shell", .008, 1]],
   [B.REEF]: [["coral", .2, 1.3], ["brain", .12, 1.1], ["seafan", .08, 1.1], ["rock", .02, 1.2, 0]],
   [B.STEPPE]: [["feathergrass", .12, 1], ["rock", .006, 1, .8], ["sagebrush", .01, .9]],
   [B.GARRIGUE]: [["olive", .03, 1, .35], ["holmoak", .04, 1, .35], ["lavender", .09, 1], ["drybush", .03, .9], ["rock", .015, 1, .8]],
@@ -719,7 +733,7 @@ const DENS = {   // [type, probabilité par essai, échelle, rayon de collision]
   [B.KELP]: [["kelp", .12, 1.1], ["rock", .015, 1.4, 0]],
   [B.TROPCONIF]: [["tpine", .1, 1.1, .4], ["drybush", .04, 1], ["feathergrass", .04, .9]],
 };
-const UNDERWATER = { coral: [-7, -.3], brain: [-7, -.3], seafan: [-8, -.6], mangrove: [-1.2, 1.5], rock: [-11, 99], kelp: [-12, -2.5] };
+const UNDERWATER = { seagrass: [-16, -.7], starfish: [-20, -.4], shell: [-20, -.4], coral: [-7, -.3], brain: [-7, -.3], seafan: [-8, -.6], mangrove: [-1.2, 1.5], rock: [-20, 99], kelp: [-12, -2.5] };
 {
   const tries = LIGHT ? 95000 : 175000;
   for (let n = 0; n < tries; n++) {
@@ -733,10 +747,12 @@ const UNDERWATER = { coral: [-7, -.3], brain: [-7, -.3], seafan: [-8, -.6], mang
       if (roll < p) {
         const uw = UNDERWATER[kind];
         if (wet && !(uw && h > uw[0] && h < uw[1])) break;
-        if (!wet && (kind === "coral" || kind === "kelp" || kind === "brain" || kind === "seafan")) break;
+        if (!wet && ["coral", "kelp", "brain", "seafan", "seagrass", "starfish", "shell"].includes(kind)) break;
         if (sl > (kind === "rock" || kind === "boulder" || kind === "lavarock" || kind === "serac" ? 2 : .75)) break;
         const s = sc * (.75 + rng() * .55), o = { r: rad };
         if (kind === "rock" || kind === "boulder" || kind === "lavarock") { o.sx = .8 + rng() * .8; o.sy = .5 + rng() * .5; o.sz = .8 + rng() * .6; o.tilt = (rng() - .5) * .4; o.sink = .3 * s; }
+        if (kind === "starfish") o.c = lc(["#E8743A", "#D84A4A", "#F2A24A", "#B85AC8"][rng() * 4 | 0]);
+        if (kind === "shell") o.c = lc(["#F4E6D8", "#F0C8B8", "#E8D8B0"][rng() * 3 | 0]);
         if (kind === "maple") o.c = lc(MAPLE[rng() * MAPLE.length | 0]);
         if (kind === "coral" || kind === "brain" || kind === "seafan") o.c = lc((iceSector(x, z) > .5 ? CORAL_COLD : CORAL)[rng() * (iceSector(x, z) > .5 ? CORAL_COLD.length : CORAL.length) | 0]);
         if (kind === "mangrove") o.sink = -.2;
@@ -766,7 +782,7 @@ Object.entries(inst).forEach(([kind, list]) => {
   list.forEach((it, i) => { im.setMatrixAt(i, it.m); im.setColorAt(i, it.c || new T.Color(1, 1, 1).multiplyScalar(.9 + rng() * .2)); });
   im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
   im.frustumCulled = false;
-  im.castShadow = !LIGHT && !["grass", "flower", "reed", "mushroom", "coral", "brain", "seafan", "kelp", "lavender", "cottongrass", "sphagnum", "saltcrystal", "tussock", "feathergrass"].includes(kind); im.receiveShadow = true;
+  im.castShadow = !LIGHT && !["grass", "flower", "reed", "mushroom", "seagrass", "starfish", "shell", "coral", "brain", "seafan", "kelp", "lavender", "cottongrass", "sphagnum", "saltcrystal", "tussock", "feathergrass"].includes(kind); im.receiveShadow = true;
   scene.add(im);
 });
 const FLOES = [];
@@ -875,6 +891,93 @@ const BRIDGES = [];
   BRIDGES.push({ x: p.x, z: p.z, ax: dx, az: dz, half, deck });
 });
 const bridgeAt = (x, z) => { for (const b of BRIDGES) { const rx = x - b.x, rz = z - b.z, along = rx * b.ax + rz * b.az, side = Math.abs(-rx * b.az + rz * b.ax); if (Math.abs(along) <= b.half && side <= 1.7) return b.deck + Math.cos(along / b.half * 1.3) * .5 - .4; } return -999; };
+
+/* ───────────────────────── Échelles, ponts de singe et tyroliennes ───────────────────────── */
+await stage("Pose des échelles, des ponts de singe et des tyroliennes…");
+const LADDERS = [], ZIPS = [], ROPES = [];
+function beam(a, b, r, s = 4) { const d = new T.Vector3().subVectors(b, a), L = d.length(), g = Cyl(r, r, L, s);
+  g.applyMatrix4(new T.Matrix4().makeRotationFromQuaternion(new T.Quaternion().setFromUnitVectors(new T.Vector3(0, 1, 0), d.normalize()))); return at(g, (a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2); }
+const V3 = (x, y, z) => new T.Vector3(x, y, z);
+const dryAt = (x, z) => waterAt(x, z) < heightAt(x, z) - .3 && !HOLES.some(hl => Math.hypot(x - hl.x, z - hl.z) < 8) && Math.hypot(x - VOLC.x, z - VOLC.z) > VOLC.cr + 6;
+const zipY = (Z, s) => lerp(Z.ya, Z.yb, s) - Z.sag * 4 * s * (1 - s);
+function canopyHit(x, z, y) { for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { const l = CANOPY.get(ckey(x + a * 8, z + b * 8)); if (l) for (const c of l) if (y < c[3] + .5 && Math.hypot(x - c[0], z - c[1]) < c[2] + .6) return true; } return false; }
+{
+  const r2 = mulberry(515), parts = [], WOOD = "#8A6440", DARK = "#5E4228", ROPE = "#C8B080", flat = (x, z) => slopeAt(x, z) < .55;
+  // Échelles : du pied d'une falaise trop raide jusqu'à son rebord
+  for (let n = 0; n < 90000 && LADDERS.length < 30; n++) {
+    const a = r2() * 6.283, rr = Math.sqrt(r2()) * (R - 10), x = Math.cos(a) * rr, z = Math.sin(a) * rr;
+    if (heightAt(x, z) < 4 || slopeAt(x, z) < 1.5 || !dryAt(x, z)) continue;
+    const e = 1.5, gxv = heightAt(x + e, z) - heightAt(x - e, z), gzv = heightAt(x, z + e) - heightAt(x, z - e), gl = Math.hypot(gxv, gzv) || 1, ux = gxv / gl, uz = gzv / gl;
+    let f = null, t = null;
+    for (let d = 0; d < 30 && !f; d += .5) if (flat(x - ux * d, z - uz * d)) f = [x - ux * d, z - uz * d];
+    for (let d = 0; d < 30 && !t; d += .5) if (flat(x + ux * d, z + uz * d)) t = [x + ux * d, z + uz * d];
+    if (!f || !t) continue;
+    const hf = heightAt(...f), ht = heightAt(...t), rise = ht - hf, hd = Math.hypot(t[0] - f[0], t[1] - f[1]), ex = t[0] + ux * 1.6, ez = t[1] + uz * 1.6;
+    if (rise < 5 || rise > 32 || rise / hd < 1.3 || !dryAt(...f) || !dryAt(...t) || !flat(ex, ez) || Math.abs(heightAt(ex, ez) - ht) > 1.2 || blocked(...f) || blocked(ex, ez)) continue;
+    if (LADDERS.some(L => Math.hypot(L.fx - f[0], L.fz - f[1]) < 35)) continue;
+    let ok = true; for (let k = 1; k < 12 && ok; k++) { const s2 = k / 12, hl = heightAt(lerp(f[0], t[0], s2) - ux * .5, lerp(f[1], t[1], s2) - uz * .5), ly = lerp(hf, ht, s2); if (hl - ly > .5 || ly - hl > 5) ok = false; }
+    if (!ok) continue;
+    const sdx = -uz * .42, sdz = ux * .42, F = V3(f[0] - ux * .5, hf - .2, f[1] - uz * .5), Tp = V3(t[0] - ux * .5, ht + 1, t[1] - uz * .5);
+    [1, -1].forEach(k => parts.push([beam(V3(F.x + sdx * k, F.y, F.z + sdz * k), V3(Tp.x + sdx * k, Tp.y, Tp.z + sdz * k), .07), DARK]));
+    const nR = Math.floor((Tp.y - F.y) / .45); for (let k = 1; k < nR; k++) { const c = F.clone().lerp(Tp, k / nR); parts.push([beam(V3(c.x - sdx, c.y, c.z - sdz), V3(c.x + sdx, c.y, c.z + sdz), .045), WOOD]); }
+    LADDERS.push({ fx: f[0], fz: f[1], tx: t[0], tz: t[1], ux, uz, ex, ez, ax: f[0] - ux, az: f[1] - uz, ay: hf, bx: t[0] - ux, bz: t[1] - uz, by: ht, sx: f[0] - ux * 1.8, sz: f[1] - uz * 1.8, len: Math.hypot(rise, hd) });
+  }
+  // Ponts de singe : planches et cordes tendues au-dessus d'un ravin
+  for (let n = 0; n < 90000 && ROPES.length < 9; n++) {
+    const a = r2() * 6.283, rr = Math.sqrt(r2()) * (R - 15), ax = Math.cos(a) * rr, az = Math.sin(a) * rr, ha = heightAt(ax, az);
+    if (ha < 6 || !flat(ax, az) || !dryAt(ax, az) || blocked(ax, az) || ROPES.some(b => Math.hypot(b.x - ax, b.z - az) < 80)) continue;
+    let best = null, bs = -1;
+    for (let k = 0; k < 20; k++) { const da = k / 20 * 6.283, dx = Math.cos(da), dz = Math.sin(da);
+      for (let L = 16; L <= 60; L += 4) { const bx = ax + dx * L, bz = az + dz * L, hb = heightAt(bx, bz);
+        if (Math.abs(ha - hb) > 5 || !flat(bx, bz) || !dryAt(bx, bz) || blocked(bx, bz) || !flat(ax - dx * 2, az - dz * 2) || !flat(bx + dx * 2, bz + dz * 2)) continue;
+        const ya = ha + .25, yb = hb + .25, sag = L * .04; let gap = 0, ok = true;
+        for (let q = 1; q < 30 && ok; q++) { const s2 = q / 30, px = ax + dx * L * s2, pz = az + dz * L * s2, dk = lerp(ya, yb, s2) - sag * 4 * s2 * (1 - s2);
+          for (const o of [-1.2, 0, 1.2]) { const tg = heightAt(px - dz * o, pz + dx * o); if (tg > dk - (s2 < .1 || s2 > .9 ? -.3 : 1.8)) ok = false; }
+          gap = Math.max(gap, dk - Math.max(heightAt(px, pz), waterAt(px, pz))); }
+        if (ok && gap > 5 && gap - L * .08 > bs) { bs = gap - L * .08; best = { dx, dz, L, bx, bz, ya, yb, sag }; } } }
+    if (!best) continue;
+    const { dx, dz, L, bx, bz, ya, yb, sag } = best, half = L / 2, rope = { x: (ax + bx) / 2, z: (az + bz) / 2, ax: dx, az: dz, half, ya, yb, sag };
+    ROPES.push(rope);
+    const deckAt = s2 => lerp(ya, yb, s2) - sag * 4 * s2 * (1 - s2), P3 = (s2, side, y) => V3(ax + dx * L * s2 - dz * side, y, az + dz * L * s2 + dx * side);
+    for (let d = .3; d < L; d += .55) { const s2 = d / L, g = new T.BoxGeometry(1.9, .12, .38); g.rotateY(Math.atan2(dx, dz)); const c = P3(s2, 0, deckAt(s2) - .06); parts.push([at(g, c.x, c.y, c.z), Math.round(d / .55) % 2 ? WOOD : "#9A7A52"]); }
+    [-1, 1].forEach(sd => { const seg = Math.ceil(L / 1.5);
+      for (let k = 0; k < seg; k++) { const s0 = k / seg, s1 = (k + 1) / seg; parts.push([beam(P3(s0, sd * 1, deckAt(s0) + 1.1), P3(s1, sd * 1, deckAt(s1) + 1.1), .045, 3), ROPE]); parts.push([beam(P3(s0, sd * .95, deckAt(s0)), P3(s1, sd * .95, deckAt(s1)), .04, 3), ROPE]);
+        parts.push([beam(P3(s0, sd * .95, deckAt(s0)), P3(s0, sd * 1, deckAt(s0) + 1.1), .025, 3), ROPE]); }
+      [0, 1].forEach(s2 => parts.push([beam(P3(s2, sd * 1.05, deckAt(s2) - 1), P3(s2, sd * 1.05, deckAt(s2) + 1.5), .14, 5), DARK])); });
+  }
+  // Tyroliennes : d'un sommet dégagé vers une clairière en contrebas
+  for (let n = 0; n < 40000 && ZIPS.length < 7; n++) {
+    const a = r2() * 6.283, rr = Math.sqrt(r2()) * (R - 30), sx = Math.cos(a) * rr, sz = Math.sin(a) * rr, hs = heightAt(sx, sz);
+    if (hs < 20 || !flat(sx, sz) || !dryAt(sx, sz) || blocked(sx, sz) || ZIPS.some(Z => Math.hypot(Z.sx - sx, Z.sz - sz) < 140 || Math.hypot(Z.bx - sx, Z.bz - sz) < 40)) continue;
+    let best = null, bs = 0;
+    for (let k = 0; k < 18; k++) { const da = k / 18 * 6.283, dx = Math.cos(da), dz = Math.sin(da);
+      for (let L = 80; L <= 230; L += 25) { const bx = sx + dx * L, bz = sz + dz * L, he = heightAt(bx, bz);
+        if (hs - he < 14 || !flat(bx, bz) || !dryAt(bx, bz) || Math.hypot(bx, bz) > R - 15 || blocked(bx, bz)) continue;
+        const Z = { ya: hs + 4.6, yb: he + 3.3, sag: L * .025 }; let ok = true;
+        for (let q = 1; q < 50 && ok; q++) { const s2 = q / 50, px = sx + dx * L * s2, pz = sz + dz * L * s2, fy = zipY(Z, s2) - 2.5;
+          if (fy < Math.max(heightAt(px, pz), waterAt(px, pz)) + (s2 > .93 ? .4 : 2.2) || canopyHit(px, pz, fy)) ok = false; }
+        const sc = L + (hs - he) * 1.5; if (ok && sc > bs) { bs = sc; best = { ...Z, dx, dz, L, bx, bz, he }; } } }
+    if (!best) continue;
+    const Z = { sx, sz, hs, ax: sx, az: sz, bx: best.bx, bz: best.bz, dx: best.dx, dz: best.dz, ya: best.ya, yb: best.yb, sag: best.sag, len: best.L, yaw: Math.atan2(best.dx, best.dz) };
+    ZIPS.push(Z);
+    const seg = 28; for (let k = 0; k < seg; k++) { const s0 = k / seg, s1 = (k + 1) / seg; parts.push([beam(V3(lerp(sx, Z.bx, s0), zipY(Z, s0), lerp(sz, Z.bz, s0)), V3(lerp(sx, Z.bx, s1), zipY(Z, s1), lerp(sz, Z.bz, s1)), .05, 3), "#3A3A3A"]); }
+    const back = [-Z.dx * .6, -Z.dz * .6];
+    parts.push([beam(V3(sx + back[0], hs - .5, sz + back[1]), V3(sx + back[0], Z.ya + .6, sz + back[1]), .22, 6), DARK]);
+    parts.push([beam(V3(Z.bx + Z.dx * .6, best.he - .5, Z.bz + Z.dz * .6), V3(Z.bx + Z.dx * .6, Z.yb + .6, Z.bz + Z.dz * .6), .22, 6), DARK]);
+    parts.push([at(Cyl(1.9, 1.9, .3, 8), sx - Z.dx * 1.2, hs + .05, sz - Z.dz * 1.2), WOOD]);
+    parts.push([at(Cyl(.25, .25, .25, 6), sx + Z.dx * .3, Z.ya - .2, sz + Z.dz * .3), "#C8483A"]);
+  }
+  if (parts.length) { const m = new T.Mesh(merge(parts), vcMat); m.castShadow = !LIGHT; m.receiveShadow = true; scene.add(m); }
+}
+function ropeAt(x, z, y) {
+  let best = -999; if (y === undefined) return best;
+  for (const b of ROPES) { const rx = x - b.x, rz = z - b.z, along = rx * b.ax + rz * b.az, side = Math.abs(-rx * b.az + rz * b.ax);
+    if (Math.abs(along) > b.half || side > 1) continue; const s2 = (along + b.half) / (2 * b.half), dk = lerp(b.ya, b.yb, s2) - b.sag * 4 * s2 * (1 - s2);
+    if (y >= dk - 1.4 && y <= dk + 3) best = Math.max(best, dk); }
+  return best;
+}
+function onRopeInner(x, z, y) { for (const b of ROPES) { const rx = x - b.x, rz = z - b.z, along = rx * b.ax + rz * b.az, side = Math.abs(-rx * b.az + rz * b.ax); if (Math.abs(along) < b.half - 1.5 && side <= 1 && ropeAt(x, z, y) > -999 && y - ropeAt(x, z, y) < .5) return true; } return false; }
+const trolley = new T.Mesh(merge([[at(Cyl(.28, .28, .3, 8), 0, 0, 0), "#C8483A"], [at(Cyl(.05, .05, 1.4, 4), 0, -.8, 0), "#3A3A3A"], [at(Cyl(.06, .06, 1.2, 4).rotateZ(Math.PI / 2), 0, -1.5, 0), "#2A2A2A"]]), vcMat); trolley.visible = false; scene.add(trolley);
 
 /* ───────────────────────── Cachettes ───────────────────────── */
 await stage("Dissimulation des cachettes…");
@@ -1007,7 +1110,11 @@ const heroParts = (() => {
   return { legs, arms, body };
 })();
 const start = findSpot([0, 30], (b, h, sl, x, z) => b === B.MEADOW && sl < .3 && !COLLIDE.some(c => Math.hypot(c[0] - x, c[1] - z) < 7), 160);
-const P = { x: start[0], z: start[1], y: heightAt(start[0], start[1]), vy: 0, yaw: 0, onGround: true, swim: false, phase: 0, cave: null };
+const P = { x: start[0], z: start[1], y: heightAt(start[0], start[1]), vy: 0, yaw: 0, onGround: true, swim: false, phase: 0, cave: null, air: 1, dive: false, under: false };
+hero.rotation.order = "YXZ";
+const airEl = document.getElementById("air"), uwEl = document.getElementById("uw");
+const bubbles = new T.Points(new T.BufferGeometry().setAttribute("position", new T.Float32BufferAttribute(new Float32Array(16 * 3).fill(-999), 3)), new T.PointsMaterial({ color: lc("#DFF6FF"), size: .22, transparent: true, opacity: .8, depthWrite: false }));
+bubbles.frustumCulled = false; bubbles.visible = false; scene.add(bubbles);
 P.yaw = Math.atan2(-P.x, -P.z);
 const SPAWN = [P.x, P.z];
 
@@ -1046,7 +1153,11 @@ addEventListener("pointermove", onMove); addEventListener("pointerup", onUp); ad
 cvs.addEventListener("wheel", e => { e.preventDefault(); cam.dist = clamp(cam.dist * (e.deltaY > 0 ? 1.1 : .9), 5, 60); }, { passive: false });
 const runBtn = document.getElementById("runbtn");
 runBtn.addEventListener("click", () => { run = !run; runBtn.classList.toggle("on", run); });
-document.getElementById("jumpbtn").addEventListener("pointerdown", e => { e.preventDefault(); jumpReq = true; });
+let upHeld = false, diveHeld = false;
+{ const jb = document.getElementById("jumpbtn"), db = document.getElementById("divebtn");
+  jb.addEventListener("pointerdown", e => { e.preventDefault(); jumpReq = true; upHeld = true; });
+  db.addEventListener("pointerdown", e => { e.preventDefault(); diveHeld = true; });
+  const off = () => { upHeld = diveHeld = false; }; [jb, db].forEach(b => { b.addEventListener("pointerup", off); b.addEventListener("pointercancel", off); b.addEventListener("pointerleave", off); }); }
 
 /* ───────────────────────── Heure du jour ───────────────────────── */
 const TIMES = [
@@ -1089,6 +1200,11 @@ function drawMap(cv, zoom, cx, cz) {
   g.clearRect(0, 0, W, W); g.save(); if (cv.id === "mini") { g.beginPath(); g.arc(W / 2, W / 2, W / 2, 0, 6.283); g.clip(); }
   g.fillStyle = "#2A6F9A"; g.fillRect(0, 0, W, W); g.imageSmoothingEnabled = true;
   const [x0, y0] = toPx(-HALF, -HALF); g.drawImage(mapImg, x0, y0, W * zoom, W * zoom);
+  g.lineCap = "round"; g.strokeStyle = "#5E4228"; g.lineWidth = Math.max(2, W * .007);
+  ROPES.forEach(b => { const [x1, y1] = toPx(b.x - b.ax * b.half, b.z - b.az * b.half), [x2, y2] = toPx(b.x + b.ax * b.half, b.z + b.az * b.half); g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); });
+  g.setLineDash([W * .012, W * .01]); g.strokeStyle = "#C8483A";
+  ZIPS.forEach(Z => { const [x1, y1] = toPx(Z.sx, Z.sz), [x2, y2] = toPx(Z.bx, Z.bz); g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); }); g.setLineDash([]);
+  g.fillStyle = "#5E4228"; LADDERS.forEach(L => { const [x, y] = toPx(L.fx, L.fz); g.fillRect(x - W * .006, y - W * .006, W * .012, W * .012); });
   SPOTS.forEach(sp => { const [x, y] = toPx(sp.pos[0], sp.pos[1]); g.fillStyle = sp.found ? "#F2B84B" : "rgba(20,35,29,.85)"; g.beginPath(); g.arc(x, y, W * .026, 0, 6.283); g.fill();
     g.strokeStyle = "#F4F1E6"; g.lineWidth = W * .005; g.stroke(); g.fillStyle = sp.found ? "#14231D" : "#F4F1E6"; g.font = `800 ${W * .032}px Figtree, sans-serif`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(sp.found ? "★" : "?", x, y + 1); });
   const [px, py] = toPx(P.x, P.z); g.translate(px, py); g.rotate(-P.yaw + Math.PI); g.fillStyle = "#FFFFFF"; g.strokeStyle = "#14231D"; g.lineWidth = W * .008;
@@ -1096,7 +1212,7 @@ function drawMap(cv, zoom, cx, cz) {
   if (cv.id === "mini") { g.strokeStyle = "rgba(244,241,230,.5)"; g.lineWidth = 3; g.beginPath(); g.arc(W / 2, W / 2, W / 2 - 1.5, 0, 6.283); g.stroke(); g.fillStyle = "#F4F1E6"; g.font = "800 22px Figtree, sans-serif"; g.textAlign = "center"; g.fillText("N", W / 2, 22); }
 }
 const mini = document.getElementById("mini"), big = document.getElementById("bigmap");
-document.getElementById("legend").innerHTML = BIOMES.slice(1).map(b => `<span><i style="background:${b.ground}"></i>${b.name}</span>`).join("") + `<span><i style="background:#4FA6D0"></i>Rivières et lacs</span>`;
+document.getElementById("legend").innerHTML = BIOMES.slice(1).map(b => `<span><i style="background:${b.ground}"></i>${b.name}</span>`).join("") + `<span><i style="background:#4FA6D0"></i>Rivières et lacs</span><span><i style="background:#C8483A"></i>Tyroliennes</span><span><i style="background:#5E4228"></i>Échelles et ponts de singe</span>`;
 const sheets = { map: document.getElementById("mapsheet"), spots: document.getElementById("spotsheet") };
 function openSheet(k) { sheets[k].hidden = false; if (k === "map") drawMap(big, 1.1, 0, 0); if (k === "spots") renderSpots(); }
 document.getElementById("mapbtn").addEventListener("click", () => openSheet("map"));
@@ -1124,8 +1240,8 @@ function discover(sp) {
 }
 
 /* ───────────────────────── Déplacements : pentes, glissement, grottes, nage ───────────────────────── */
-function terrainGround(x, z) { return Math.max(heightAt(x, z), bridgeAt(x, z), floeAt(x, z), iceAt(x, z)); }
-function groundAt(x, z, y) { const c = caveAt(x, z, y); return c ? c.f : terrainGround(x, z); }
+function terrainGround(x, z, y) { return Math.max(heightAt(x, z), bridgeAt(x, z), floeAt(x, z), iceAt(x, z), ropeAt(x, z, y)); }
+function groundAt(x, z, y) { const c = caveAt(x, z, y); return c ? c.f : terrainGround(x, z, y); }
 function blocked(x, z) {
   if (Math.hypot(x, z) > 575) return true;
   for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { const l = CG.get(ckey(x + a * 8, z + b * 8)); if (l) for (const c of l) if (Math.hypot(x - c[0], z - c[1]) < c[2] + .35) return true; }
@@ -1136,7 +1252,8 @@ function canStep(nx, nz) {
   const cNow = P.cave, cNext = caveAt(nx, nz, P.y);
   if (cNow && !cNext) return terrainGround(nx, nz) <= P.y + .9;          // parois de la grotte ; on ne sort que par l'entrée
   if (!cNext && blocked(nx, nz)) return false;
-  const gn = cNext ? cNext.f : terrainGround(nx, nz), dist = Math.hypot(nx - P.x, nz - P.z) + 1e-6, rise = gn - P.y;
+  if (onRopeInner(P.x, P.z, P.y) && ropeAt(nx, nz, P.y) === -999) return false;   // les filets retiennent sur le pont de singe
+  const gn = cNext ? cNext.f : terrainGround(nx, nz, P.y), dist = Math.hypot(nx - P.x, nz - P.z) + 1e-6, rise = gn - P.y;
   if (P.swim) return rise < 1.3;
   if (!P.onGround) return rise < .3;
   return rise <= .35 || rise / dist <= MAX_CLIMB;
@@ -1150,6 +1267,33 @@ function tryMove(dx, dz) {
   if (canStep(P.x, P.z + dz)) { P.z += dz; return true; }
   return false;
 }
+// Échelles et tyroliennes : on s'y accroche en marchant vers elles
+function rideStart() {
+  if (P.rideCd > 0 || !P.onGround || P.swim) return;
+  const fx = Math.sin(P.yaw), fz = Math.cos(P.yaw);
+  for (const L of LADDERS) {
+    if (Math.hypot(P.x - L.fx, P.z - L.fz) < 1.8 && Math.abs(P.y - L.ay) < 1.6 && fx * L.ux + fz * L.uz > .35) { P.ride = { kind: "ladder", L, t: 0, dir: 1 }; return; }
+    if (Math.hypot(P.x - L.tx, P.z - L.tz) < 1.8 && Math.abs(P.y - L.by) < 1.6 && -(fx * L.ux + fz * L.uz) > .35) { P.ride = { kind: "ladder", L, t: 1, dir: -1 }; return; }
+  }
+  for (const Z of ZIPS) if (Math.hypot(P.x - Z.sx, P.z - Z.sz) < 2.4 && Math.abs(P.y - Z.hs) < 2) {
+    P.ride = { kind: "zip", Z, s: 0, v: 4, blend: 0, x0: P.x, z0: P.z, y0: P.y }; trolley.visible = true;
+    showToast("Tyrolienne", "Accrochez-vous !", `${Math.round(Z.len)} m de glisse, ${Math.round((Z.hs - heightAt(Z.bx, Z.bz)) * 12)} m de dénivelé.`); return; }
+}
+function rideStep(dt, running) {
+  const r = P.ride;
+  if (r.kind === "ladder") {
+    const L = r.L; r.t += r.dir * (running ? 5.5 : 3.4) / L.len * dt; const k = clamp(r.t, 0, 1);
+    P.x = lerp(L.ax, L.bx, k); P.z = lerp(L.az, L.bz, k); P.y = lerp(L.ay, L.by, k); P.yaw = Math.atan2(L.ux, L.uz); P.phase += dt * 3; P.vy = 0;
+    if (r.t >= 1 || r.t <= 0) { const up = r.t >= 1; P.x = up ? L.ex : L.sx; P.z = up ? L.ez : L.sz; P.y = terrainGround(P.x, P.z); P.onGround = true; P.ride = null; P.rideCd = 1.2; if (!up) P.yaw += Math.PI; }
+  } else {
+    const Z = r.Z, left = (1 - r.s) * Z.len; r.v = left < 16 ? Math.max(3.5, r.v - 14 * dt) : Math.min(22, r.v + 7 * dt);
+    r.s = Math.min(1, r.s + r.v * dt / Z.len); r.blend = Math.min(1, r.blend + dt * 2.5);
+    const cx = lerp(Z.ax, Z.bx, r.s), cz = lerp(Z.az, Z.bz, r.s), cy = zipY(Z, r.s);
+    P.x = lerp(r.x0, cx, r.blend); P.z = lerp(r.z0, cz, r.blend); P.y = lerp(r.y0, cy - 2.35, r.blend); P.yaw = Z.yaw; P.vy = 0;
+    trolley.position.set(P.x, P.y + 2.35, P.z); trolley.rotation.y = Z.yaw;
+    if (r.s >= 1) { P.x = Z.bx + Z.dx * 1.5; P.z = Z.bz + Z.dz * 1.5; P.onGround = false; P.ride = null; P.rideCd = 1.5; trolley.visible = false; }
+  }
+}
 function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
 addEventListener("resize", resize); resize();
 let last = performance.now(), hudT = 0, biomeShown = "", caveT = 0;
@@ -1162,23 +1306,35 @@ function step(now) {
   if (joy.active) { ix = joy.x; iz = -joy.y; }
   const mag = Math.min(1, Math.hypot(ix, iz)), running = keys.has("ShiftLeft") || keys.has("ShiftRight") || run || (joy.active && mag > .95);
   P.cave = caveAt(P.x, P.z, P.y);
-  const g0 = P.cave ? P.cave.f : terrainGround(P.x, P.z), wl = P.cave ? -999 : waterAt(P.x, P.z);
+  const g0 = P.cave ? P.cave.f : terrainGround(P.x, P.z, P.y), wl = P.cave ? -999 : waterAt(P.x, P.z);
   P.swim = wl > g0 + 1.1 && P.y < wl + .2;
   const speed = (running ? 15 : 7.5) * (P.swim ? .5 : 1) * (wl > g0 + .3 && !P.swim ? .75 : 1) * (P.cave ? .8 : 1);
-  if (mag > .05 && !cam.sky) {
+  P.rideCd = Math.max(0, (P.rideCd || 0) - dt);
+  const riding = !!P.ride; if (riding) rideStep(dt, running);
+  if (!riding && mag > .05 && !cam.sky) {
     const f = cam.yaw + Math.PI, dirx = Math.sin(f) * iz + Math.sin(f - Math.PI / 2) * ix, dirz = Math.cos(f) * iz + Math.cos(f - Math.PI / 2) * ix, L = Math.hypot(dirx, dirz);
     const stepLen = speed * mag * dt, n = Math.ceil(stepLen / .5);
     for (let s = 0; s < n; s++) { if (!tryMove(dirx / L * stepLen / n, dirz / L * stepLen / n)) break; P.cave = caveAt(P.x, P.z, P.y); }
     const want = Math.atan2(dirx, dirz); const d = ((want - P.yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI; P.yaw += d * Math.min(1, dt * 12);
     P.phase += dt * speed * mag * .9;
   }
+  if (!riding && mag > .05 && !cam.sky && !P.cave) rideStart();
   P.cave = caveAt(P.x, P.z, P.y);
-  const gnow = P.cave ? P.cave.f : terrainGround(P.x, P.z), wnow = P.cave ? -999 : waterAt(P.x, P.z);
+  const gnow = P.cave ? P.cave.f : terrainGround(P.x, P.z, P.y), wnow = P.cave ? -999 : waterAt(P.x, P.z);
+  if (P.ride) jumpReq = false;
+  else {
   if (jumpReq && P.onGround && !P.swim) { P.vy = 10.5; P.onGround = false; }
   jumpReq = false;
-  if (wnow > gnow + 1.1) { P.y = lerp(P.y, wnow - 1.05, Math.min(1, dt * 6)); P.vy = 0; P.onGround = true; }
+  if (wnow > gnow + 1.1) {   // nage : en surface, ou en plongée libre entre la surface et le fond
+    const surf = wnow - 1.05, down = (keys.has("KeyC") || keys.has("ControlLeft") || diveHeld) && P.air > .15, up = keys.has("Space") || upHeld;
+    if (down) P.dive = true;
+    if (P.dive && P.air > 0) { P.y = clamp(P.y + ((up ? 1 : 0) - (down ? 1 : 0)) * (running ? 8 : 5) * dt, gnow + .25, surf); if (P.y >= surf - .01 && !down) P.dive = false; }
+    else { P.dive = false; P.y = lerp(P.y, surf, Math.min(1, dt * (P.y < surf - 1 ? 1.8 : 6))); }
+    P.vy = 0; P.onGround = true;
+  }
   else if (P.onGround && P.vy <= 0 && P.y - gnow < 1.6 && P.y - gnow > -1.6) { P.y = gnow; P.vy = 0; }      // colle aux pentes, sans rebond
   else { P.vy -= 28 * dt; P.y += P.vy * dt; P.onGround = false; if (P.y <= gnow) { P.y = gnow; P.vy = 0; P.onGround = true; } }
+  }
   // Lave : retour au bord du cratère
   if ((!P.cave && Math.hypot(P.x - VOLC.x, P.z - VOLC.z) < VOLC.lavaR && P.y < VOLC.lava + .6) || (P.cave && P.cave.cv.hazard && P.cave.room && Math.hypot(P.x - P.cave.cv.room.x, P.z - P.cave.cv.room.z) < P.cave.cv.hazard)) {
     const a = Math.atan2(P.z - VOLC.z, P.x - VOLC.x);
@@ -1186,10 +1342,19 @@ function step(now) {
     else { P.x = VOLC.x + Math.cos(a) * (VOLC.cr + 6); P.z = VOLC.z + Math.sin(a) * (VOLC.cr + 6); P.y = terrainGround(P.x, P.z); }
     showToast("Attention", "Trop chaud !", "La lave vous renvoie en lieu sûr."); cam.snap = true;
   }
-  hero.position.set(P.x, P.y, P.z); hero.rotation.y = P.yaw;
+  // Sous l'eau : oxygène, nage à plat ventre, bulles
+  P.under = !P.cave && P.swim && P.y + 2.1 < wnow;
+  const air0 = P.air; P.air = clamp(P.air + (P.under ? -dt / 40 : dt / 3), 0, 1);
+  if (air0 > 0 && P.air === 0) { P.dive = false; showToast("Plongée", "Plus d'air !", "Vous remontez respirer à la surface."); }
+  airEl.hidden = P.air >= 1 && !P.under; airEl.querySelector("b").style.width = (P.air * 100).toFixed(0) + "%"; airEl.classList.toggle("low", P.air < .25);
+  hero.position.set(P.x, P.y + (P.under ? .9 : 0), P.z); hero.rotation.y = P.yaw; hero.rotation.x = lerp(hero.rotation.x, P.under ? 1.3 : 0, Math.min(1, dt * 5));
+  bubbles.visible = P.under; if (P.under) { const bp = bubbles.geometry.attributes.position; for (let k = 0; k < bp.count; k++) { let y = bp.getY(k) + dt * (1.5 + k % 3); if (y > wnow || y < P.y) { y = P.y + 1.8; bp.setX(k, P.x + Math.sin(k * 7 + t) * .4); bp.setZ(k, P.z + Math.cos(k * 5 + t) * .4); } bp.setY(k, y); } bp.needsUpdate = true; }
   const sw = Math.sin(P.phase * 2.2) * (mag > .05 ? .7 : 0) * (P.onGround ? 1 : .2);
   heroParts.legs[0].rotation.x = sw; heroParts.legs[1].rotation.x = -sw; heroParts.arms[0].rotation.x = -sw * .8; heroParts.arms[1].rotation.x = sw * .8;
   heroParts.body.position.y = 1.35 + Math.abs(Math.sin(P.phase * 2.2)) * .06 * (mag > .05 ? 1 : 0);
+  if (P.under) { const k = Math.sin(t * 7); heroParts.legs[0].rotation.x = k * .5; heroParts.legs[1].rotation.x = -k * .5; heroParts.arms[0].rotation.x = heroParts.arms[1].rotation.x = -2.6 + Math.sin(t * 3.5) * .6; }
+  if (P.ride && P.ride.kind === "ladder") { const c = Math.sin(P.phase * 2); heroParts.arms[0].rotation.x = -2.4 + c * .5; heroParts.arms[1].rotation.x = -2.4 - c * .5; heroParts.legs[0].rotation.x = -.5 - c * .4; heroParts.legs[1].rotation.x = -.5 + c * .4; }
+  else if (P.ride) { heroParts.arms[0].rotation.x = heroParts.arms[1].rotation.x = -3; heroParts.legs[0].rotation.x = .35 + Math.sin(t * 5) * .1; heroParts.legs[1].rotation.x = -.15; }
   // Ambiance de grotte : lumière du jour atténuée, lanterne allumée, lueur de la salle
   caveT = clamp(caveT + (P.cave ? 1 : -1) * dt * 1.5, 0, 1);
   sun.intensity = base.sun * (1 - .88 * caveT); hemi.intensity = base.hemi * (1 - .82 * caveT);
@@ -1218,9 +1383,10 @@ function step(now) {
       if (hit) { dist = Math.max(4, f - 1); break; }
     }
     const cx = P.x + Math.sin(cam.yaw) * Math.cos(cam.pitch) * dist, cz = P.z + Math.cos(cam.yaw) * Math.cos(cam.pitch) * dist;
-    const cy = Math.max(P.y + 1.6 + Math.sin(cam.pitch) * dist, terrainGround(cx, cz) + 1.5, waterAt(cx, cz) + .8, 1);
+    const cy = P.under ? clamp(P.y + 1.6 + Math.sin(cam.pitch) * dist, terrainGround(cx, cz) + 1, waterAt(cx, cz) - .5) : Math.max(P.y + 1.6 + Math.sin(cam.pitch) * dist, terrainGround(cx, cz) + 1.5, waterAt(cx, cz) + .8, 1);
     if (cam.snap) { camera.position.set(cx, cy, cz); cam.snap = false; } else camera.position.lerp(tmpV.set(cx, cy, cz), Math.min(1, dt * 8));
-    camera.position.y = Math.max(camera.position.y, terrainGround(camera.position.x, camera.position.z) + 1.2, waterAt(camera.position.x, camera.position.z) + .6);
+    const cwl = waterAt(camera.position.x, camera.position.z), cgr = terrainGround(camera.position.x, camera.position.z);
+    camera.position.y = P.under ? clamp(camera.position.y, cgr + .8, cwl - .4) : Math.max(camera.position.y, cgr + 1.2, cwl + .6);
     camera.lookAt(P.x, P.y + 1.7, P.z);
   }
   // Soleil et ombres qui suivent le joueur
@@ -1229,6 +1395,12 @@ function step(now) {
   const sh = cam.sky ? 330 : 75; if (sun.shadow.camera.right !== sh) { Object.assign(sun.shadow.camera, { left: -sh, right: sh, top: sh, bottom: -sh }); sun.shadow.camera.updateProjectionMatrix(); }
   sunDisc.position.copy(camera.position).addScaledVector(sd, 1700); sunDisc.lookAt(camera.position);
   sky.position.copy(camera.position); stars.position.copy(camera.position);
+  { // ambiance sous-marine : brume bleue, ciel masqué
+    const cw = waterAt(camera.position.x, camera.position.z), uw = !cam.sky && !P.cave && camera.position.y < cw - .05;
+    sky.visible = sunDisc.visible = clouds.visible = !uw; stars.visible = !uw && timeIdx === 3; uwEl.classList.toggle("on", uw);
+    if (uw) { const dpt = cw - camera.position.y; scene.fog.color.copy(lc("#2E9AB0")).lerp(lc("#0B3550"), sstep(0, 16, dpt)).multiplyScalar(timeIdx === 3 ? .3 : timeIdx === 2 ? .7 : 1); scene.fog.near = 1; scene.fog.far = LIGHT ? 55 : 85; scene.background = scene.fog.color; }
+    else if (scene.fog.near !== 180) { scene.fog.color.copy(lc(TIMES[timeIdx].fog)); scene.fog.near = 180; scene.fog.far = 1150; scene.background = null; }
+  }
   // Animations d'ambiance
   WATER_MATS.forEach(m => { m.uniforms.time.value = t; }); lavaMat.uniforms.time.value = t; fallTex.offset.y += dt * 1.6;
   clouds.rotation.y += dt * .004; mist.rotation.y = Math.sin(t * .05) * .01;
@@ -1243,10 +1415,10 @@ function step(now) {
   if (toastT > 0) { toastT -= dt; if (toastT <= 0) document.getElementById("toast").classList.remove("show"); }
   hudT -= dt;
   if (hudT <= 0) { hudT = .2;
-    const bh = biomeAt(P.x, P.z), b = P.cave ? P.cave.cv.name : floeAt(P.x, P.z) > -1 || iceAt(P.x, P.z) > -1 ? "Banquise" : P.swim ? (wnow === LAKE.level ? "Lac du Col" : wnow === 0 ? ([B.LAGOON, B.KELP, B.PACKICE, B.REEF].includes(bh) ? BIOMES[bh].name : "En mer") : "Rivière") : BIOMES[bh].name;
+    const bh = biomeAt(P.x, P.z), b = P.under ? "Plongée · " + BIOMES[bh].name : P.ride ? (P.ride.kind === "zip" ? "Tyrolienne" : "Échelle") : onRopeInner(P.x, P.z, P.y) ? "Pont de singe" : P.cave ? P.cave.cv.name : floeAt(P.x, P.z) > -1 || iceAt(P.x, P.z) > -1 ? "Banquise" : P.swim ? (wnow === LAKE.level ? "Lac du Col" : wnow === 0 ? ([B.LAGOON, B.KELP, B.PACKICE, B.REEF].includes(bh) ? BIOMES[bh].name : "En mer") : "Rivière") : BIOMES[bh].name;
     if (b !== biomeShown) { document.getElementById("biome").textContent = b; biomeShown = b; }
     const n = SPOTS.filter(s => s.found).length;
-    document.getElementById("alt").textContent = `Altitude ${Math.max(0, Math.round(P.y * 12))} m · ${n} cachette${n > 1 ? "s" : ""} trouvée${n > 1 ? "s" : ""}`;
+    document.getElementById("alt").textContent = `${P.under ? "Profondeur " + Math.max(0, Math.round((waterAt(P.x, P.z) - P.y - 1.05) * 12)) : "Altitude " + Math.max(0, Math.round(P.y * 12))} m · ${n} cachette${n > 1 ? "s" : ""} trouvée${n > 1 ? "s" : ""}`;
     drawMap(mini, 6.2, P.x, P.z);
     if (!sheets.map.hidden) drawMap(big, 1.1, 0, 0);
   }
@@ -1254,6 +1426,6 @@ function step(now) {
 }
 document.getElementById("loading").hidden = true;
 requestAnimationFrame(step);
-window.__island = { P, SPOTS, cam, CAVES, setTime: i => { timeIdx = i; applyTime(); } };
+window.__island = { P, SPOTS, cam, CAVES, LADDERS, ZIPS, ROPES, setTime: i => { timeIdx = i; applyTime(); } };
 }
 </script>
