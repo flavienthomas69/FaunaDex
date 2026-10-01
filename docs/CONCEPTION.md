@@ -451,9 +451,18 @@ CREATE TABLE capture_variants (
 - **Événements** : fenêtres datées (« Grande migration d'automne » du 22 septembre au 21 décembre) qui ajoutent des quêtes et des multiplicateurs (×2 sur les migrateurs, liste tirée des traits d'espèce).
 - **Heure et météo** : calculées côté serveur à partir de la position et de l'heure de la photo. La nuit est définie par le coucher et le lever du soleil au lieu de la capture ; la météo vient d'une API météo historique (Open-Meteo, par exemple). Bonus : +50 % pour une espèce nocturne photographiée de nuit, +50 % sous la pluie. Le client ne déclare jamais ces conditions lui-même.
 
-### 2.10 Sanctuaire
+### 2.10 Cartes de collection
 
-Partie retirée pour être entièrement reconçue : sanctuaire, compagnon, décor scanné, nourriture et bien-être, météo-morphisme et rendu 3D. L'ancienne version reste consultable dans l'historique Git (branche `claude/gracious-curie-c4snps`, avant le commit « Suppression complète du Sanctuaire »).
+Le sanctuaire (île 3D explorable, compagnon, décor) est abandonné. À la place, chaque espèce débloquée donne une **carte à collectionner**.
+
+- **Quand** : à la première capture d'une espèce, et à chaque nouvelle variante « shiny » (§2.7). Une simple observation supplémentaire ne crée pas de carte.
+- **Révélation** : la carte arrive face cachée, se retourne, puis va dans le classeur. Les badges et quêtes débloqués par la même capture s'affichent ensuite.
+- **Contenu** : nom, nom scientifique, numéro, photo du joueur (ou illustration), famille et milieu, trois caractéristiques, une anecdote, statut UICN, date et lieu de capture.
+- **Habillage** : le cadre prend la couleur de la rareté (§2.7). Les cartes épiques, légendaires et celles qui ont une variante sont holographiques.
+- **Classeur** : onglet « Cartes » de la collection, avec les cartes obtenues et les emplacements à découvrir, filtrables (obtenues, rares et plus, variantes). Une carte s'ouvre en grand et se retourne au toucher.
+- **Données** : aucune table en plus. La carte se déduit de `captures` (première capture, variantes) et de la fiche espèce ; seule l'image de carte partagée est générée à la demande.
+
+L'ancienne île 3D reste consultable dans l'historique Git (branche `claude/gracious-curie-c4snps`, avant le commit « Abandon du sanctuaire au profit des cartes de collection »).
 
 ---
 
